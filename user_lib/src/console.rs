@@ -1,15 +1,15 @@
-use crate::sbi::console_putchar;
-use core::{
-    arch::asm,
-    cell::UnsafeCell,
-    fmt::{self, Write},
-};
+use core::fmt::{self, Write};
+
+use crate::write;
 
 struct OUT;
 
+// 标识符
+const STDOUT: usize = 1;
+
 impl Write for OUT {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        s.chars().for_each(|c| console_putchar(c as usize));
+        write(STDOUT, s.as_bytes());
         Ok(())
     }
 }

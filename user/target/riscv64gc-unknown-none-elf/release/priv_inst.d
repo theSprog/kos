@@ -1,0 +1,1 @@
+/home/mrfan/Rust/kos/user/target/riscv64gc-unknown-none-elf/release/priv_inst: /home/mrfan/Rust/kos/user/src/priv_inst.rs /home/mrfan/Rust/kos/user_lib/src/console.rs /home/mrfan/Rust/kos/user_lib/src/lang_items.rs /home/mrfan/Rust/kos/user_lib/src/lib.rs /home/mrfan/Rust/kos/user_lib/src/syscall.rs
