@@ -2,11 +2,11 @@ use crate::batch::{self, *};
 use crate::trap;
 use crate::{debug, info, println};
 
-pub(crate) fn init() {
+pub fn init() {
     print_banner();
     clear_bss();
 
-    trap::init();   
+    trap::init();
     batch::init();
     batch::run_apps();
 }
