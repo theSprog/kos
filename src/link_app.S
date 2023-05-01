@@ -1,5 +1,5 @@
 
-    .align 3
+    .align 3    # 按照 2^3 = 8字节 对齐
     .section .data
     .global _num_app
 _num_app:

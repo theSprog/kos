@@ -8,6 +8,8 @@ mod batch;
 mod init;
 mod lang_items;
 mod sbi;
+mod syscall;
+mod trap;
 mod unicore;
 
 #[macro_use]
@@ -18,12 +20,14 @@ use crate::init::*;
 use core::arch::{asm, global_asm};
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_app.S"));
 
 const LOG_LEVEL: LogLevel = LogLevel::TRACE;
 
 #[no_mangle]
-pub fn entry() -> ! {
+pub fn main() -> ! {
     init();
+
     println!("Hello, world!");
     panic!("goodbye world!");
 }

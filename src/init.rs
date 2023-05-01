@@ -1,10 +1,14 @@
-use crate::batch::*;
+use crate::batch::{self, *};
+use crate::trap;
 use crate::{debug, info, println};
 
 pub(crate) fn init() {
     print_banner();
     clear_bss();
-    print_app_info();
+
+    trap::init();   
+    batch::init();
+    batch::run_apps();
 }
 
 pub(crate) fn clear_bss() {

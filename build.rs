@@ -28,11 +28,19 @@ fn insert_app_data() -> Result<()> {
     // 按照首字母排序
     apps.sort();
 
+    // 最多容纳 16 个 app, 详情见 src/batch.rs 中的 MAX_APP_NUM 常量
+    if apps.len() > 16 {
+        panic!(
+            "There cannot place so many applications({}), it is maximum of 16 applications",
+            apps.len()
+        );
+    }
+
     // 向 link_app.S 中写入内容
     writeln!(
         f,
         r#"
-    .align 3
+    .align 3    # 按照 2^3 = 8字节 对齐
     .section .data
     .global _num_app
 _num_app:

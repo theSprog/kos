@@ -10,7 +10,7 @@ fn main() -> i32 {
     println!("Try to execute privileged instruction in U Mode");
     println!("Kernel should kill this application!");
     unsafe {
-        asm!("sret");
+        asm!("sret"); // U mode 执行高特权级指令
     }
     0
 }
