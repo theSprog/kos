@@ -1,12 +1,14 @@
 #![no_main]
 #![no_std]
+#![feature(panic_info_message)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
-#![feature(panic_info_message)]
 
+mod batch;
 mod init;
 mod lang_items;
 mod sbi;
+mod unicore;
 
 #[macro_use]
 mod console;

@@ -8,6 +8,10 @@ pub mod console;
 mod lang_items;
 mod syscall;
 
+use console::LogLevel;
+use syscall::*;
+const LOG_LEVEL: LogLevel = LogLevel::WARN;
+
 // 应用程序入口点
 #[no_mangle]
 #[link_section = ".text.entry"]
@@ -38,8 +42,6 @@ fn clear_bss() {
         (addr as *mut u8).write_volatile(0);
     });
 }
-
-use syscall::*;
 
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)

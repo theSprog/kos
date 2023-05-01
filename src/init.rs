@@ -1,8 +1,10 @@
+use crate::batch::*;
 use crate::{debug, info, println};
 
 pub(crate) fn init() {
     print_banner();
     clear_bss();
+    print_app_info();
 }
 
 pub(crate) fn clear_bss() {
