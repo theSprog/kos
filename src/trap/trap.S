@@ -17,6 +17,7 @@ __alltraps:
     # 在这一行之前:sp 指向用户栈，sscratch 指向内核栈
     csrrw sp, sscratch, sp  
     # 现在: sp 指向内核栈，sscratch 指向用户栈
+
     # 分配一个 TrapContext 的内容 : 32 个通用寄存器 + sepc + Sstatus
     addi sp, sp, -34*8
 
@@ -56,9 +57,9 @@ __alltraps:
 
 # 从 trap_handler 返回后就会直接顺势从 __restore 继续执行, 我们用此恢复上下文
 __restore:
-    # case1: start running app by __restore
-    # case2: back to U after handling trap
-    mv sp, a0
+    # case1: 使用 __restore 来运行 app
+    # case2: 返回用户态
+    # mv sp, a0
     # 目前 sp 指向 kernel-stack, 而 sscratch 指向 user-stack
     # 每恢复一个寄存器，该寄存器就不能再使用，因此需要先恢复 CSR 寄存器
     ld t0, 32*8(sp) # sstatus

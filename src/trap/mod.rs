@@ -6,7 +6,7 @@ use riscv::register::{
     utvec::TrapMode,
 };
 
-use crate::{batch::run_apps, println, syscall::syscall, warn};
+use crate::{info, println, syscall::syscall, warn};
 
 use self::context::TrapContext;
 
@@ -16,6 +16,7 @@ global_asm!(include_str!("trap.S"));
 
 // 设置发生 trap 时的模式和地址, 自此以后我们就有用户态与内核态的区分了
 pub fn init() {
+    info!("Trap Initialization");
     // 外部符号 __alltraps, 发生 tarp 后跳转到其中
     extern "C" {
         fn __alltraps();
@@ -42,17 +43,16 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
         // 如果是来自内存访问错误，包括低特权级访问高特权级寄存器
         Trap::Exception(Exception::StoreFault) => {
             warn!("[kernel] StoreFault in application, kernel killed it.");
-            run_apps();
+            panic!();
         }
         Trap::Exception(Exception::StorePageFault) => {
             warn!("[kernel] StorePageFault in application, kernel killed it.");
-            run_apps();
+            panic!();
         }
-
         // 如果是来自非法指令, 例如用户态下 sret
         Trap::Exception(Exception::IllegalInstruction) => {
             warn!("[kernel] IllegalInstruction in application, kernel killed it.");
-            run_apps();
+            panic!();
         }
         _ => {
             panic!(

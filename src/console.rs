@@ -61,7 +61,7 @@ macro_rules! log {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {
-        if crate::console::LogLevel::ERROR >= crate::LOG_LEVEL {
+        if $crate::console::LogLevel::ERROR >= $crate::LOG_LEVEL {
             crate::log!(crate::console::Color::Red, "ERROR", $($arg)*)
         }
     }
@@ -70,7 +70,7 @@ macro_rules! error {
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        if  crate::console::LogLevel::WARN >= crate::LOG_LEVEL{
+        if  $crate::console::LogLevel::WARN >= $crate::LOG_LEVEL{
             crate::log!(crate::console::Color::Yellow, "WARN", $($arg)*)
         }
     }
@@ -79,7 +79,7 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {
-        if crate::console::LogLevel::INFO >= crate::LOG_LEVEL {
+        if $crate::console::LogLevel::INFO >= $crate::LOG_LEVEL {
             crate::log!(crate::console::Color::Blue, "INFO", $($arg)*)
         }
     }
@@ -88,7 +88,7 @@ macro_rules! info {
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {
-        if crate::console::LogLevel::DEBUG >= crate::LOG_LEVEL {
+        if $crate::console::LogLevel::DEBUG >= $crate::LOG_LEVEL {
             crate::log!(crate::console::Color::Green, "DEBUG", $($arg)*)
         }
     }
@@ -97,7 +97,7 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! trace {
     ($($arg:tt)*) => {
-        if crate::console::LogLevel::TRACE >= crate::LOG_LEVEL {
+        if $crate::console::LogLevel::TRACE >= $crate::LOG_LEVEL {
             crate::log!(crate::console::Color::Gray, "TRACE", $($arg)*)
         }
     }

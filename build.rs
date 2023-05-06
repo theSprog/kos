@@ -17,7 +17,6 @@ fn insert_app_data() -> Result<()> {
     let mut f = File::create(SCRIPT_PATH).unwrap();
     let mut apps: Vec<_> = read_dir(BIN_PATH)
         .unwrap()
-        .into_iter()
         .map(|dir_entry| {
             let mut name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
             name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());

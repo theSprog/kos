@@ -4,12 +4,16 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-pub mod batch;
+#[macro_use]
+extern crate lazy_static;
+
 pub mod console;
 pub mod init;
 pub mod lang_items;
+pub mod loader;
 pub mod sbi;
 pub mod syscall;
+pub mod task;
 pub mod trap;
 pub mod unicore;
 

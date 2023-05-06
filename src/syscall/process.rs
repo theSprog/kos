@@ -1,7 +1,15 @@
-use crate::{batch::run_apps, info, println};
+use crate::task::{exit_and_run_next, suspend_and_run_next};
+use crate::{info, println};
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
-    info!("[kernel] Application exited with code {}\n", exit_code);
-    run_apps() // 批处理系统上一个任务处理完后又要继续处理下一个任务
+    println!("[kernel] Application exited with code {}", exit_code);
+    exit_and_run_next();
+    panic!("Unreachable in sys_exit!");
+}
+
+pub fn sys_yield() -> isize {
+    // 处理方式就是挂起当前，并且运行下一个
+    suspend_and_run_next();
+    0
 }

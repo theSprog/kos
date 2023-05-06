@@ -15,19 +15,13 @@ debug = true
 
 # -----------------------------------------
 [[bin]]
-name = "hello"
-path = "src/hello.rs"
-
-# 执行高优先级指令，应该被 kill
-[[bin]]
-name = "priv_inst"
-path = "src/priv_inst.rs"
-
-# 执行 0 地址写入，应该被 kill
-[[bin]]
-name = "store_fault"
-path = "src/store_fault.rs"
+name = "write_a"
+path = "src/write_a.rs"
 
 [[bin]]
-name = "power"
-path = "src/power.rs"
+name = "write_b"
+path = "src/write_b.rs"
+
+[[bin]]
+name = "write_c"
+path = "src/write_c.rs"

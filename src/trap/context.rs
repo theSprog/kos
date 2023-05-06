@@ -19,6 +19,7 @@ impl TrapContext {
     }
 
     /// init app context
+    /// entry: app 入口, 即第一条指令地址
     pub fn app_init_context(entry: usize, sp: usize) -> Self {
         // CSR sstatus
         let sstatus = sstatus::read();
