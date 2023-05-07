@@ -1,17 +1,17 @@
+pub mod context;
+pub mod switch;
+
 use crate::{
+    config::*,
     debug, info,
-    loader::MAX_APP_NUM,
-    loader::{get_num_app, init_app_ctx},
+    loader::{get_num_app, init_app_ctx, KernelStack, UserStack},
     sbi::shutdown,
     unicore::UPSafeCell,
 };
 
 use self::context::TaskContext;
 
-pub mod context;
-pub mod switch;
-
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TaskStatus {
     UnInit,  // 未初始化
     Ready,   // 准备运行
@@ -19,13 +19,35 @@ pub enum TaskStatus {
     Died,    // 已退出
 }
 
+pub static KERNEL_STACKS: [KernelStack; MAX_APP_NUM] = [KernelStack {
+    data: [0; KERNEL_STACK_SIZE],
+}; MAX_APP_NUM];
+
+pub static USER_STACKS: [UserStack; MAX_APP_NUM] = [UserStack {
+    data: [0; USER_STACK_SIZE],
+}; MAX_APP_NUM];
+
 // Task Control Block, 任务控制块
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TCB {
     pub task_status: TaskStatus,
     pub task_cx: TaskContext,
+    pub user_stack: Option<&'static UserStack>,
+    pub kernel_stack: Option<&'static KernelStack>,
 }
 
+impl TCB {
+    pub fn new() -> TCB {
+        TCB {
+            task_status: TaskStatus::UnInit,
+            task_cx: TaskContext::default(),
+            user_stack: None,
+            kernel_stack: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 struct TaskManagerInner {
     tasks: [TCB; MAX_APP_NUM],
     current_task_idx: usize,
@@ -41,17 +63,38 @@ lazy_static! {
         let num_app = get_num_app();
         info!("APP_NUM: {}", num_app);
 
-        let mut tasks = [TCB {
-            task_cx: TaskContext::default(),
-            task_status: TaskStatus::UnInit,
-        }; MAX_APP_NUM];
+        {
+            let kernel_stack_start = KERNEL_STACKS[0].data.as_ptr() as usize;
+            let kernel_stack_end = KERNEL_STACKS.last().unwrap().get_sp();
+            let kernel_stack_size = kernel_stack_end - kernel_stack_start;
+
+            debug!("Kernel-Stack Address: [0x{:x}..0x{:x}), size: 0x{:x}",
+            kernel_stack_start,
+            kernel_stack_end,
+            kernel_stack_size);
+
+            let user_stack_start = USER_STACKS[0].data.as_ptr() as usize;
+            let user_stack_end = USER_STACKS.last().unwrap().get_sp();
+            let user_stack_size = user_stack_end - user_stack_start;
+
+            debug!("User-Stack Address: [0x{:x}..0x{:x}), size: 0x{:x}",
+            user_stack_start,
+            user_stack_end,
+            user_stack_size);
+        }
+
+
+        let mut tasks = [TCB::new(); MAX_APP_NUM];
+
 
         // 初始化, 但只初始化前 num_app 个
         tasks.iter_mut().take(num_app).enumerate().for_each(|task_pack| {
             let (app_id, task) = task_pack;
             info!("Init app {}", app_id);
+            task.kernel_stack = Some(&KERNEL_STACKS[app_id]);
+            task.user_stack = Some(&USER_STACKS[app_id]);
             // 将 ra 设置为 __restore 地址, 返回时 jmp 到该地方开始回到用户态
-            task.task_cx = TaskContext::goto_restore(init_app_ctx(app_id));
+            task.task_cx = TaskContext::goto_restore(init_app_ctx(task, app_id));
             task.task_status = TaskStatus::Ready;
         });
 
@@ -77,7 +120,10 @@ impl TaskManager {
             .take(get_num_app())
             .enumerate()
         {
-            debug!("app_id: {}, task: {:#?}", app_id, task);
+            debug!(
+                "app_id: {}, task_cx: {:#x?}, task_status: {:?}",
+                app_id, task.task_cx, task.task_status
+            );
         }
     }
 
@@ -105,6 +151,8 @@ impl TaskManager {
         let next_end = next_start + self.num_app;
 
         // 在 [next_start, next_end) 区间查找
+        // 有可能没有其他任务可调度, 从而再次调度当前(current)任务
+        // 因为 (next_end - 1) % num_app = current
         for app_id in next_start..next_end {
             let app_id = app_id % self.num_app;
             if inner.tasks[app_id].task_status == TaskStatus::Ready {
@@ -146,7 +194,7 @@ impl TaskManager {
     }
 
     fn start(&self) -> ! {
-        info!("now we starting app(s)!");
+        info!("Now we starting app(s)!");
 
         let mut inner = self.inner.exclusive_access();
         assert!(!inner.tasks.is_empty());
@@ -184,6 +232,7 @@ impl TaskManager {
 
 // 公有接口
 pub fn start() {
+    // TASK_MANAGER.print_task_info();
     TASK_MANAGER.start();
 }
 

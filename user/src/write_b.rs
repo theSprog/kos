@@ -6,8 +6,8 @@ extern crate user_lib;
 
 use user_lib::yield_;
 
-const WIDTH: usize = 10;
-const HEIGHT: usize = 2;
+const WIDTH: usize = 20;
+const HEIGHT: usize = 5;
 
 #[no_mangle]
 fn main() -> i32 {

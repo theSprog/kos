@@ -1,21 +1,12 @@
 use core::arch::asm;
 
-use crate::{debug, info, sbi::shutdown, trap::context::TrapContext, unicore::UPSafeCell};
+use crate::{
+    config::*, debug, info, sbi::shutdown, task::TCB, trap::context::TrapContext,
+    unicore::UPSafeCell,
+};
 
-// 用户栈大小, 8K
-pub const USER_STACK_SIZE: usize = 4096 * 2;
-// 内核栈大小, 8K
-pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
-// 最多允许 16 个 app
-pub const MAX_APP_NUM: usize = 16;
-// 起始基地址
-pub const BASE_ADDRESS: usize = 0x80400000;
-// 每个 app 的 size 上限, 128K
-pub const APP_SIZE_LIMIT: usize = 0x20000;
-
-// 内核栈, .bss 段中
 #[repr(align(4096))]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct KernelStack {
     pub(crate) data: [u8; KERNEL_STACK_SIZE],
 }
@@ -30,6 +21,7 @@ impl KernelStack {
         // 预留栈空间
         let cx_ptr = (self.get_sp() - core::mem::size_of::<TrapContext>()) as *mut TrapContext;
         unsafe {
+            // 将内容放进预留的空间中
             *cx_ptr = cx;
         }
         cx_ptr as usize
@@ -37,12 +29,12 @@ impl KernelStack {
 
     // 获取栈顶地址, 即数组结尾
     pub fn get_sp(&self) -> usize {
-        KERNEL_STACK_SIZE + self.data.as_ptr() as usize
+        self.data.as_ptr() as usize + KERNEL_STACK_SIZE
     }
 }
-// 用户程序栈, .bss 段中
+
 #[repr(align(4096))]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct UserStack {
     pub(crate) data: [u8; USER_STACK_SIZE],
 }
@@ -55,19 +47,11 @@ impl UserStack {
     }
     // 获取栈顶地址, 即数组结尾
     pub fn get_sp(&self) -> usize {
-        USER_STACK_SIZE + self.data.as_ptr() as usize
+        self.data.as_ptr() as usize + USER_STACK_SIZE
     }
 }
 
-pub static KERNEL_STACKS: [KernelStack; MAX_APP_NUM] = [KernelStack {
-    data: [0; KERNEL_STACK_SIZE],
-}; MAX_APP_NUM];
-
-pub static USER_STACKS: [UserStack; MAX_APP_NUM] = [UserStack {
-    data: [0; USER_STACK_SIZE],
-}; MAX_APP_NUM];
-
-// 获取 app 的内存起始地址
+// 获取 app 对应的内存起始地址
 #[inline]
 pub fn get_app_base(app_id: usize) -> usize {
     BASE_ADDRESS + app_id * APP_SIZE_LIMIT
@@ -82,11 +66,15 @@ pub fn get_num_app() -> usize {
 }
 
 // 将 app_id 初始化并且返回 context 地址
-pub fn init_app_ctx(app_id: usize) -> usize {
-    KERNEL_STACKS[app_id].push_context(TrapContext::app_init_context(
-        get_app_base(app_id),
-        USER_STACKS[app_id].get_sp(),
-    ))
+pub fn init_app_ctx(tcb: &TCB, app_id: usize) -> usize {
+    if let (Some(kernel_stack), Some(user_stack)) = (tcb.kernel_stack, tcb.user_stack) {
+        return kernel_stack.push_context(TrapContext::app_init_context(
+            get_app_base(app_id),
+            user_stack.get_sp(),
+        ));
+    }
+
+    panic!("kernel_stack or user_stack is not initialized!");
 }
 
 pub struct AppManager {
@@ -132,14 +120,25 @@ impl AppManager {
             debug!(
                 // 我们暂时使用内存模拟硬盘
                 // app 硬盘地址是一个左闭右开的区间
-                "[kernel] hard-disk address: app-{} [ {:#x}, {:#x} )",
+                "[kernel] hard-disk address: app-{} [{:#x}, {:#x}), size: 0x{:x}",
                 i,
                 self.app_start[i],
-                self.app_start[i + 1]
+                self.app_start[i + 1],
+                self.app_start[i + 1] - self.app_start[i]
             );
         }
     }
 
+    // 一次性加载所有程序
+    pub fn load_apps(&self) {
+        // 加载所有 app
+        for app_id in 0..self.num_app {
+            let app_base = BASE_ADDRESS + app_id * APP_SIZE_LIMIT;
+            unsafe {
+                self.load_app(app_id, app_base, APP_SIZE_LIMIT);
+            }
+        }
+    }
     // batch 批处理形式加载程序
     // 将指定 app_id 的应用程序加载到 [start..start+len) 这块地址上
     // 这需要保证 源app文件 在链接时也指定自己应该放进这块地址
@@ -175,21 +174,11 @@ impl AppManager {
         app_dst.copy_from_slice(app_src);
         asm!("fence.i");
     }
-
-    // 一次性加载所有程序
-    pub fn load_apps(&self) {
-        // 加载所有 app
-        for app_id in 0..self.num_app {
-            let app_base = BASE_ADDRESS + app_id * APP_SIZE_LIMIT;
-            unsafe {
-                self.load_app(app_id, app_base, APP_SIZE_LIMIT);
-            }
-        }
-    }
 }
 
 pub fn init() {
     info!("Loader Initialization");
     APP_MANAGER.exclusive_access().print_app_info();
     APP_MANAGER.exclusive_access().load_apps();
+    info!("App(s) loaded successfully")
 }

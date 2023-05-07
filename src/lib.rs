@@ -7,6 +7,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+pub mod config;
 pub mod console;
 pub mod init;
 pub mod lang_items;
@@ -16,6 +17,7 @@ pub mod syscall;
 pub mod task;
 pub mod trap;
 pub mod unicore;
+pub mod util;
 
 use crate::console::LogLevel;
 use console::*;

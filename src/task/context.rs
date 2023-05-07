@@ -1,6 +1,6 @@
 // 按照 C 方式解释，编译器不得重排它们
 #[repr(C)]
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct TaskContext {
     // 返回地址，__switch 最后一句代码需要用到它
     ra: usize,

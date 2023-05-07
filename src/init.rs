@@ -20,7 +20,7 @@ pub(crate) fn clear_bss() {
     // 将 bss 清零
     let bss_start = sbss as usize;
     let bss_end = ebss as usize;
-    info!("bss_start:{}, bss_end:{}", bss_start, bss_end);
+    info!("bss_start:0x{:x}, bss_end:0x{:x}", bss_start, bss_end);
     for bit_addr in bss_start..bss_end {
         unsafe { (bit_addr as *mut u8).write_volatile(0u8) }
     }

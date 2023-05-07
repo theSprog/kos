@@ -2,7 +2,7 @@
 
 use core::arch::asm;
 
-use crate::println;
+use crate::error;
 
 const SBI_SET_TIMER: usize = 0;
 const SBI_CONSOLE_PUTCHAR: usize = 1;
@@ -43,7 +43,7 @@ pub fn console_getchar() -> usize {
 
 pub fn shutdown() -> ! {
     sbi_call(SBI_SHUTDOWN, 0, 0, 0);
-    println!("cannot be here");
+    error!("cannot be here");
     // 最后的防线如果不关机，就自旋
     loop {}
 }

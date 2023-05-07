@@ -1,6 +1,6 @@
 import os
 
-base_address = 0x80400000
+base_address = 0x82000000
 step = 0x20000
 linker = 'src/linker.ld'
 
@@ -8,6 +8,7 @@ app_id = 0
 apps = os.listdir('./src')
 apps.remove('linker.ld')
 apps.sort()
+
 for app in apps:
     app = app[:app.rfind('.')]
     print('processing app "%s"' % app)
@@ -16,7 +17,11 @@ for app in apps:
         end_addr = base_address + step * (app_id+1)
 
         ori_content = f.read()
-        new_content = ori_content.replace(hex(base_address), hex(start_addr))
+        new_content = ori_content.replace("PENDING_ADDRESS", hex(start_addr))
+
+        # 如果替换失败
+        if ori_content == new_content:
+            raise RuntimeError("replace address failed")
 
         f.seek(0)
         f.truncate()  # 清空文件内容

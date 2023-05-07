@@ -77,9 +77,10 @@ __restore:
         LOAD_GP %n
         .set n, n+1
     .endr
-    # 释放 TrapContext 上下文空间
+    # 必须释放 TrapContext 上下文空间, 否则变相内存泄露
     addi sp, sp, 34*8
     # 目前 sp 指向内核栈, sscratch 指向用户栈
     # 再次交换 sp 和 sscratch
     csrrw sp, sscratch, sp
+    # 现在 sp 指向用户栈, sscratch 指向内核栈
     sret

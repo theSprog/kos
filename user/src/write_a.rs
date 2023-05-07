@@ -6,8 +6,8 @@ extern crate user_lib;
 
 use user_lib::yield_;
 
-const WIDTH: usize = 10;
-const HEIGHT: usize = 5;
+const WIDTH: usize = 20;
+const HEIGHT: usize = 6;
 
 #[no_mangle]
 fn main() -> i32 {
@@ -18,6 +18,6 @@ fn main() -> i32 {
         println!(" [{}/{}]", i + 1, HEIGHT);
         yield_();
     }
-    println!("App write_a already OK!");
+    println!("App write_a OK and exit!");
     0
 }
