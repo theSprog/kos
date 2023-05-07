@@ -1,15 +1,16 @@
 pub mod context;
+pub mod stack;
 pub mod switch;
 
 use crate::{
     config::*,
     debug, info,
-    loader::{get_num_app, init_app_ctx, KernelStack, UserStack},
+    loader::{get_num_app, init_app_ctx},
     sbi::shutdown,
     unicore::UPSafeCell,
 };
 
-use self::context::TaskContext;
+use self::{context::TaskContext, stack::*};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TaskStatus {
@@ -18,14 +19,6 @@ pub enum TaskStatus {
     Running, // 正在运行
     Died,    // 已退出
 }
-
-pub static KERNEL_STACKS: [KernelStack; MAX_APP_NUM] = [KernelStack {
-    data: [0; KERNEL_STACK_SIZE],
-}; MAX_APP_NUM];
-
-pub static USER_STACKS: [UserStack; MAX_APP_NUM] = [UserStack {
-    data: [0; USER_STACK_SIZE],
-}; MAX_APP_NUM];
 
 // Task Control Block, 任务控制块
 #[derive(Clone, Copy, Debug)]
@@ -68,18 +61,22 @@ lazy_static! {
             let kernel_stack_end = KERNEL_STACKS.last().unwrap().get_sp();
             let kernel_stack_size = kernel_stack_end - kernel_stack_start;
 
-            debug!("Kernel-Stack Address: [0x{:x}..0x{:x}), size: 0x{:x}",
+            debug!("Kernel-Stacks Address:\t [0x{:x}..0x{:x}), single_size:0x{:x}, num:{}, total_size: 0x{:x}",
             kernel_stack_start,
             kernel_stack_end,
+            kernel_stack_size / MAX_APP_NUM,
+            MAX_APP_NUM,
             kernel_stack_size);
 
             let user_stack_start = USER_STACKS[0].data.as_ptr() as usize;
             let user_stack_end = USER_STACKS.last().unwrap().get_sp();
             let user_stack_size = user_stack_end - user_stack_start;
 
-            debug!("User-Stack Address: [0x{:x}..0x{:x}), size: 0x{:x}",
+            debug!("User-Stacks Address:\t [0x{:x}..0x{:x}), single_size:0x{:x}, num:{}, total_size: 0x{:x}",
             user_stack_start,
             user_stack_end,
+            user_stack_size / MAX_APP_NUM,
+            MAX_APP_NUM,
             user_stack_size);
         }
 
@@ -121,8 +118,8 @@ impl TaskManager {
             .enumerate()
         {
             debug!(
-                "app_id: {}, task_cx: {:#x?}, task_status: {:?}",
-                app_id, task.task_cx, task.task_status
+                "app_id: {}, task_status: {:?}, task_cx: {:#x?}",
+                app_id, task.task_status, task.task_cx
             );
         }
     }
@@ -232,7 +229,7 @@ impl TaskManager {
 
 // 公有接口
 pub fn start() {
-    // TASK_MANAGER.print_task_info();
+    TASK_MANAGER.print_task_info();
     TASK_MANAGER.start();
 }
 

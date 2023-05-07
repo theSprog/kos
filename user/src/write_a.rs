@@ -4,6 +4,8 @@
 #[macro_use]
 extern crate user_lib;
 
+use core::arch::asm;
+
 use user_lib::yield_;
 
 const WIDTH: usize = 20;
@@ -17,6 +19,10 @@ fn main() -> i32 {
         }
         println!(" [{}/{}]", i + 1, HEIGHT);
         yield_();
+    }
+    unsafe {
+        println!("A will execute illegal instruction");
+        asm!("sret");
     }
     println!("App write_a OK and exit!");
     0

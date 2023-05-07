@@ -5,56 +5,10 @@ use crate::{
     unicore::UPSafeCell,
 };
 
-#[repr(align(4096))]
-#[derive(Copy, Clone, Debug)]
-pub struct KernelStack {
-    pub(crate) data: [u8; KERNEL_STACK_SIZE],
-}
-impl KernelStack {
-    pub fn new() -> KernelStack {
-        KernelStack {
-            data: [0; KERNEL_STACK_SIZE],
-        }
-    }
-
-    pub fn push_context(&self, cx: TrapContext) -> usize {
-        // 预留栈空间
-        let cx_ptr = (self.get_sp() - core::mem::size_of::<TrapContext>()) as *mut TrapContext;
-        unsafe {
-            // 将内容放进预留的空间中
-            *cx_ptr = cx;
-        }
-        cx_ptr as usize
-    }
-
-    // 获取栈顶地址, 即数组结尾
-    pub fn get_sp(&self) -> usize {
-        self.data.as_ptr() as usize + KERNEL_STACK_SIZE
-    }
-}
-
-#[repr(align(4096))]
-#[derive(Copy, Clone, Debug)]
-pub struct UserStack {
-    pub(crate) data: [u8; USER_STACK_SIZE],
-}
-
-impl UserStack {
-    pub fn new() -> UserStack {
-        UserStack {
-            data: [0; USER_STACK_SIZE],
-        }
-    }
-    // 获取栈顶地址, 即数组结尾
-    pub fn get_sp(&self) -> usize {
-        self.data.as_ptr() as usize + USER_STACK_SIZE
-    }
-}
-
 // 获取 app 对应的内存起始地址
 #[inline]
 pub fn get_app_base(app_id: usize) -> usize {
-    BASE_ADDRESS + app_id * APP_SIZE_LIMIT
+    USER_BASE_ADDRESS + app_id * APP_SIZE_LIMIT
 }
 
 pub fn get_num_app() -> usize {
@@ -79,7 +33,7 @@ pub fn init_app_ctx(tcb: &TCB, app_id: usize) -> usize {
 
 pub struct AppManager {
     // app 数量
-    pub(crate) num_app: usize,
+    pub(crate) num_apps: usize,
     // 当前正在执行的 app 数量
     pub(crate) current_app: usize,
     // 每个 app 的起始地址, 最后一个 usize 代表 app_end 地址
@@ -97,15 +51,17 @@ lazy_static! {
             }
             let num_app_ptr = _num_app as usize as *const usize;
             // link_app.S 中的一个 .quad 是一个 usize 宽
-            let num_app = num_app_ptr.read_volatile();  // 首个 usize 代表 app 个数
+            let num_apps = num_app_ptr.read_volatile();  // 首个 usize 代表 app 个数
             // 之所以要 +1 是因为最后还有个 app_??_end 也要占用空间
             let mut app_start: [usize; MAX_APP_NUM + 1] = [0; MAX_APP_NUM + 1];
+
             // 从首个 usize 之后的地方开始读 app 数据
+            // 这就是为什么要 add(1) 跳过一个 usize
             let app_start_raw: &[usize] =
-                core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1);
-            app_start[..=num_app].copy_from_slice(app_start_raw);
+                core::slice::from_raw_parts(num_app_ptr.add(1), num_apps + 1);
+            app_start[..=num_apps].copy_from_slice(app_start_raw);
             AppManager {
-                num_app,
+                num_apps,
                 current_app: 0,
                 app_start,
             }
@@ -115,8 +71,8 @@ lazy_static! {
 
 impl AppManager {
     fn print_app_info(&self) {
-        debug!("[kernel] num_app = {}", self.num_app);
-        for i in 0..self.num_app {
+        debug!("[kernel] num_app = {}", self.num_apps);
+        for i in 0..self.num_apps {
             debug!(
                 // 我们暂时使用内存模拟硬盘
                 // app 硬盘地址是一个左闭右开的区间
@@ -131,9 +87,14 @@ impl AppManager {
 
     // 一次性加载所有程序
     pub fn load_apps(&self) {
+        assert!(
+            self.num_apps <= MAX_APP_NUM,
+            "Too many apps, there are {} slots",
+            MAX_APP_NUM
+        );
         // 加载所有 app
-        for app_id in 0..self.num_app {
-            let app_base = BASE_ADDRESS + app_id * APP_SIZE_LIMIT;
+        for app_id in 0..self.num_apps {
+            let app_base = USER_BASE_ADDRESS + app_id * APP_SIZE_LIMIT;
             unsafe {
                 self.load_app(app_id, app_base, APP_SIZE_LIMIT);
             }

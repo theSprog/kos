@@ -9,8 +9,9 @@ global_asm!(include_str!("link_app.S"));
 
 #[no_mangle]
 pub fn main() -> ! {
-    // 创建 init 进程
-    init();
-
+    // 内核初始化
+    if !kernel_start() {
+        panic!("kernel init failed!");
+    }
     panic!("process init should not be exit!");
 }

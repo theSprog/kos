@@ -18,8 +18,11 @@ const LOG_LEVEL: LogLevel = LogLevel::WARN;
 pub extern "C" fn _start() -> ! {
     clear_bss();
     let exit_code = main();
+    // 进程退出后调用 exit
     exit(exit_code);
-    panic!("unreachable after sys_exit!");
+
+    // 应该不可达
+    unreachable!()
 }
 
 // 定义弱符号 main, 如果用户没有定义 main 则会进入该函数

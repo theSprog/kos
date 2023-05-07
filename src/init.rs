@@ -1,13 +1,16 @@
 use crate::{debug, info, println, task};
 use crate::{loader, trap};
 
-pub fn init() {
+pub fn kernel_start() -> bool {
     print_banner();
     clear_bss();
 
     trap::init();
     loader::init();
     task::start();
+
+    // 初始化成功
+    true
 }
 
 pub(crate) fn clear_bss() {
