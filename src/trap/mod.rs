@@ -1,7 +1,7 @@
 use core::arch::global_asm;
 
 use riscv::register::{
-    scause::{self, Exception, Trap},
+    scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
     utvec::TrapMode,
 };
@@ -9,6 +9,7 @@ use riscv::register::{
 use crate::{
     info, println,
     syscall::{self, syscall},
+    timer::{get_time_ms, set_next_trigger},
     warn,
 };
 
@@ -63,6 +64,13 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
             warn!("[kernel] IllegalInstruction in application, kernel killed it.");
             crate::task::exit_and_run_next();
         }
+
+        // 处理 S 态的时钟中断
+        Trap::Interrupt(Interrupt::SupervisorTimer) => {
+            set_next_trigger();
+            crate::task::suspend_and_run_next();
+        }
+
         _ => {
             panic!(
                 "Temporarily unsupported trap {:?}, stval = {:#x}!",

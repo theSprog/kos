@@ -3,11 +3,11 @@ pub mod stack;
 pub mod switch;
 
 use crate::{
-    config::*,
     debug, info,
     loader::{get_num_app, init_app_ctx},
     sbi::shutdown,
     unicore::UPSafeCell,
+    *,
 };
 
 use self::{context::TaskContext, stack::*};
@@ -130,21 +130,21 @@ impl TaskManager {
         }
     }
 
-    fn mark_current_suspended(&self) {
+    fn mark_suspended(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
         // 让出 cpu
         inner.tasks[current].task_status = TaskStatus::Ready;
     }
 
-    fn mark_current_exited(&self) {
+    fn mark_died(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
         // 标记已死亡
         inner.tasks[current].task_status = TaskStatus::Died;
     }
 
-    // return next app_id if exists
+    // 返回下一个 app_id (不存在返回 None)
     fn select_next(&self) -> Option<usize> {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
@@ -163,6 +163,7 @@ impl TaskManager {
             }
         }
 
+        // 不存在下一个
         None
     }
 
@@ -248,11 +249,11 @@ pub fn start() {
 }
 
 pub fn suspend_and_run_next() {
-    TASK_MANAGER.mark_current_suspended();
+    TASK_MANAGER.mark_suspended();
     TASK_MANAGER.schedule();
 }
 
 pub fn exit_and_run_next() {
-    TASK_MANAGER.mark_current_exited();
+    TASK_MANAGER.mark_died();
     TASK_MANAGER.schedule();
 }

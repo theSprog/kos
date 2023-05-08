@@ -1,4 +1,4 @@
-use crate::{debug, info, println, task};
+use crate::{debug, info, println, task, timer};
 use crate::{loader, trap};
 
 pub fn kernel_start() -> bool {
@@ -7,6 +7,7 @@ pub fn kernel_start() -> bool {
 
     trap::init();
     loader::init();
+    timer::init();
     task::start();
 
     // 初始化成功
