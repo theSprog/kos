@@ -4,7 +4,7 @@ use std::io::{Result, Write};
 static SRC_PATH: &str = "./user/src/";
 static TARGET_PATH: &str = "./user/prog/";
 static BIN_PATH: &str = "./user/bin/";
-static SCRIPT_PATH: &str = "./src/link_app.S";
+static SCRIPT_PATH: &str = "./kernel/link_app.S";
 
 fn main() {
     println!("cargo:rerun-if-changed={}", SRC_PATH);

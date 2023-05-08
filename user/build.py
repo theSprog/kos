@@ -2,11 +2,10 @@ import os
 
 base_address = 0x82000000
 step = 0x20000
-linker = 'src/linker.ld'
+linker = 'kernel/linker.ld'
 
 app_id = 0
 apps = os.listdir('./src')
-apps.remove('linker.ld')
 apps.sort()
 
 for app in apps:

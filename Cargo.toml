@@ -13,7 +13,10 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 debug = true
 opt-level = 0
 
+[lib]
+name = "kos"
+path = "kernel/lib.rs"
 
 [[bin]]
 name = "kos"
-path = "src/main.rs"
+path = "kernel/main.rs"
