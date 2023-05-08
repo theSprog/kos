@@ -35,8 +35,9 @@ pub fn init() {
     }
 }
 
-#[no_mangle]
 /// 处理中断或者系统调用
+/// x10 是返回值
+#[no_mangle]
 pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
@@ -50,11 +51,11 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
         }
         // 如果是来自内存访问错误，包括低特权级访问高特权级寄存器
         Trap::Exception(Exception::StoreFault) => {
-            warn!("[kernel] StoreFault in application, kernel killed it.");
+            warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
             crate::task::exit_and_run_next();
         }
         Trap::Exception(Exception::StorePageFault) => {
-            warn!("[kernel] StorePageFault in application, kernel killed it.");
+            warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
             crate::task::exit_and_run_next();
         }
         // 如果是来自非法指令, 例如用户态下 sret

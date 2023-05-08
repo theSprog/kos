@@ -38,6 +38,12 @@ impl TCB {
             kernel_stack: None,
         }
     }
+
+    // 检查当前 TCB 的栈是否溢出
+    pub fn check_canary(&self) {
+        self.kernel_stack.unwrap().check_canary();
+        self.user_stack.unwrap().check_canary();
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -90,7 +96,7 @@ lazy_static! {
             info!("Init app {}", app_id);
             task.kernel_stack = Some(&KERNEL_STACKS[app_id]);
             task.user_stack = Some(&USER_STACKS[app_id]);
-            // 将 ra 设置为 __restore 地址, 返回时 jmp 到该地方开始回到用户态
+            // 将 ra 设置为 __restore 地址, 返回时 ret 到该地方开始回到用户态
             task.task_cx = TaskContext::goto_restore(init_app_ctx(task, app_id));
             task.task_status = TaskStatus::Ready;
         });
@@ -160,7 +166,8 @@ impl TaskManager {
         None
     }
 
-    fn run_next_task(&self) {
+    // 调度下一个 app 运行
+    fn schedule(&self) {
         // 选出下一个 app
         if let Some(next) = self.select_next() {
             // 由于后面要修改 current_task_idx 所以需要 mut
@@ -185,9 +192,10 @@ impl TaskManager {
         } else {
             info!("All applications completed!");
             shutdown();
-            // use crate::board::QEMUExit;
-            // crate::board::QEMU_EXIT_HANDLE.exit_success();
         }
+
+        // 检测是否栈溢出
+        self.check_canary();
     }
 
     fn start(&self) -> ! {
@@ -225,20 +233,26 @@ impl TaskManager {
     ) {
         unsafe { crate::task::switch::__switch(current_task_ctx_ptr, next_task_ctx_ptr) }
     }
+
+    fn check_canary(&self) {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task_idx;
+        inner.tasks[current].check_canary();
+    }
 }
 
 // 公有接口
 pub fn start() {
-    TASK_MANAGER.print_task_info();
+    // TASK_MANAGER.print_task_info();
     TASK_MANAGER.start();
 }
 
 pub fn suspend_and_run_next() {
     TASK_MANAGER.mark_current_suspended();
-    TASK_MANAGER.run_next_task();
+    TASK_MANAGER.schedule();
 }
 
 pub fn exit_and_run_next() {
     TASK_MANAGER.mark_current_exited();
-    TASK_MANAGER.run_next_task();
+    TASK_MANAGER.schedule();
 }

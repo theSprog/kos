@@ -13,12 +13,12 @@ pub struct TaskContext {
 impl TaskContext {
     // 返回时返回到 __restore 从而恢复寄存器现场
     // 从 __restore 返回到用户态
-    pub fn goto_restore(kernel_stack_ptr: usize) -> Self {
+    pub fn goto_restore(ctx_ptr: usize) -> Self {
         Self {
             // 记录返回地址
             ra: crate::trap::__restore as usize,
             // sp 此时指向内核栈
-            sp: kernel_stack_ptr,
+            sp: ctx_ptr,
             s: [0; 12],
         }
     }

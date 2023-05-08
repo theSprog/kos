@@ -26,6 +26,7 @@ debugc:
 	$(TOOLS)/riscv64-unknown-elf-gdb -ex 'file ./kos' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234' -ex 'b *0x80200000' -ex 'c'
 
 clean:
-	@rm -f kos
-	@rm -f kos.bin
-	@cargo clean
+	cd ./user && make clean && cd ..
+	rm -f kos
+	rm -f kos.bin
+	cargo clean
