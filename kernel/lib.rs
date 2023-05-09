@@ -7,27 +7,30 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod console;
 pub mod init;
-pub mod lang_items;
-pub mod loader;
-pub mod sbi;
-pub mod syscall;
-pub mod task;
-pub mod timer;
-pub mod trap;
-pub mod unicore;
-pub mod util;
+pub mod interface;
 
-use crate::console::LogLevel;
-use console::*;
+mod console;
+mod lang_items;
+mod loader;
+mod logger;
+mod sbi;
+mod syscall;
+mod task;
+mod timer;
+mod trap;
+mod unicore;
+mod util;
+
+use crate::logger::LogLevel;
 const LOG_LEVEL: LogLevel = LogLevel::TRACE;
+
+// 配置信息
+// ---------------------------------------------------------------------
 
 pub const KB: usize = 1024;
 pub const PAGE: usize = 4 * KB;
 
-// 配置信息
-// ---------------------------------------------------------------------
 // 用户栈大小, 64K
 pub const USER_STACK_SIZE: usize = 64 * KB;
 // 内核栈大小, 32K, 应该开大一点，因为内核栈有时候会爆栈

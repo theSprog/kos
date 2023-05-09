@@ -13,6 +13,9 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 debug = true
 opt-level = 0
 
+[features]
+disable_panic = []
+
 [lib]
 name = "kos"
 path = "kernel/lib.rs"

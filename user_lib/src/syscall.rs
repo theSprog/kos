@@ -1,11 +1,8 @@
 use core::arch::asm;
 
-// 各种系统调用号
-const SYSCALL_WRITE: usize = 64;
-const SYSCALL_EXIT: usize = 93;
-const SYSCALL_YIELD: usize = 124;
-const SYSCALL_GET_TIME: usize = 169;
+use kos::interface::syscall::*;
 
+#[inline(always)]
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
     unsafe {

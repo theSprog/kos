@@ -1,0 +1,1 @@
+{"rustc":13776925221958630508,"features":"","target":0,"profile":0,"path":0,"deps":[[7503316475154866781,"build_script_build",false,12092543656299665639]],"local":[{"RerunIfChanged":{"output":"riscv64gc-unknown-none-elf/debug/build/kos-b939cf286493cb4d/output","paths":["./user/src/","./user/prog/"]}}],"rustflags":[],"metadata":0,"config":0,"compile_kind":0}

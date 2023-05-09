@@ -14,7 +14,7 @@ pub fn kernel_start() -> bool {
     true
 }
 
-pub(crate) fn clear_bss() {
+fn clear_bss() {
     extern "C" {
         // bss 起始处
         fn sbss();
@@ -30,7 +30,7 @@ pub(crate) fn clear_bss() {
     }
 }
 
-pub(crate) fn print_banner() {
+fn print_banner() {
     let banner = include_str!("banner");
     println!("{}", banner);
 }

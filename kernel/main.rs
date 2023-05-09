@@ -5,7 +5,6 @@ use core::arch::global_asm;
 use kos::init::*;
 
 global_asm!(include_str!("entry.asm"));
-global_asm!(include_str!("link_app.S"));
 
 #[no_mangle]
 pub fn main() -> ! {
@@ -15,3 +14,5 @@ pub fn main() -> ! {
     }
     panic!("process init should not be exit!");
 }
+
+global_asm!(include_str!("link_app.S"));

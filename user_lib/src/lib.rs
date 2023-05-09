@@ -6,11 +6,11 @@
 #[macro_use]
 pub mod console;
 mod lang_items;
+mod logger;
 mod syscall;
 
-use console::LogLevel;
 use syscall::*;
-const LOG_LEVEL: LogLevel = LogLevel::WARN;
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 // 应用程序入口点
 #[no_mangle]
@@ -19,6 +19,7 @@ pub extern "C" fn _start() -> ! {
     clear_bss();
     let exit_code = main();
     // 进程退出后调用 exit
+    // 发生 panic 的进程不应该到此处，而会进入 panic 处理
     exit(exit_code);
 
     // 应该不可达

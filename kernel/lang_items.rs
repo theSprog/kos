@@ -4,18 +4,20 @@ use crate::console::*;
 use crate::sbi::shutdown;
 use crate::{debug, error, info, trace, warn};
 
+// 如果外部没有禁用 panic, 就定义 panic
+#[cfg(not(feature = "disable_panic"))]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn kernel_panic(info: &PanicInfo) -> ! {
     // 如果有位置信息
     if let Some(location) = info.location() {
         error!(
-            "Panicked at {}:{} {}",
+            "Kernel Panicked at {}:{} {}",
             location.file(),
             location.line(),
             info.message().unwrap()
         );
     } else {
-        error!("Panicked: {}", info.message().unwrap());
+        error!("Kernel Panicked: {}", info.message().unwrap());
     }
     shutdown()
 }
