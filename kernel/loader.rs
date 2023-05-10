@@ -137,7 +137,7 @@ impl AppManager {
 }
 
 pub fn init() {
-    info!("Loader Initialization");
+    info!("Loader initalizing");
     APP_MANAGER.exclusive_access().print_app_info();
     APP_MANAGER.exclusive_access().load_apps();
     info!("App(s) loaded successfully")

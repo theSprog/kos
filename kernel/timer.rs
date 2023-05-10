@@ -60,7 +60,7 @@ pub fn set_next_trigger() {
 /// 换句话说同特权级中断没有中断嵌套
 pub(crate) fn init() {
     unsafe {
-        info!("enable time-sharing mechanism");
+        info!("Time-Sharing mechanism initalizing");
         // 此前 S 态由于关时钟中断所以不会响应时钟
         // 开启 S 态时钟中断,
         riscv::register::sie::set_stimer();

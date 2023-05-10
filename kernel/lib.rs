@@ -1,11 +1,13 @@
 #![no_main]
 #![no_std]
 #![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
 #[macro_use]
 extern crate lazy_static;
+extern crate alloc;
 
 pub mod init;
 pub mod interface;
@@ -14,6 +16,7 @@ mod console;
 mod lang_items;
 mod loader;
 mod logger;
+mod memory;
 mod sbi;
 mod syscall;
 mod task;
@@ -27,7 +30,6 @@ const LOG_LEVEL: LogLevel = LogLevel::TRACE;
 
 // 配置信息
 // ---------------------------------------------------------------------
-
 pub const KB: usize = 1024;
 pub const PAGE: usize = 4 * KB;
 
@@ -55,3 +57,17 @@ pub const CANARY_MAGIC_NUMBER: u8 = 0x55;
 /// 时钟频率, 机器每秒执行 CLOCK_FREQ 这么多 cycle
 /// 因此 CLOCK_FREQ 可以理解为一秒
 pub const CLOCK_FREQ: usize = 10000000;
+
+/// 内核堆大小, 16M
+pub const KERNEL_HEAP_SIZE: usize = 0x1_000_000;
+/// 伙伴系统以块为分配单位，每个块包含若干个物理页，物理页的数量必须是 2 的幂次
+/// ORDER 决定了能连续分配的物理页, 相当于是空闲链表数组的长度。
+/// 第 n 个数组项有 2^n 个物理页面。总和可以大于堆大小，但不能小于
+pub const KERNEL_HEAP_ORDER: usize = 32;
+
+// 外部组件
+// ----------------------------------------------------------------
+// 使用 buddy 伙伴系统分配内存
+use component::memory::buddy::LockedHeap;
+// 使用互斥锁保护 Heap, LockedHeap.lock(); 获得 Heap
+type GeneralAllocator = LockedHeap<KERNEL_HEAP_ORDER>;

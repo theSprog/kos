@@ -28,7 +28,7 @@ extern "C" {
 
 // 设置发生 trap 时的模式和地址, 自此以后我们就有用户态与内核态的区分了
 pub fn init() {
-    info!("Trap Initialization");
+    info!("Trap initalizing");
 
     unsafe {
         // 将 stvec 设置为 Direct 模式, 一旦发生 trap 总是陷入 __alltraps 地址

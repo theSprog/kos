@@ -11,13 +11,13 @@ fn kernel_panic(info: &PanicInfo) -> ! {
     // 如果有位置信息
     if let Some(location) = info.location() {
         error!(
-            "Kernel Panicked at {}:{} {}",
+            "Kernel panic at {}:{}\nDetail: {}",
             location.file(),
             location.line(),
             info.message().unwrap()
         );
     } else {
-        error!("Kernel Panicked: {}", info.message().unwrap());
+        error!("Kernel panic: {}", info.message().unwrap());
     }
     shutdown()
 }

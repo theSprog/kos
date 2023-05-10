@@ -12,7 +12,8 @@ pub fn main() -> ! {
     if !kernel_start() {
         panic!("kernel init failed!");
     }
-    panic!("process init should not be exit!");
+
+    init();
 }
 
 global_asm!(include_str!("link_app.S"));

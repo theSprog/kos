@@ -1,0 +1,32 @@
+/home/mrfan/Rust/kos/user/target/riscv64gc-unknown-none-elf/release/deps/kos-325013b0ea9535a8.rmeta: /home/mrfan/Rust/kos/kernel/lib.rs /home/mrfan/Rust/kos/kernel/init.rs /home/mrfan/Rust/kos/kernel/interface/mod.rs /home/mrfan/Rust/kos/kernel/interface/syscall.rs /home/mrfan/Rust/kos/kernel/console.rs /home/mrfan/Rust/kos/kernel/lang_items.rs /home/mrfan/Rust/kos/kernel/loader.rs /home/mrfan/Rust/kos/kernel/logger.rs /home/mrfan/Rust/kos/kernel/memory/mod.rs /home/mrfan/Rust/kos/kernel/memory/heap_alloc.rs /home/mrfan/Rust/kos/kernel/sbi.rs /home/mrfan/Rust/kos/kernel/syscall/mod.rs /home/mrfan/Rust/kos/kernel/syscall/fs.rs /home/mrfan/Rust/kos/kernel/syscall/process.rs /home/mrfan/Rust/kos/kernel/task/mod.rs /home/mrfan/Rust/kos/kernel/task/context.rs /home/mrfan/Rust/kos/kernel/task/stack.rs /home/mrfan/Rust/kos/kernel/task/switch.rs /home/mrfan/Rust/kos/kernel/timer.rs /home/mrfan/Rust/kos/kernel/trap/mod.rs /home/mrfan/Rust/kos/kernel/trap/context.rs /home/mrfan/Rust/kos/kernel/unicore.rs /home/mrfan/Rust/kos/kernel/util/mod.rs /home/mrfan/Rust/kos/kernel/banner /home/mrfan/Rust/kos/kernel/task/switch.S /home/mrfan/Rust/kos/kernel/trap/trap.S
+
+/home/mrfan/Rust/kos/user/target/riscv64gc-unknown-none-elf/release/deps/libkos-325013b0ea9535a8.rlib: /home/mrfan/Rust/kos/kernel/lib.rs /home/mrfan/Rust/kos/kernel/init.rs /home/mrfan/Rust/kos/kernel/interface/mod.rs /home/mrfan/Rust/kos/kernel/interface/syscall.rs /home/mrfan/Rust/kos/kernel/console.rs /home/mrfan/Rust/kos/kernel/lang_items.rs /home/mrfan/Rust/kos/kernel/loader.rs /home/mrfan/Rust/kos/kernel/logger.rs /home/mrfan/Rust/kos/kernel/memory/mod.rs /home/mrfan/Rust/kos/kernel/memory/heap_alloc.rs /home/mrfan/Rust/kos/kernel/sbi.rs /home/mrfan/Rust/kos/kernel/syscall/mod.rs /home/mrfan/Rust/kos/kernel/syscall/fs.rs /home/mrfan/Rust/kos/kernel/syscall/process.rs /home/mrfan/Rust/kos/kernel/task/mod.rs /home/mrfan/Rust/kos/kernel/task/context.rs /home/mrfan/Rust/kos/kernel/task/stack.rs /home/mrfan/Rust/kos/kernel/task/switch.rs /home/mrfan/Rust/kos/kernel/timer.rs /home/mrfan/Rust/kos/kernel/trap/mod.rs /home/mrfan/Rust/kos/kernel/trap/context.rs /home/mrfan/Rust/kos/kernel/unicore.rs /home/mrfan/Rust/kos/kernel/util/mod.rs /home/mrfan/Rust/kos/kernel/banner /home/mrfan/Rust/kos/kernel/task/switch.S /home/mrfan/Rust/kos/kernel/trap/trap.S
+
+/home/mrfan/Rust/kos/user/target/riscv64gc-unknown-none-elf/release/deps/kos-325013b0ea9535a8.d: /home/mrfan/Rust/kos/kernel/lib.rs /home/mrfan/Rust/kos/kernel/init.rs /home/mrfan/Rust/kos/kernel/interface/mod.rs /home/mrfan/Rust/kos/kernel/interface/syscall.rs /home/mrfan/Rust/kos/kernel/console.rs /home/mrfan/Rust/kos/kernel/lang_items.rs /home/mrfan/Rust/kos/kernel/loader.rs /home/mrfan/Rust/kos/kernel/logger.rs /home/mrfan/Rust/kos/kernel/memory/mod.rs /home/mrfan/Rust/kos/kernel/memory/heap_alloc.rs /home/mrfan/Rust/kos/kernel/sbi.rs /home/mrfan/Rust/kos/kernel/syscall/mod.rs /home/mrfan/Rust/kos/kernel/syscall/fs.rs /home/mrfan/Rust/kos/kernel/syscall/process.rs /home/mrfan/Rust/kos/kernel/task/mod.rs /home/mrfan/Rust/kos/kernel/task/context.rs /home/mrfan/Rust/kos/kernel/task/stack.rs /home/mrfan/Rust/kos/kernel/task/switch.rs /home/mrfan/Rust/kos/kernel/timer.rs /home/mrfan/Rust/kos/kernel/trap/mod.rs /home/mrfan/Rust/kos/kernel/trap/context.rs /home/mrfan/Rust/kos/kernel/unicore.rs /home/mrfan/Rust/kos/kernel/util/mod.rs /home/mrfan/Rust/kos/kernel/banner /home/mrfan/Rust/kos/kernel/task/switch.S /home/mrfan/Rust/kos/kernel/trap/trap.S
+
+/home/mrfan/Rust/kos/kernel/lib.rs:
+/home/mrfan/Rust/kos/kernel/init.rs:
+/home/mrfan/Rust/kos/kernel/interface/mod.rs:
+/home/mrfan/Rust/kos/kernel/interface/syscall.rs:
+/home/mrfan/Rust/kos/kernel/console.rs:
+/home/mrfan/Rust/kos/kernel/lang_items.rs:
+/home/mrfan/Rust/kos/kernel/loader.rs:
+/home/mrfan/Rust/kos/kernel/logger.rs:
+/home/mrfan/Rust/kos/kernel/memory/mod.rs:
+/home/mrfan/Rust/kos/kernel/memory/heap_alloc.rs:
+/home/mrfan/Rust/kos/kernel/sbi.rs:
+/home/mrfan/Rust/kos/kernel/syscall/mod.rs:
+/home/mrfan/Rust/kos/kernel/syscall/fs.rs:
+/home/mrfan/Rust/kos/kernel/syscall/process.rs:
+/home/mrfan/Rust/kos/kernel/task/mod.rs:
+/home/mrfan/Rust/kos/kernel/task/context.rs:
+/home/mrfan/Rust/kos/kernel/task/stack.rs:
+/home/mrfan/Rust/kos/kernel/task/switch.rs:
+/home/mrfan/Rust/kos/kernel/timer.rs:
+/home/mrfan/Rust/kos/kernel/trap/mod.rs:
+/home/mrfan/Rust/kos/kernel/trap/context.rs:
+/home/mrfan/Rust/kos/kernel/unicore.rs:
+/home/mrfan/Rust/kos/kernel/util/mod.rs:
+/home/mrfan/Rust/kos/kernel/banner:
+/home/mrfan/Rust/kos/kernel/task/switch.S:
+/home/mrfan/Rust/kos/kernel/trap/trap.S:

@@ -8,6 +8,5 @@ extern crate user_lib;
 fn main() -> i32 {
     loop {
         print!("A");
-        panic!("user_lib panic");
     }
 }

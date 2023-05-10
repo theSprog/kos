@@ -5,9 +5,9 @@ use core::{
     fmt::{self, Write},
 };
 
-struct OUT;
+struct Console;
 
-impl Write for OUT {
+impl Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         s.chars().for_each(|c| console_putchar(c as usize));
         Ok(())
@@ -15,7 +15,7 @@ impl Write for OUT {
 }
 
 pub fn print(args: fmt::Arguments) {
-    OUT.write_fmt(args).unwrap();
+    Console.write_fmt(args).unwrap();
 }
 
 #[macro_export]
