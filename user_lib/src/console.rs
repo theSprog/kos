@@ -2,21 +2,19 @@ use core::fmt::{self, Write};
 
 use crate::write;
 
-struct OUT;
+struct Console;
 
-// 标识符
-const STDOUT: usize = 1;
-
-impl Write for OUT {
+impl Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        // 通过内核系统调用打印
+        // 标识符
+        const STDOUT: usize = 1;
         write(STDOUT, s.as_bytes());
         Ok(())
     }
 }
 
 pub fn print(args: fmt::Arguments) {
-    OUT.write_fmt(args).unwrap();
+    Console.write_fmt(args).unwrap();
 }
 
 #[macro_export]

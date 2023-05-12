@@ -1,7 +1,9 @@
-use crate::{error, syscall::sys_exit};
+use crate::syscall::sys_exit;
 
 #[panic_handler]
 fn panic_handler(panic_info: &core::panic::PanicInfo) -> ! {
+    use logger::error;
+
     let err_msg = panic_info.message().unwrap();
     if let Some(location) = panic_info.location() {
         error!(

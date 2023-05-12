@@ -1,3 +1,4 @@
+pub mod bitmap;
 pub mod buddy;
 
 // 所有的分配器都应该实现这两点

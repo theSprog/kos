@@ -1,10 +1,11 @@
 use crate::{
-    debug, info, init::get_kernel_bss_range, println, util::human_size, GeneralAllocator,
-    KERNEL_HEAP_ORDER, KERNEL_HEAP_SIZE, PAGE,
+    init::get_kernel_bss_range, println, util::human_size, GeneralAllocator, KERNEL_HEAP_ORDER,
+    KERNEL_HEAP_SIZE, PAGE,
 };
 
 use alloc::format;
 use core::{mem::size_of, ops::Range};
+use logger::{debug, info};
 
 // 任何对象只需要实现 alloc::alloc::GlobalAlloc 库中的分配函数
 // pub unsafe fn alloc(&self, layout: Layout) -> *mut u8;
@@ -39,13 +40,11 @@ pub fn init_heap() {
         heap_range.len() % PAGE,
         "Kernel heap size must be an integer multiple of the page size"
     );
-    unsafe {
-        HEAP_ALLOCATOR
-            .lock()
-            .init(heap_range.start, KERNEL_HEAP_SIZE); // 以起点和长度作为参数
-    }
 
-    info!("Kernel heap initialized");
+    HEAP_ALLOCATOR
+        .lock()
+        .init(heap_range.start, KERNEL_HEAP_SIZE); // 以起点和长度作为参数
+
     info!(
         "kernel heap range: [0x{:x}..0x{:x}), size: {}",
         heap_range.start,
@@ -64,9 +63,9 @@ pub fn heap_test() {
     info!("Heap test start");
     let heap_range = get_kernel_heap_range();
 
+    test_vec(&heap_range);
     test_box(&heap_range);
     test_string(&heap_range);
-    test_vec(&heap_range);
 
     info!("Heap test passed! good luck");
 }

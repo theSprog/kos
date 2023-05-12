@@ -1,4 +1,6 @@
-use crate::{debug, trap::context::TrapContext, *};
+use logger::debug;
+
+use crate::{trap::context::TrapContext, *};
 
 #[repr(align(4096))]
 #[derive(Copy, Clone, Debug)]

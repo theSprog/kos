@@ -9,13 +9,15 @@
 extern crate lazy_static;
 extern crate alloc;
 
+extern crate logger;
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+
+pub mod console;
 pub mod init;
 pub mod interface;
 
-mod console;
 mod lang_items;
 mod loader;
-mod logger;
 mod memory;
 mod sbi;
 mod syscall;
@@ -24,9 +26,6 @@ mod timer;
 mod trap;
 mod unicore;
 mod util;
-
-use crate::logger::LogLevel;
-const LOG_LEVEL: LogLevel = LogLevel::TRACE;
 
 // 配置信息
 // ---------------------------------------------------------------------
@@ -67,7 +66,10 @@ pub const KERNEL_HEAP_ORDER: usize = 32;
 
 // 外部组件
 // ----------------------------------------------------------------
+// 使用 bitmap 分配内存
+use component::memory::bitmap::LockedHeap;
+type GeneralAllocator = LockedHeap;
+
 // 使用 buddy 伙伴系统分配内存
-use component::memory::buddy::LockedHeap;
-// 使用互斥锁保护 Heap, LockedHeap.lock(); 获得 Heap
-type GeneralAllocator = LockedHeap<KERNEL_HEAP_ORDER>;
+// use component::memory::buddy::LockedHeap;
+// type GeneralAllocator = LockedHeap<KERNEL_HEAP_ORDER>;

@@ -3,7 +3,6 @@ pub mod stack;
 pub mod switch;
 
 use crate::{
-    debug, info,
     loader::{get_num_app, init_app_ctx},
     sbi::shutdown,
     unicore::UPSafeCell,
@@ -57,8 +56,10 @@ pub struct TaskManager {
 }
 
 use lazy_static::lazy_static;
+use logger::{debug, info};
 lazy_static! {
     pub static ref TASK_MANAGER: TaskManager = {
+        info!("TASK_MANAGER initializing...");
         let num_app = get_num_app();
         info!("APP_NUM: {}", num_app);
 

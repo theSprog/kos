@@ -62,7 +62,7 @@ impl<const ORDER: usize> Heap<ORDER> {
         Self::new()
     }
 
-    /// Add a range of memory [start, end) to the heap
+    /// 向堆中添加一个内存范围 [start, end)
     pub unsafe fn add_to_heap(&mut self, mut start: usize, mut end: usize) {
         // avoid unaligned access on some platforms
         start = (start + size_of::<usize>() - 1) & (!size_of::<usize>() + 1);
@@ -73,6 +73,8 @@ impl<const ORDER: usize> Heap<ORDER> {
         let mut current_start = start;
 
         while current_start + size_of::<usize>() <= end {
+            // 保留最低一位, 其余都设定为 0。
+            // 例如 start = 11010000 -> 00010000
             let lowbit = current_start & (!current_start + 1);
             let size = min(lowbit, prev_power_of_two(end - current_start));
             total += size;
@@ -85,12 +87,15 @@ impl<const ORDER: usize> Heap<ORDER> {
     }
 
     /// Add a range of memory [start, start+size) to the heap
-    pub unsafe fn init(&mut self, start: usize, size: usize) {
-        self.add_to_heap(start, start + size);
+    pub fn init(&mut self, start: usize, size: usize) {
+        unsafe {
+            self.add_to_heap(start, start + size);
+        }
     }
 
     /// Alloc a range of memory from the heap satifying `layout` requirements
     pub fn alloc(&mut self, layout: Layout) -> Result<NonNull<u8>, ()> {
+        // 为了对齐, 取最大值
         let size = max(
             layout.size().next_power_of_two(),
             max(layout.align(), size_of::<usize>()),
@@ -112,6 +117,7 @@ impl<const ORDER: usize> Heap<ORDER> {
                     }
                 }
 
+                // NonNull 如果传入空, 则返回 None
                 let result = NonNull::new(
                     self.free_list[class]
                         .pop()
@@ -323,6 +329,10 @@ unsafe impl<const ORDER: usize> GlobalAlloc for LockedHeapWithRescue<ORDER> {
     }
 }
 
+/// 找到小于等于 num 的最大的幂次
+/// 例如 14 -> 8, 32 -> 32
+/// 与其相对应的还有 next_power_of_two, 是找到大于等于 num 的最小的幂次
+/// 例如 14 -> 16, 32 -> 32
 pub(crate) fn prev_power_of_two(num: usize) -> usize {
     1 << (8 * (size_of::<usize>()) - num.leading_zeros() as usize - 1)
 }

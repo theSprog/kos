@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 component = {path = "./component"}
+logger = {path = "./logger"}
 riscv = { version = "0.10.1" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 

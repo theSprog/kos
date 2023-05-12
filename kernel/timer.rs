@@ -1,7 +1,8 @@
+use logger::info;
 use riscv::register::time;
 
 use crate::sbi::set_timer;
-use crate::{info, CLOCK_FREQ};
+use crate::CLOCK_FREQ;
 
 // 每秒执行多少次中断
 const INTERRUPT_PER_SEC: usize = 100;

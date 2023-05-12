@@ -1,6 +1,7 @@
+use logger::info;
+
 use crate::task::{exit_and_run_next, suspend_and_run_next};
 use crate::timer::get_time_ms;
-use crate::{info, println};
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {

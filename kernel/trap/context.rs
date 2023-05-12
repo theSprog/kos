@@ -3,8 +3,6 @@ use riscv::register::{
     sstatus::{self, Sstatus, SPP},
 };
 
-use crate::debug;
-
 #[repr(C)]
 pub struct TrapContext {
     pub x: [usize; 32], // 通用寄存器

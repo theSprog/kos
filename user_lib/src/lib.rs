@@ -3,14 +3,16 @@
 #![feature(panic_info_message)]
 #![allow(dead_code)]
 
+extern crate logger;
+// 定义 logger 层级
+pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+
 #[macro_use]
 pub mod console;
 mod lang_items;
-mod logger;
 mod syscall;
 
 use syscall::*;
-const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 // 应用程序入口点
 #[no_mangle]
@@ -47,6 +49,7 @@ fn clear_bss() {
     });
 }
 
+// 沟通 OS 系统调用, 发起请求后陷入 kernel
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }

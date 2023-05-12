@@ -2,7 +2,7 @@
 
 use core::arch::asm;
 
-use crate::error;
+use logger::error;
 
 const SBI_SET_TIMER: usize = 0;
 const SBI_CONSOLE_PUTCHAR: usize = 1;

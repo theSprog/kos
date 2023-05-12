@@ -1,5 +1,6 @@
 use core::arch::global_asm;
 
+use logger::{info, warn};
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
@@ -7,10 +8,9 @@ use riscv::register::{
 };
 
 use crate::{
-    info, println,
+    println,
     syscall::{self, syscall},
     timer::{get_time_ms, set_next_trigger},
-    warn,
 };
 
 use self::context::TrapContext;

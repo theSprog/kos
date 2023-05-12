@@ -1,7 +1,9 @@
 use core::ops::Range;
 
-use crate::{debug, info, memory, println, task, timer};
+use logger::{debug, info};
+
 use crate::{loader, trap};
+use crate::{memory, println, task, timer};
 
 pub fn kernel_start() -> bool {
     print_banner();
@@ -17,11 +19,8 @@ pub fn kernel_start() -> bool {
     true
 }
 
-pub fn init() -> ! {
-    // something else to do and never exit
-
-    // if init exit we have nothing to do so we must panic
-    panic!("Process 'init' should not be exited!");
+pub fn init() {
+    // init process and never exit
 }
 
 pub fn get_kernel_bss_range() -> Range<usize> {

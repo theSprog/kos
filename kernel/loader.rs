@@ -1,8 +1,8 @@
 use core::arch::asm;
 
-use crate::{
-    debug, info, sbi::shutdown, task::TCB, trap::context::TrapContext, unicore::UPSafeCell, *,
-};
+use logger::{debug, info};
+
+use crate::{sbi::shutdown, task::TCB, trap::context::TrapContext, unicore::UPSafeCell, *};
 
 // 获取 app 对应的内存起始地址
 #[inline]

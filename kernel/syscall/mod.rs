@@ -1,4 +1,4 @@
-use crate::{info, interface::syscall::*};
+use crate::interface::syscall::*;
 
 use self::{fs::sys_write, process::*};
 
