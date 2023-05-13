@@ -15,9 +15,10 @@ const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 extern crate qemu_config;
 
+extern crate sys_interface;
+
 pub mod console;
 pub mod init;
-pub mod interface;
 
 mod lang_items;
 mod loader;

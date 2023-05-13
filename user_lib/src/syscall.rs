@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-use kos::interface::syscall::*;
+use sys_interface::syscall::*;
 
 #[inline(always)]
 fn syscall(id: usize, args: [usize; 3]) -> isize {

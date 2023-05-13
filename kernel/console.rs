@@ -3,6 +3,7 @@ use core::{
     arch::asm,
     cell::UnsafeCell,
     fmt::{self, Write},
+    unreachable,
 };
 
 struct Console;

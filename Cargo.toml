@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 component = {path = "./component"}
-logger = {path = "./logger"}
+logger = {path = "./logger", features = ["kernel"]}
 qemu_config = {path = "./qemu_config"}
+sys_interface = {path = "./sys_interface"}
 riscv = { version = "0.10.1" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 hashbrown = "0.13.2"
@@ -16,9 +17,6 @@ hashbrown = "0.13.2"
 [profile.release]
 debug = true
 opt-level = 0
-
-[features]
-disable_panic = []
 
 [lib]
 name = "kos"

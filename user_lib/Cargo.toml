@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 # 由于我们定义了自己的用户级 panic, 因此在编译本库的时候禁用 kernel 的 panic
-kos = { path = "../" , features = ["disable_panic"]}
-logger = {path = "../logger" }
+sys_interface = {path = "../sys_interface"}
+logger = {path = "../logger", features = ["user"]}
+spin = "0.9.6"
 
 [profile.release]
 debug = true

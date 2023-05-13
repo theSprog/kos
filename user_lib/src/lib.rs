@@ -43,10 +43,14 @@ fn clear_bss() {
         // bss 结束处
         fn end_bss();
     }
+
+    let start_bss = start_bss as usize;
+    let end_bss = end_bss as usize;
     // 将 bss 清零
-    (start_bss as usize..end_bss as usize).for_each(|addr| unsafe {
-        (addr as *mut u8).write_volatile(0);
-    });
+    unsafe {
+        // 优化后的版本, 更快
+        core::ptr::write_bytes(start_bss as *mut u8, 0, end_bss - start_bss);
+    }
 }
 
 // 沟通 OS 系统调用, 发起请求后陷入 kernel

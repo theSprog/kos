@@ -1,10 +1,5 @@
 use crate::syscall::sys_exit;
-
-macro_rules! error {
-    ($($arg:tt)*)=> {
-        $crate::console::print(format_args!("\x1B[31m[ERROR] {}\x1B[0m\n", format_args!($($arg)*)))
-    };
-}
+use logger::error;
 
 #[panic_handler]
 fn panic_handler(panic_info: &core::panic::PanicInfo) -> ! {

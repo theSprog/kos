@@ -13,7 +13,10 @@ impl Write for Console {
     }
 }
 
+use spin::Mutex;
+static LOGGER_LOCK: Mutex<()> = Mutex::new(());
 pub fn print(args: fmt::Arguments) {
+    let _guard = LOGGER_LOCK.lock();
     Console.write_fmt(args).unwrap();
 }
 

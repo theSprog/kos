@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::unreachable;
-
 #[macro_use]
 extern crate user_lib;
 
@@ -10,6 +8,5 @@ extern crate user_lib;
 fn main() -> i32 {
     loop {
         print!("A");
-        unreachable!()
     }
 }

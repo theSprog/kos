@@ -9,3 +9,8 @@ edition = "2021"
 [dependencies]
 riscv = { version = "0.10.1" }
 qemu_config = { path = "../qemu_config"}
+spin = "0.9.6"
+
+[features]
+kernel = []
+user = []

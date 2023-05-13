@@ -8,6 +8,5 @@ extern crate user_lib;
 fn main() -> i32 {
     loop {
         print!("B");
-        unreachable!()
     }
 }
