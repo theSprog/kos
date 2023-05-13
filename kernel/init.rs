@@ -12,7 +12,7 @@ pub fn kernel_start() -> bool {
     trap::init();
     loader::init();
     timer::init();
-    // task::start();
+    task::start();
     memory::init();
 
     // 初始化成功

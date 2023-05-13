@@ -70,12 +70,12 @@ lazy_static! {
 
 impl AppManager {
     fn print_app_info(&self) {
-        debug!("[kernel] num_app = {}", self.num_apps);
+        debug!("num_app = {}", self.num_apps);
         for i in 0..self.num_apps {
             debug!(
                 // 我们暂时使用内存模拟硬盘
                 // app 硬盘地址是一个左闭右开的区间
-                "[kernel] hard-disk address: app-{} [{:#x}, {:#x}), size: 0x{:x}",
+                "hard-disk address: app-{} [{:#x}, {:#x}), size: 0x{:x}",
                 i,
                 self.app_start[i],
                 self.app_start[i + 1],
@@ -104,7 +104,7 @@ impl AppManager {
     // 这需要保证 源app文件 在链接时也指定自己应该放进这块地址
     unsafe fn load_app(&self, app_id: usize, start: usize, len: usize) {
         info!(
-            "[kernel] Loading app-{} into [{:#x}..{:#x})",
+            "Loading app-{} into [{:#x}..{:#x})",
             app_id,
             start,
             start + len

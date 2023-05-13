@@ -63,11 +63,13 @@ pub fn logger_now() -> usize {
     riscv::register::time::read()
 }
 
-// 通用打印
+/// 通用打印
+/// 类似样式
+/// [        79 ms][INFO]   [kernel] Application exited with code 1
 #[macro_export]
 macro_rules! log {
     ($color:expr, $level:literal, $($arg:tt)*) => {
-        $crate::logger_print(format_args!("\x1B[90m[{:10} ms]\x1B[0m\x1B[{}m[{}]\t{}\x1B[0m\n",  $crate::logger_time_ms!(), ($color as i32), $level, format_args!($($arg)*)))
+        $crate::logger_print(format_args!("\x1B[90m[{:10} ms]\x1B[0m\x1B[{}m[{}]\t[kernel] {}\x1B[0m\n",  $crate::logger_time_ms!(), ($color as i32), $level, format_args!($($arg)*)))
     }
 }
 
