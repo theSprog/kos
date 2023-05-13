@@ -1,10 +1,10 @@
 use crate::{
-    init::get_kernel_bss_range, println, util::human_size, GeneralAllocator, KERNEL_HEAP_ORDER,
-    KERNEL_HEAP_SIZE, PAGE,
+    init::get_kernel_bss_range, println, timer::get_time_ms, util::human_size, GeneralAllocator,
+    KERNEL_HEAP_ORDER, KERNEL_HEAP_SIZE, PAGE,
 };
 
-use alloc::format;
-use core::{mem::size_of, ops::Range};
+use alloc::{format, string::String};
+use core::{assert_eq, mem::size_of, ops::Range};
 use logger::{debug, info};
 
 // 任何对象只需要实现 alloc::alloc::GlobalAlloc 库中的分配函数
@@ -60,20 +60,28 @@ pub fn get_kernel_heap_range() -> Range<usize> {
 }
 
 pub fn heap_test() {
-    info!("Heap test start");
-    let heap_range = get_kernel_heap_range();
+    use core::time::Duration;
 
+    let start = Duration::from_millis(get_time_ms() as u64);
+    info!("Heap test start, Time: [{:8} ms]", start.as_millis());
+
+    let heap_range = get_kernel_heap_range();
     test_vec(&heap_range);
     test_box(&heap_range);
     test_string(&heap_range);
+    test_hashmap(&heap_range);
 
-    info!("Heap test passed! good luck");
+    let end = Duration::from_millis(get_time_ms() as u64);
+    info!(
+        "Heap test passed! good luck, Time: [{:8} ms]",
+        end.as_millis()
+    );
 }
 
 fn test_vec(heap_range: &Range<usize>) {
     use alloc::vec::Vec;
 
-    let len = 500;
+    let len = 5000;
     debug!("alloc Vec of usize (len: {})", len);
     let mut v: Vec<usize> = Vec::new();
     for i in 0..len {
@@ -102,7 +110,8 @@ fn test_string(heap_range: &Range<usize>) {
     debug!("alloc String for random string");
     let mut string = String::new();
     string.push_str("random string");
-    assert_eq!(string, "random string");
+    string.remove(3);
+    assert_eq!(string, "ranom string");
 
     debug!("size of String is {}", core::mem::size_of_val(&string));
 
@@ -118,6 +127,70 @@ fn test_box(heap_range: &Range<usize>) {
     // a 是一个指针, 因此可以直接用 {:p} 打印
     debug!("assert bss contains '{:p}'", a);
     assert!(heap_range.contains(&(a.as_ref() as *const _ as usize)));
+    let x = Box::new([1, 2, 3]);
+    debug!("x: {:?}, x[2]: {:?}", x, x[2]);
     debug!("dealloc Box");
     drop(a);
+}
+
+fn test_hashmap(heap_range: &Range<usize>) {
+    use crate::alloc::string::ToString;
+    use hashbrown::HashMap;
+
+    debug!("alloc hashmap for random insert String");
+
+    // Type inference lets us omit an explicit type signature (which
+    // would be `HashMap<String, String>` in this example).
+    let mut book_reviews = HashMap::new();
+
+    // Review some books.
+    book_reviews.insert(
+        "Adventures of Huckleberry Finn".to_string(),
+        "My favorite book.".to_string(),
+    );
+    book_reviews.insert(
+        "Grimms' Fairy Tales".to_string(),
+        "Masterpiece.".to_string(),
+    );
+    book_reviews.insert(
+        "Pride and Prejudice".to_string(),
+        "Very enjoyable.".to_string(),
+    );
+    book_reviews.insert(
+        "The Adventures of Sherlock Holmes".to_string(),
+        "Eye lyked it alot.".to_string(),
+    );
+
+    // Check for a specific one.
+    // When collections store owned values (String), they can still be
+    // queried using references (&str).
+    if !book_reviews.contains_key("Les Miserables") {
+        debug!(
+            "We've got {} reviews, but Les Miserables ain't one.",
+            book_reviews.len()
+        );
+    }
+
+    // oops, this review has a lot of spelling mistakes, let's delete it.
+    book_reviews.remove("The Adventures of Sherlock Holmes");
+
+    // Look up the values associated with some keys.
+    let to_find = ["Pride and Prejudice", "Alice's Adventure in Wonderland"];
+    for &book in &to_find {
+        match book_reviews.get(book) {
+            Some(review) => {
+                debug!("{}: {}", book, review);
+                assert!(heap_range.contains(&(review as *const _ as usize)))
+            }
+            None => debug!("{} is unreviewed.", book),
+        }
+    }
+
+    // Look up the value for a key (will panic if the key is not found).
+    debug!("Review for Jane: {}", book_reviews["Pride and Prejudice"]);
+
+    // Iterate over everything.
+    for (book, review) in &book_reviews {
+        debug!("{}: \"{}\"", book, review);
+    }
 }

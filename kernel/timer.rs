@@ -1,21 +1,13 @@
 use logger::info;
-use riscv::register::time;
 
+use crate::qemu_config::*;
 use crate::sbi::set_timer;
-use crate::CLOCK_FREQ;
 
 // 每秒执行多少次中断
 const INTERRUPT_PER_SEC: usize = 100;
 
 // 时间片长度
 const TIME_INTERVAL: usize = CLOCK_FREQ / INTERRUPT_PER_SEC;
-
-// 微秒单位
-const MICRO_UNIT: usize = CLOCK_FREQ / 1_000_000;
-// 毫秒单位
-const MILLI_UNIT: usize = CLOCK_FREQ / 1_000;
-// 秒单位
-const SECOND_UNIT: usize = CLOCK_FREQ;
 
 #[repr(C)]
 pub struct TimeVal {
@@ -27,7 +19,7 @@ pub struct TimeVal {
 // 取得当前 mtime 计数器
 // mtime 是一个64位技术器, 用来统计处理器自上电以来经过了多少个内置时钟的时钟周期
 pub fn get_cycle() -> usize {
-    time::read()
+    riscv::register::time::read()
 }
 
 // 以微秒形式获取时间

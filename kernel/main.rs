@@ -23,13 +23,5 @@ pub fn main() -> ! {
 global_asm!(include_str!("link_app.S"));
 
 fn test_rust() {
-    println!("a: {}, prev: {}", 14, prev_power_of_two(14));
-    println!("a: {}, prev: {}", 32, prev_power_of_two(32));
-    println!("a: {}, next: {}", 14, (14 as usize).next_power_of_two());
-    println!("a: {}, next: {}", 32, (32 as usize).next_power_of_two());
     todo!()
-}
-
-pub(crate) fn prev_power_of_two(num: usize) -> usize {
-    1 << (8 * (core::mem::size_of::<usize>()) - num.leading_zeros() as usize - 1)
 }

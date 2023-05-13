@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 extern crate logger;
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;

@@ -7,10 +7,13 @@
 
 #[macro_use]
 extern crate lazy_static;
+
 extern crate alloc;
 
 extern crate logger;
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+
+extern crate qemu_config;
 
 pub mod console;
 pub mod init;
@@ -52,10 +55,6 @@ pub const APP_SIZE_LIMIT: usize = 0x20000;
 
 // 金丝雀魔数, 用于检测栈溢出
 pub const CANARY_MAGIC_NUMBER: u8 = 0x55;
-
-/// 时钟频率, 机器每秒执行 CLOCK_FREQ 这么多 cycle
-/// 因此 CLOCK_FREQ 可以理解为一秒
-pub const CLOCK_FREQ: usize = 10000000;
 
 /// 内核堆大小, 16M
 pub const KERNEL_HEAP_SIZE: usize = 0x1_000_000;

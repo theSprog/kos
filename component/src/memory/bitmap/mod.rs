@@ -20,21 +20,24 @@ const BLOCK_UNIT: usize = size_of::<usize>();
 const MB: usize = 1024 * 1024;
 const MAX_HEAP_SIZE: usize = 16 * MB;
 
-// 需要多少个 bits (最多256KB)
+// 需要多少个 bits (最多256KB = 16MB / (8*8))
 const BITMAP_SIZE: usize = MAX_HEAP_SIZE / (BLOCK_UNIT * 8);
 use logger::debug;
 use spin::Mutex;
 
 pub struct Heap {
-    // 用 1bit 代表一个 word 区域的内存
+    // 用 1bit 代表一个 usize 区域的内存
     bitmap: [u8; BITMAP_SIZE],
-    heap_start_ptr: usize,
+    // 位图的有效位末端, 位图有效区域 [0, endpoint)
     endpoint: usize,
+
+    // 堆的起始地址
+    heap_start_ptr: usize,
 
     // 附带信息
     // 用户请求使用的内存量
     user: usize,
-    // 分配给用户的内存量, 可能与 user 不相等比如用户请求一个 u8 但是分配一个 usize
+    // 分配给用户的内存量, 可能与 user 不相等。比如用户请求一个 u8 但是分配一个 usize
     allocated: usize,
 
     // 总量
@@ -180,7 +183,7 @@ impl Heap {
         assert!(start.0 < self.endpoint && start.1 < 8);
         assert!(fill == 0 || fill == 1);
 
-        let (mut byte_idx, bit_idx) = start;
+        let (mut byte_idx, mut bit_idx) = start;
 
         for i in bit_idx..8usize {
             if fill == 0 {
@@ -201,6 +204,7 @@ impl Heap {
         if units != 0 {
             // 开始从下一字节开始查找
             byte_idx += 1;
+            bit_idx = 0;
 
             let packed = units / 8;
             let rest = units % 8;
@@ -214,7 +218,7 @@ impl Heap {
                 }
                 byte_idx += 1;
             }
-            self.fill((byte_idx, 0), rest, fill);
+            self.fill((byte_idx, bit_idx), rest, fill);
         }
     }
 
@@ -247,6 +251,7 @@ impl Deref for LockedHeap {
     }
 }
 
+// 实现接口
 unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // 调用内部的 Heap 的 alloc 实现
