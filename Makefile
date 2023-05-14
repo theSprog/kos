@@ -1,5 +1,5 @@
 OS_DIR = target/riscv64gc-unknown-none-elf/release
-QEMU_FLAGS = -machine virt -nographic -smp 4
+QEMU_FLAGS = -machine virt -nographic -m 256M -smp 4
 QEMU_BIOS = -bios ./boot/rustsbi-qemu.bin -device loader,file=./kos.bin,addr=0x80200000
 QEMU = qemu-system-riscv64
 TOOLS = ~/riscv64-elf-tools/bin

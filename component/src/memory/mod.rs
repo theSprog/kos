@@ -1,5 +1,6 @@
 pub mod bitmap;
 pub mod buddy;
+pub mod slab;
 
 // 所有的分配器都应该实现这两点
 pub trait IAllocator<T> {

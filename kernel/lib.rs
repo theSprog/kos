@@ -4,6 +4,7 @@
 #![feature(alloc_error_handler)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(unused_variables)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -45,24 +46,22 @@ pub const KERNEL_STACK_SIZE: usize = 32 * KB;
 // 最多允许 8 个 app
 pub const MAX_APP_NUM: usize = 8;
 
-// 0x80000000 - 0x80200000 固件地址
-// 0x80200000 - 0x82000000 内核空间
-// 0x82000000 - 0x87000000 用户空间
-// 0x87000000 - 0x870012be 设备树区域
-// 用户程序起始基地址
-pub const USER_BASE_ADDRESS: usize = 0x82000000;
+/// QEMU 配置总内存大小 256 M, 区间 0x80000000..0x90000000
+/// 内存基本分区如下
+/// 0x80000000 - 0x80200000 固件(Firmware)地址
+/// 0x80200000 - 0x84000000 内核空间 (大约 64 M)
+/// 0x84000000 - 0x8f000000 用户空间
+/// 0x8f000000 - 0x8f0012be 设备树区域
+/// 用户程序起始基地址
+pub const USER_BASE_ADDRESS: usize = 0x84000000;
 // 每个 app 的 size 上限, 128K
 pub const APP_SIZE_LIMIT: usize = 0x20000;
 
 // 金丝雀魔数, 用于检测栈溢出
 pub const CANARY_MAGIC_NUMBER: u8 = 0x55;
 
-/// 内核堆大小, 16M
-pub const KERNEL_HEAP_SIZE: usize = 0x1_000_000;
-/// 伙伴系统以块为分配单位，每个块包含若干个物理页，物理页的数量必须是 2 的幂次
-/// ORDER 决定了能连续分配的物理页, 相当于是空闲链表数组的长度。
-/// 第 n 个数组项有 2^n 个物理页面。总和可以大于堆大小，但不能小于
-pub const KERNEL_HEAP_ORDER: usize = 32;
+/// 内核堆大小, 32M
+pub const KERNEL_HEAP_SIZE: usize = 0x2_000_000;
 
 // 外部组件
 // ----------------------------------------------------------------
@@ -72,4 +71,4 @@ type GeneralAllocator = LockedHeap;
 
 // 使用 buddy 伙伴系统分配内存
 // use component::memory::buddy::LockedHeap;
-// type GeneralAllocator = LockedHeap<KERNEL_HEAP_ORDER>;
+// type GeneralAllocator = LockedHeap;

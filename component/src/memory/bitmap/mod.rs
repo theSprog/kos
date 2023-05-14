@@ -16,13 +16,13 @@ macro_rules! look {
 // 分配内存的基本单位是一个 usize 长度
 const BLOCK_UNIT: usize = size_of::<usize>();
 
-// 最大管理堆大小
+// 最大管理堆大小, 设为 64 MB
 const MB: usize = 1024 * 1024;
-const MAX_HEAP_SIZE: usize = 16 * MB;
+const MAX_HEAP_SIZE: usize = 64 * MB;
 
-// 需要多少个 bits (最多256KB = 16MB / (8*8))
+// 需要多少个 bits (最多 1MB = 64MB / (8*8))
 const BITMAP_SIZE: usize = MAX_HEAP_SIZE / (BLOCK_UNIT * 8);
-use logger::debug;
+use logger::{debug, info};
 use spin::Mutex;
 
 pub struct Heap {
@@ -58,6 +58,8 @@ impl Heap {
 
     // 管理 size bytes 的堆大小
     pub fn init(&mut self, start: usize, size: usize) {
+        info!("Memory allocator: bitmap allocator");
+
         assert!(
             size <= (8 * self.bitmap.len()) * BLOCK_UNIT,
             "Heap size 0x{:x} overflow for upper bound of bitmap(upper bound: 0x{:x})",

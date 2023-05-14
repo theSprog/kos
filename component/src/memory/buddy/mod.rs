@@ -13,6 +13,7 @@ use core::ptr::NonNull;
 // 使用的是 spin 自旋方式, 来自外部库 spin, 而非 std
 // 因为只有 mutex 变量才能够线程间安全共享
 extern crate spin;
+use logger::info;
 use spin::Mutex;
 
 mod linked_list;
@@ -88,6 +89,7 @@ impl<const ORDER: usize> Heap<ORDER> {
 
     /// Add a range of memory [start, start+size) to the heap
     pub fn init(&mut self, start: usize, size: usize) {
+        info!("Memory allocator: buddy allocator");
         unsafe {
             self.add_to_heap(start, start + size);
         }
@@ -223,9 +225,14 @@ impl<const ORDER: usize> fmt::Debug for Heap<ORDER> {
 ///     heap.lock().add_to_heap(begin, end);
 /// }
 /// ```
-pub struct LockedHeap<const ORDER: usize>(Mutex<Heap<ORDER>>);
 
-impl<const ORDER: usize> LockedHeap<ORDER> {
+/// 伙伴系统以块为分配单位，每个块包含若干个物理页，物理页的数量必须是 2 的幂次
+/// ORDER 决定了能 "连续分配" 的物理页, 相当于是空闲链表数组的长度。
+/// 第 n 个数组项有 2^n 个物理页面。总和可以大于堆大小，但不能小于
+const ORDER: usize = 32;
+pub struct LockedHeap(Mutex<Heap<ORDER>>);
+
+impl LockedHeap {
     /// Creates an empty heap
     pub const fn new() -> Self {
         LockedHeap(Mutex::new(Heap::<ORDER>::new()))
@@ -238,7 +245,7 @@ impl<const ORDER: usize> LockedHeap<ORDER> {
 }
 
 // 实现 deref 可以直接使用内部的 Heap, LockedHeap 就是对 Heap 的一层封装
-impl<const ORDER: usize> Deref for LockedHeap<ORDER> {
+impl Deref for LockedHeap {
     type Target = Mutex<Heap<ORDER>>;
 
     fn deref(&self) -> &Self::Target {
@@ -246,7 +253,7 @@ impl<const ORDER: usize> Deref for LockedHeap<ORDER> {
     }
 }
 
-unsafe impl<const ORDER: usize> GlobalAlloc for LockedHeap<ORDER> {
+unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // 调用内部的 Heap 的 alloc 实现
         // 其实也可以直接 self.lock() 但为了语义明显我们还是保留 self.0

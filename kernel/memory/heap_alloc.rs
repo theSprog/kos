@@ -1,6 +1,6 @@
 use crate::{
     init::get_kernel_bss_range, println, timer::get_time_ms, util::human_size, GeneralAllocator,
-    KERNEL_HEAP_ORDER, KERNEL_HEAP_SIZE, PAGE,
+    KERNEL_HEAP_SIZE, PAGE,
 };
 
 use alloc::{format, string::String};
@@ -15,8 +15,10 @@ use logger::{debug, info};
 // 将 GeneralAllocator 作为全局堆分配器, GeneralAllocator 必须实现 GlobalAlloc 要求的抽象接口
 #[global_allocator]
 static HEAP_ALLOCATOR: GeneralAllocator = GeneralAllocator::empty();
+
 // 内核堆空间, 位于内核的 .bss 段中
-static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+// 不需要 mut 因为分配器在分配时会自动 lock 整个堆
+static HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
 // 分配出错的 error handler
 #[alloc_error_handler]
@@ -56,32 +58,35 @@ pub fn init_heap() {
 }
 
 pub fn get_kernel_heap_range() -> Range<usize> {
-    unsafe { (HEAP_SPACE.as_ptr() as usize)..(HEAP_SPACE.as_ptr() as usize + KERNEL_HEAP_SIZE) }
+    (HEAP_SPACE.as_ptr() as usize)..(HEAP_SPACE.as_ptr() as usize + KERNEL_HEAP_SIZE)
 }
 
 pub fn heap_test() {
     use core::time::Duration;
 
     let start = Duration::from_millis(get_time_ms() as u64);
-    info!("Heap test start, Time: [{:8} ms]", start.as_millis());
+    info!("Heap test start, Start Time: [{:4} ms]", start.as_millis());
 
     let heap_range = get_kernel_heap_range();
     test_vec(&heap_range);
     test_box(&heap_range);
     test_string(&heap_range);
     test_hashmap(&heap_range);
+    test_slab(&heap_range);
 
     let end = Duration::from_millis(get_time_ms() as u64);
     info!(
-        "Heap test passed! good luck, Time: [{:8} ms]",
-        end.as_millis()
+        "Heap test passed! good luck, End Time: [{:4} ms], Time consumption: [{:4} ms]",
+        end.as_millis(),
+        Duration::from(end - start).as_millis()
     );
 }
 
 fn test_vec(heap_range: &Range<usize>) {
     use alloc::vec::Vec;
+    debug!("testing vector");
 
-    let len = 5000;
+    let len = 500;
     debug!("alloc Vec of usize (len: {})", len);
     let mut v: Vec<usize> = Vec::new();
     for i in 0..len {
@@ -98,7 +103,7 @@ fn test_vec(heap_range: &Range<usize>) {
     );
     debug!(
         "total size of (content of Vec<usize>) is {}",
-        core::mem::size_of_val(&v[0]) * v.len()
+        human_size(core::mem::size_of_val(&v[0]) * v.len())
     );
     assert!(heap_range.contains(&(v.as_ptr() as usize)));
     debug!("dealloc Vec");
@@ -107,6 +112,8 @@ fn test_vec(heap_range: &Range<usize>) {
 
 fn test_string(heap_range: &Range<usize>) {
     use alloc::string::String;
+    debug!("testing String");
+
     debug!("alloc String for random string");
     let mut string = String::new();
     string.push_str("random string");
@@ -119,6 +126,8 @@ fn test_string(heap_range: &Range<usize>) {
 }
 
 fn test_box(heap_range: &Range<usize>) {
+    debug!("testing Box");
+
     use alloc::boxed::Box;
     debug!("alloc Box ptr of '{}'", 5);
     let a = Box::new(5);
@@ -136,6 +145,7 @@ fn test_box(heap_range: &Range<usize>) {
 fn test_hashmap(heap_range: &Range<usize>) {
     use crate::alloc::string::ToString;
     use hashbrown::HashMap;
+    debug!("testing Hashmap");
 
     debug!("alloc hashmap for random insert String");
 
@@ -193,4 +203,42 @@ fn test_hashmap(heap_range: &Range<usize>) {
     for (book, review) in &book_reviews {
         debug!("{}: \"{}\"", book, review);
     }
+}
+
+fn test_slab(heap_range: &Range<usize>) {
+    use component::memory::slab::*;
+    debug!("testing slab allocator");
+
+    let mut slab = Slab::new();
+    let key1 = slab.insert("hello world");
+    let key2 = slab.insert("fuck world");
+    assert_eq!(slab[key1], "hello world");
+    assert_eq!(slab[key2], "fuck world");
+    slab[key2] = "goody world";
+    assert_eq!(slab[key2], "goody world");
+    drop(slab);
+
+    let mut slab = Slab::new();
+    let hello = {
+        let entry = slab.vacant_entry();
+        let key = entry.key();
+
+        entry.insert((key, "hello"));
+        key
+    };
+    assert_eq!(hello, slab[hello].0);
+    assert_eq!("hello", slab[hello].1);
+    drop(slab);
+
+    let mut slab = Slab::with_capacity(10);
+    let a = slab.insert('a');
+    slab.insert('b');
+    slab.insert('c');
+    slab.remove(a);
+    slab.compact(|&mut value, from, to| {
+        assert_eq!((value, from, to), ('c', 2, 0));
+        true
+    });
+    assert!(slab.capacity() >= 2 && slab.capacity() < 10);
+    drop(slab);
 }

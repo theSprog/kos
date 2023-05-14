@@ -82,6 +82,7 @@ pub fn logger_print(args: fmt::Arguments) {
 
 use spin::Mutex;
 static LOGGER_LOCK: Mutex<()> = Mutex::new(());
+#[allow(unused_variables)]
 pub fn print(color: i32, level: &'static str, args: fmt::Arguments) {
     let _lock = LOGGER_LOCK.lock();
     #[cfg(feature = "kernel")]

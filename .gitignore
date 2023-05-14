@@ -5,5 +5,8 @@
 /kos.bin
 /remember
 /user/target
+/user_lib/target
 /component/target
 /logger/target
+/qemu_config/target
+/sys_interface/target
