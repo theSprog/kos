@@ -1,53 +1,90 @@
 pub mod context;
-pub mod stack;
 pub mod switch;
 
+use core::todo;
+
 use crate::{
-    loader::{get_num_app, init_app_ctx},
+    loader::{get_app_data, get_num_app},
+    memory::{
+        address::*,
+        address_space::{AddressSpace, MapPermission, KERNEL_SPACE},
+        kernel_view::get_kernel_view,
+    },
     sbi::shutdown,
+    trap::{context::TrapContext, trap_handler},
     unicore::UPSafeCell,
     *,
 };
 
-use self::{context::TaskContext, stack::*};
+use self::context::TaskContext;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TaskStatus {
-    UnInit,  // 未初始化
     Ready,   // 准备运行
     Running, // 正在运行
     Died,    // 已退出
 }
 
 // Task Control Block, 任务控制块
-#[derive(Clone, Copy, Debug)]
 pub struct TCB {
     pub task_status: TaskStatus,
     pub task_cx: TaskContext,
-    pub user_stack: Option<&'static UserStack>,
-    pub kernel_stack: Option<&'static KernelStack>,
+
+    pub address_space: AddressSpace, // 应用程序的地址空间
+    pub trap_cx_ppn: PhysPageNum,    // 位于应用地址空间次高页的 Trap 上下文的物理页号
+    pub base_size: usize, // base_size 统计了应用数据的大小，也就是在应用地址空间中从 0x0 开始到用户栈结束一共包含多少字节
 }
 
 impl TCB {
-    pub fn new() -> TCB {
-        TCB {
-            task_status: TaskStatus::UnInit,
-            task_cx: TaskContext::default(),
-            user_stack: None,
-            kernel_stack: None,
-        }
+    pub fn new(elf_data: &[u8], app_id: usize) -> TCB {
+        let kernel_view = get_kernel_view();
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data);
+
+        // 查询 TrapContext 的物理页号
+        let trap_cx_ppn = address_space
+            .translate(VirtAddr::from(TRAP_CONTEXT).into())
+            .unwrap()
+            .ppn();
+
+        let task_status = TaskStatus::Ready;
+        // 在内核空间中申请内核栈
+        let (kernel_stack_bottom, kernel_stack_top) = kernel_view.kernel_stack_range(app_id);
+        KERNEL_SPACE.exclusive_access().insert_framed_segment(
+            kernel_stack_bottom.into(),
+            kernel_stack_top.into(),
+            MapPermission::R | MapPermission::W,
+        );
+        let tcb = Self {
+            task_status,
+            task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+            address_space,
+            trap_cx_ppn,
+            base_size: user_sp,
+        };
+
+        // 为用户空间准备 TrapContext
+        let trap_cx = tcb.get_trap_cx();
+        *trap_cx = TrapContext::app_init_context(
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.exclusive_access().token(),
+            kernel_stack_top,
+            trap_handler as usize,
+        );
+        tcb
     }
 
-    // 检查当前 TCB 的栈是否溢出
-    pub fn check_canary(&self) {
-        self.kernel_stack.unwrap().check_canary();
-        self.user_stack.unwrap().check_canary();
+    pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+        self.trap_cx_ppn.get_mut()
+    }
+
+    pub fn get_user_token(&self) -> usize {
+        self.address_space.token()
     }
 }
 
-#[derive(Clone, Copy)]
 struct TaskManagerInner {
-    tasks: [TCB; MAX_APP_NUM],
+    tasks: Vec<TCB>,
     current_task_idx: usize,
 }
 pub struct TaskManager {
@@ -55,52 +92,42 @@ pub struct TaskManager {
     inner: UPSafeCell<TaskManagerInner>, // 只是内部可变性, 而非结构体可变
 }
 
+impl TaskManager {
+    fn get_current_token(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task_idx;
+        inner.tasks[current].get_user_token()
+    }
+
+    fn get_current_trap_cx(&self) -> &mut TrapContext {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task_idx;
+        inner.tasks[current].get_trap_cx()
+    }
+}
+
+pub fn current_user_token() -> usize {
+    TASK_MANAGER.get_current_token()
+}
+
+pub fn current_trap_cx() -> &'static mut TrapContext {
+    TASK_MANAGER.get_current_trap_cx()
+}
+
+use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use logger::{debug, info};
+use logger::info;
 lazy_static! {
-    pub static ref TASK_MANAGER: TaskManager = {
+    pub(crate) static ref TASK_MANAGER: TaskManager = {
         info!("TASK_MANAGER initializing...");
         let num_app = get_num_app();
-        info!("APP_NUM: {}", num_app);
+        info!("App number: {}", num_app);
 
-        {
-            let kernel_stack_start = KERNEL_STACKS[0].data.as_ptr() as usize;
-            let kernel_stack_end = KERNEL_STACKS.last().unwrap().get_sp();
-            let kernel_stack_size = kernel_stack_end - kernel_stack_start;
-
-            debug!("Kernel-Stacks Address:\t [0x{:x}..0x{:x}), single_size:0x{:x}, num:{}, total_size: 0x{:x}",
-            kernel_stack_start,
-            kernel_stack_end,
-            kernel_stack_size / MAX_APP_NUM,
-            MAX_APP_NUM,
-            kernel_stack_size);
-
-            let user_stack_start = USER_STACKS[0].data.as_ptr() as usize;
-            let user_stack_end = USER_STACKS.last().unwrap().get_sp();
-            let user_stack_size = user_stack_end - user_stack_start;
-
-            debug!("User-Stacks Address:\t [0x{:x}..0x{:x}), single_size:0x{:x}, num:{}, total_size: 0x{:x}",
-            user_stack_start,
-            user_stack_end,
-            user_stack_size / MAX_APP_NUM,
-            MAX_APP_NUM,
-            user_stack_size);
+        let mut tasks: Vec<TCB> = Vec::new();
+        for i in 0..num_app {
+            info!("App-{} is managing by TASK_MANAGER", i);
+            tasks.push(TCB::new(get_app_data(i), i));
         }
-
-
-        let mut tasks = [TCB::new(); MAX_APP_NUM];
-
-
-        // 初始化, 但只初始化前 num_app 个
-        tasks.iter_mut().take(num_app).enumerate().for_each(|task_pack| {
-            let (app_id, task) = task_pack;
-            info!("Init app {}", app_id);
-            task.kernel_stack = Some(&KERNEL_STACKS[app_id]);
-            task.user_stack = Some(&USER_STACKS[app_id]);
-            // 将 ra 设置为 __restore 地址, 返回时 ret 到该地方开始回到用户态
-            task.task_cx = TaskContext::goto_restore(init_app_ctx(task, app_id));
-            task.task_status = TaskStatus::Ready;
-        });
 
         TaskManager {
             num_app,
@@ -115,22 +142,6 @@ lazy_static! {
 }
 
 impl TaskManager {
-    fn print_task_info(&self) {
-        for (app_id, task) in self
-            .inner
-            .exclusive_access()
-            .tasks
-            .iter()
-            .take(get_num_app())
-            .enumerate()
-        {
-            debug!(
-                "app_id: {}, task_status: {:?}, task_cx: {:#x?}",
-                app_id, task.task_status, task.task_cx
-            );
-        }
-    }
-
     fn mark_suspended(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
@@ -195,14 +206,11 @@ impl TaskManager {
             info!("All applications completed!");
             shutdown();
         }
-
-        // 检测是否栈溢出
-        self.check_canary();
     }
 
     fn start(&self) -> ! {
         info!("Now we starting app(s)!");
-
+        todo!("prepare to continue");
         let mut inner = self.inner.exclusive_access();
         assert!(!inner.tasks.is_empty());
 
@@ -235,17 +243,10 @@ impl TaskManager {
     ) {
         unsafe { crate::task::switch::__switch(current_task_ctx_ptr, next_task_ctx_ptr) }
     }
-
-    fn check_canary(&self) {
-        let inner = self.inner.exclusive_access();
-        let current = inner.current_task_idx;
-        inner.tasks[current].check_canary();
-    }
 }
 
 // 公有接口
 pub fn start() {
-    // TASK_MANAGER.print_task_info();
     TASK_MANAGER.start();
 }
 

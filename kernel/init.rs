@@ -1,20 +1,17 @@
-use core::ops::Range;
-
 use logger::{debug, info};
 
-use crate::{loader, trap};
-use crate::{memory, println, task, timer};
+use crate::memory::kernel_view::get_kernel_view;
+use crate::{loader, task, trap, KB};
+use crate::{memory, timer};
 
 pub fn kernel_start() -> bool {
     print_banner();
     clear_bss();
-
-    trap::init();
-    loader::init();
-    timer::init();
-    // task::start();
     memory::init();
 
+    trap::init();
+    timer::init(); // 开启分时机制
+    task::start();
     // 初始化成功
     true
 }
@@ -23,23 +20,13 @@ pub fn init() {
     // init process and never exit
 }
 
-pub fn get_kernel_bss_range() -> Range<usize> {
-    extern "C" {
-        // bss 起始处
-        fn sbss();
-        // bss 结束处
-        fn ebss();
-    }
-
-    sbss as usize..ebss as usize
-}
-
 fn clear_bss() {
-    let bss = get_kernel_bss_range();
+    let kernel_view = get_kernel_view();
+    let bss = kernel_view.bss_range();
     debug!(
-        "bss_start: {:p}, bss_end: {:p}, BSS size: 0x{:x} Bytes",
-        bss.start as *const u8,
-        bss.end as *const u8,
+        "bss_start: {:#x}, bss_end: {:#x}, BSS size: 0x{:#x} Bytes",
+        bss.start,
+        bss.end,
         bss.len()
     );
 
@@ -57,7 +44,15 @@ fn clear_bss() {
 }
 
 fn print_banner() {
-    println!("{}", include_str!("banner"));
+    crate::println!("{}", include_str!("banner"));
     info!("KOS: A Simple Riscv Operating System Written In Rust");
-    info!("Now I am initalizing something neccessary")
+    let kernel_view = get_kernel_view();
+    let kernel_range = kernel_view.kernel_range();
+    debug!(
+        "kernel_start: {:#x}, kernel_end: {:#x}, kernel size: {:#x} KiB",
+        kernel_range.start,
+        kernel_range.end,
+        kernel_range.len() / KB
+    );
+    info!("Now I am initalizing something neccessary");
 }

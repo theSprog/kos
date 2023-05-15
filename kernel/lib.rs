@@ -2,14 +2,15 @@
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
+#![feature(fn_align)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
 #[macro_use]
 extern crate lazy_static;
-
 extern crate alloc;
+extern crate bitflags;
 
 extern crate logger;
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
@@ -35,7 +36,9 @@ mod util;
 // 配置信息
 // ---------------------------------------------------------------------
 pub const KB: usize = 1024;
-pub const PAGE: usize = 4 * KB;
+pub const PAGE_SIZE: usize = 4 * KB;
+// 单页页宽
+pub const PAGE_SIZE_BITS: usize = 12;
 
 // 用户栈大小, 64K
 pub const USER_STACK_SIZE: usize = 64 * KB;
@@ -46,6 +49,9 @@ pub const KERNEL_STACK_SIZE: usize = 32 * KB;
 // 最多允许 8 个 app
 pub const MAX_APP_NUM: usize = 8;
 
+pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
+pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+
 /// QEMU 配置总内存大小 256 M, 区间 0x80000000..0x90000000
 /// 内存基本分区如下
 /// 0x80000000 - 0x80200000 固件(Firmware)地址
@@ -54,6 +60,8 @@ pub const MAX_APP_NUM: usize = 8;
 /// 0x8f000000 - 0x8f0012be 设备树区域
 /// 用户程序起始基地址
 pub const USER_BASE_ADDRESS: usize = 0x84000000;
+/// 可用内存空间的结尾, 从 USER_BASE_ADDRESS 到 MEMORY_END 会被页表管理
+pub const MEMORY_END: usize = 0x8f000000;
 // 每个 app 的 size 上限, 128K
 pub const APP_SIZE_LIMIT: usize = 0x20000;
 
@@ -67,8 +75,8 @@ pub const KERNEL_HEAP_SIZE: usize = 0x2_000_000;
 // ----------------------------------------------------------------
 // 使用 bitmap 分配内存
 use component::memory::bitmap::LockedHeap;
-type GeneralAllocator = LockedHeap;
+type KernelHeapAllocator = LockedHeap;
 
 // 使用 buddy 伙伴系统分配内存
 // use component::memory::buddy::LockedHeap;
-// type GeneralAllocator = LockedHeap;
+// type KernelHeapAllocator = LockedHeap;

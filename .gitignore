@@ -3,6 +3,7 @@
 /.vscode
 /kos
 /kos.bin
+/kosdisk
 /remember
 /user/target
 /user_lib/target

@@ -1,9 +1,7 @@
 use crate::{
-    init::get_kernel_bss_range, println, timer::get_time_ms, util::human_size, GeneralAllocator,
-    KERNEL_HEAP_SIZE, PAGE,
+    timer::get_time_ms, util::human_size, KernelHeapAllocator, KERNEL_HEAP_SIZE, PAGE_SIZE,
 };
 
-use alloc::{format, string::String};
 use core::{assert_eq, mem::size_of, ops::Range};
 use logger::{debug, info};
 
@@ -14,11 +12,12 @@ use logger::{debug, info};
 
 // 将 GeneralAllocator 作为全局堆分配器, GeneralAllocator 必须实现 GlobalAlloc 要求的抽象接口
 #[global_allocator]
-static HEAP_ALLOCATOR: GeneralAllocator = GeneralAllocator::empty();
+static HEAP_ALLOCATOR: KernelHeapAllocator = KernelHeapAllocator::empty();
 
-// 内核堆空间, 位于内核的 .bss 段中
-// 不需要 mut 因为分配器在分配时会自动 lock 整个堆
-static HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+/// 可以不需要 mut 关键字因为分配器在分配时会自动 lock 整个堆
+/// 但是如果不加 mut 会放进 .rodata 数据区, 而我们知道内核堆空间实际上并不是 .rodata
+/// 加上 mut 关键字后会放进 bss 数据区
+static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
 // 分配出错的 error handler
 #[alloc_error_handler]
@@ -33,13 +32,13 @@ pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
     panic!("Heap allocation error, layout = {:?}", layout);
 }
 
-pub fn init_heap() {
+pub fn init_allocator() {
     info!("Memory allocator initalizing");
     let heap_range = get_kernel_heap_range();
     info!("Kernel heap initalizing");
     assert_eq!(
         0,
-        heap_range.len() % PAGE,
+        heap_range.len() % PAGE_SIZE,
         "Kernel heap size must be an integer multiple of the page size"
     );
 
@@ -48,17 +47,20 @@ pub fn init_heap() {
         .init(heap_range.start, KERNEL_HEAP_SIZE); // 以起点和长度作为参数
 
     info!(
-        "kernel heap range: [0x{:x}..0x{:x}), size: {}",
+        "Kernel heap range: [{:#x}..0x{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
         human_size(heap_range.len()) // 现在我们已经可以使用 format! 宏格式化字符串了
     );
 
     info!("Now String, Vec and other internal data-structures are available");
+
+    // 测试是否可用
+    heap_test();
 }
 
 pub fn get_kernel_heap_range() -> Range<usize> {
-    (HEAP_SPACE.as_ptr() as usize)..(HEAP_SPACE.as_ptr() as usize + KERNEL_HEAP_SIZE)
+    unsafe { (HEAP_SPACE.as_ptr() as usize)..(HEAP_SPACE.as_ptr() as usize + KERNEL_HEAP_SIZE) }
 }
 
 pub fn heap_test() {
@@ -72,7 +74,7 @@ pub fn heap_test() {
     test_box(&heap_range);
     test_string(&heap_range);
     test_hashmap(&heap_range);
-    test_slab(&heap_range);
+    test_slab();
 
     let end = Duration::from_millis(get_time_ms() as u64);
     info!(
@@ -86,7 +88,7 @@ fn test_vec(heap_range: &Range<usize>) {
     use alloc::vec::Vec;
     debug!("testing vector");
 
-    let len = 500;
+    let len = 5000;
     debug!("alloc Vec of usize (len: {})", len);
     let mut v: Vec<usize> = Vec::new();
     for i in 0..len {
@@ -205,7 +207,7 @@ fn test_hashmap(heap_range: &Range<usize>) {
     }
 }
 
-fn test_slab(heap_range: &Range<usize>) {
+fn test_slab() {
     use component::memory::slab::*;
     debug!("testing slab allocator");
 

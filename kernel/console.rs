@@ -1,10 +1,5 @@
 use crate::sbi::console_putchar;
-use core::{
-    arch::asm,
-    cell::UnsafeCell,
-    fmt::{self, Write},
-    unreachable,
-};
+use core::fmt::{self, Write};
 
 struct Console;
 

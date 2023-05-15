@@ -7,12 +7,24 @@ pub fn human_size(size: usize) -> String {
     const G: usize = M * K;
 
     if size < K {
-        format!("{} B", size)
+        format!("{}B", size)
     } else if size < M {
-        format!("{} KB", size / K)
+        let kbs = size / K;
+        let rest = size % K;
+        if rest == 0 {
+            format!("{}KiB", kbs)
+        } else {
+            format!("{}KiB+{}", kbs, human_size(rest))
+        }
     } else if size < G {
-        format!("{} MB", size / M)
+        let mbs = size / M;
+        let rest = size % M;
+        if rest == 0 {
+            format!("{}MiB", mbs)
+        } else {
+            format!("{}MiB+{}", mbs, human_size(rest))
+        }
     } else {
-        format!("{} GB", size / G)
+        panic!("Too large size for {} Bytes", size)
     }
 }
