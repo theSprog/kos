@@ -13,7 +13,7 @@ pub fn get_num_app() -> usize {
     unsafe { (_num_app as usize as *const usize).read_volatile() }
 }
 
-pub fn get_app_data(app_id: usize) -> &'static [u8] {
+pub fn load_app(app_id: usize) -> &'static [u8] {
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_num_app();
 

@@ -6,10 +6,8 @@ use logger::info;
 use super::address::*;
 
 use crate::{
-    memory::kernel_view::{ get_kernel_view},
-    unicore::UPSafeCell,
-    util::human_size,
-    MEMORY_END, PAGE_SIZE,
+    memory::kernel_view::get_kernel_view, unicore::UPSafeCell, util::human_size, MEMORY_END,
+    PAGE_SIZE,
 };
 type FrameAllocatorImpl = StackFrameAllocator;
 lazy_static! {
@@ -38,7 +36,9 @@ pub fn init_frame_allocator() {
         free_end as *const u8,
         human_size(free_end - free_start)
     );
-    // into() 从物理地址中取出页号
+
+    // init 参数是 PhysPageNum
+    // 使用 into() 自动从物理地址中取出页号
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(free_start).into(),
         PhysAddr::from(free_end).into(),

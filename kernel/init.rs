@@ -11,7 +11,7 @@ pub fn kernel_start() -> bool {
 
     trap::init();
     timer::init(); // 开启分时机制
-    task::start();
+    task::api::start();
     // 初始化成功
     true
 }

@@ -6,7 +6,7 @@ use crate::sbi::set_timer;
 // 每秒执行多少次中断
 const INTERRUPT_PER_SEC: usize = 100;
 
-// 时间片长度
+// 时间片长度, 每秒 100 次中断, 每个时间片大概 10 ms
 const TIME_INTERVAL: usize = CLOCK_FREQ / INTERRUPT_PER_SEC;
 
 #[repr(C)]

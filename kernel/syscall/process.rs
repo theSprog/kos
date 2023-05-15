@@ -1,11 +1,11 @@
 use logger::info;
 
-use crate::task::{exit_and_run_next, suspend_and_run_next};
+use crate::task::api::*;
 use crate::timer::get_time_ms;
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
-    info!("[kernel] Application exited with code {}", exit_code);
+    info!("Application exited with code {}", exit_code);
     exit_and_run_next();
     panic!("Unreachable in sys_exit!");
 }

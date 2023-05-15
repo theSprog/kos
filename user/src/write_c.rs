@@ -6,7 +6,8 @@ extern crate user_lib;
 
 #[no_mangle]
 fn main() -> i32 {
-    loop {
+    for _i in 0..100 {
         print!("C");
     }
+    0
 }

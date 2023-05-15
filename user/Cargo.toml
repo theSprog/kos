@@ -25,3 +25,7 @@ path = "src/write_b.rs"
 [[bin]]
 name = "write_c"
 path = "src/write_c.rs"
+
+[[bin]]
+name = "stack_deep"
+path = "src/stack_deep.rs"

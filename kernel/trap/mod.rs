@@ -1,5 +1,9 @@
-use core::arch::{asm, global_asm};
+use core::{
+    arch::{asm, global_asm},
+    assert_eq, todo,
+};
 
+use alloc::vec::Vec;
 use logger::{info, warn};
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
@@ -8,10 +12,11 @@ use riscv::register::{
 };
 
 use crate::{
+    memory::address::{VirtAddr, VirtPageNum},
     syscall::syscall,
-    task::{current_trap_cx, current_user_token},
+    task::{self, TCB},
     timer::set_next_trigger,
-    TRAMPOLINE, TRAP_CONTEXT,
+    PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT,
 };
 
 pub mod context;
@@ -58,7 +63,7 @@ pub fn trap_return() -> ! {
     // 一旦返回用户态，trap 就可以通过 TRAMPOLINE 返回
     set_user_trap_entry();
     let trap_cx_ptr = TRAP_CONTEXT;
-    let user_satp = current_user_token();
+    let user_satp = task::api::current_user_token();
 
     // 最后我们需要跳转到 __restore ，
     // 以执行：切换到应用地址空间、从 Trap 上下文中恢复通用寄存器、 sret 继续执行应用
@@ -84,7 +89,7 @@ pub fn trap_return() -> ! {
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     // 调用 current_trap_cx 来获取当前应用的 Trap 上下文的可变引用而不是像之前那样作为参数传入 trap_handler
-    let cx = current_trap_cx();
+    let cx = task::api::current_trap_cx();
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
     match scause.cause() {
@@ -95,25 +100,45 @@ pub fn trap_handler() -> ! {
             // x17: syscallID; x10-x12: 参数
             cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;
         }
+
         // 如果是来自内存访问错误，包括低特权级访问高特权级寄存器
-        Trap::Exception(Exception::StoreFault) => {
-            warn!("PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
-            crate::task::exit_and_run_next();
+        Trap::Exception(Exception::StoreFault)
+        | Trap::Exception(Exception::StorePageFault)
+        // 页访问错误
+        | Trap::Exception(Exception::LoadFault)
+        | Trap::Exception(Exception::LoadPageFault) => {
+            let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
+
+            if tcb.address_space.valid_addr(stval) {
+                tcb.address_space.fix_page_fault(stval);
+            }
+            else {
+                warn!("PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
+                task::api::exit_and_run_next();
+            }
         }
-        Trap::Exception(Exception::StorePageFault) => {
-            warn!("PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
-            crate::task::exit_and_run_next();
-        }
+
         // 如果是来自非法指令, 例如用户态下 sret
         Trap::Exception(Exception::IllegalInstruction) => {
-            warn!("IllegalInstruction in application, kernel killed it.");
-            crate::task::exit_and_run_next();
+            warn!("IllegalInstruction in application, stval:{}, cx.sepc: {}. kernel killed it.", stval, cx.sepc);
+            task::api::exit_and_run_next();
         }
 
         // 处理 S 态的时钟中断
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             set_next_trigger();
-            crate::task::suspend_and_run_next();
+            task::api::suspend_and_run_next();
+        }
+
+        // 指令缺页异常
+        Trap::Exception(Exception::InstructionPageFault) => {
+            let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
+
+            if tcb.address_space.valid_addr(stval) {
+                tcb.address_space.fix_page_fault(stval);
+            }else {
+                warn!("PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
+            }
         }
 
         _ => {
@@ -127,3 +152,5 @@ pub fn trap_handler() -> ! {
 
     trap_return();
 }
+
+fn fun_name(tcb: &mut TCB, stval: usize) {}

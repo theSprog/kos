@@ -50,7 +50,7 @@ pub fn init_allocator() {
         "Kernel heap range: [{:#x}..0x{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
-        human_size(heap_range.len()) // 现在我们已经可以使用 format! 宏格式化字符串了
+        heap_range.len() // 现在我们已经可以使用 format! 宏格式化字符串了
     );
 
     info!("Now String, Vec and other internal data-structures are available");

@@ -4,7 +4,7 @@ pub mod switch;
 use core::todo;
 
 use crate::{
-    loader::{get_app_data, get_num_app},
+    loader::{get_num_app, load_app},
     memory::{
         address::*,
         address_space::{AddressSpace, MapPermission, KERNEL_SPACE},
@@ -17,6 +17,34 @@ use crate::{
 };
 
 use self::context::TaskContext;
+
+use alloc::vec::Vec;
+use lazy_static::lazy_static;
+use logger::info;
+
+lazy_static! {
+    pub(crate) static ref TASK_MANAGER: TaskManager = {
+        info!("TASK_MANAGER initializing...");
+        let num_app = get_num_app();
+        info!("App number: {}", num_app);
+
+        let mut tasks: Vec<TCB> = Vec::new();
+        for i in 0..num_app {
+            info!("App-{} is managing by TASK_MANAGER", i);
+            tasks.push(TCB::new(load_app(i), i));
+        }
+
+        TaskManager {
+            num_app,
+            inner: unsafe {
+                UPSafeCell::new(TaskManagerInner {
+                    tasks,
+                    current_task_idx: 0,
+                })
+            },
+        }
+    };
+}
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TaskStatus {
@@ -31,7 +59,7 @@ pub struct TCB {
     pub task_cx: TaskContext,
 
     pub address_space: AddressSpace, // 应用程序的地址空间
-    pub trap_cx_ppn: PhysPageNum,    // 位于应用地址空间次高页的 Trap 上下文的物理页号
+    pub trap_cx_ppn: PhysPageNum,    // 位于应用地址空间次高页的 TrapContext 的物理页号
     pub base_size: usize, // base_size 统计了应用数据的大小，也就是在应用地址空间中从 0x0 开始到用户栈结束一共包含多少字节
 }
 
@@ -93,6 +121,19 @@ pub struct TaskManager {
 }
 
 impl TaskManager {
+    fn get_current_tcb(&self) -> *mut TCB {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task_idx;
+        let tcb = &mut inner.tasks[current] as *mut TCB;
+        drop(inner);
+        tcb
+    }
+
+    fn get_current_tid(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.current_task_idx
+    }
+
     fn get_current_token(&self) -> usize {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
@@ -104,44 +145,7 @@ impl TaskManager {
         let current = inner.current_task_idx;
         inner.tasks[current].get_trap_cx()
     }
-}
 
-pub fn current_user_token() -> usize {
-    TASK_MANAGER.get_current_token()
-}
-
-pub fn current_trap_cx() -> &'static mut TrapContext {
-    TASK_MANAGER.get_current_trap_cx()
-}
-
-use alloc::vec::Vec;
-use lazy_static::lazy_static;
-use logger::info;
-lazy_static! {
-    pub(crate) static ref TASK_MANAGER: TaskManager = {
-        info!("TASK_MANAGER initializing...");
-        let num_app = get_num_app();
-        info!("App number: {}", num_app);
-
-        let mut tasks: Vec<TCB> = Vec::new();
-        for i in 0..num_app {
-            info!("App-{} is managing by TASK_MANAGER", i);
-            tasks.push(TCB::new(get_app_data(i), i));
-        }
-
-        TaskManager {
-            num_app,
-            inner: unsafe {
-                UPSafeCell::new(TaskManagerInner {
-                    tasks,
-                    current_task_idx: 0,
-                })
-            },
-        }
-    };
-}
-
-impl TaskManager {
     fn mark_suspended(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
@@ -210,7 +214,6 @@ impl TaskManager {
 
     fn start(&self) -> ! {
         info!("Now we starting app(s)!");
-        todo!("prepare to continue");
         let mut inner = self.inner.exclusive_access();
         assert!(!inner.tasks.is_empty());
 
@@ -246,16 +249,36 @@ impl TaskManager {
 }
 
 // 公有接口
-pub fn start() {
-    TASK_MANAGER.start();
-}
 
-pub fn suspend_and_run_next() {
-    TASK_MANAGER.mark_suspended();
-    TASK_MANAGER.schedule();
-}
+pub mod api {
+    use super::*;
+    pub fn start() {
+        TASK_MANAGER.start();
+    }
 
-pub fn exit_and_run_next() {
-    TASK_MANAGER.mark_died();
-    TASK_MANAGER.schedule();
+    pub fn suspend_and_run_next() {
+        TASK_MANAGER.mark_suspended();
+        TASK_MANAGER.schedule();
+    }
+
+    pub fn exit_and_run_next() {
+        TASK_MANAGER.mark_died();
+        TASK_MANAGER.schedule();
+    }
+
+    pub fn current_tcb() -> *mut TCB {
+        TASK_MANAGER.get_current_tcb()
+    }
+
+    pub fn current_tid() -> usize {
+        TASK_MANAGER.get_current_tid()
+    }
+
+    pub fn current_user_token() -> usize {
+        TASK_MANAGER.get_current_token()
+    }
+
+    pub fn current_trap_cx() -> &'static mut TrapContext {
+        TASK_MANAGER.get_current_trap_cx()
+    }
 }

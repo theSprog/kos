@@ -9,7 +9,7 @@ pub struct PhysAddr(pub usize);
 
 /// SV39 对应 56 位物理地址
 const PA_WIDTH_SV39: usize = 56;
-/// SV39 对应的 39 位物理地址
+/// SV39 对应的 39 位虚拟地址
 const VA_WIDTH_SV39: usize = 39;
 /// 虚拟页号宽度
 /// |       PPN        |  offset  |
@@ -47,7 +47,7 @@ impl PhysAddr {
 }
 
 /// 物理页页号
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PhysPageNum(pub usize);
 
 /// 从一个 usize 转为 PPN, 同样只需要一定的范围
@@ -61,7 +61,6 @@ impl Into<usize> for PhysPageNum {
         self.0
     }
 }
-
 // 从物理地址中取出页号
 impl From<PhysAddr> for PhysPageNum {
     fn from(v: PhysAddr) -> Self {
@@ -147,6 +146,10 @@ pub struct VirtPageNum(pub usize);
 pub type VPNRange = SimpleRange<VirtPageNum>;
 
 impl VirtPageNum {
+    pub fn empty() -> Self {
+        VirtPageNum(0)
+    }
+
     // 一个 VirtPageNum 分为三个部分, 分别指向下一级别页目录号
     pub fn indexes(&self) -> [usize; 3] {
         let mut vpn = self.0;

@@ -1,3 +1,5 @@
+use core::{assert_eq, todo, unreachable};
+
 use super::{
     address::*,
     frame::{frame_alloc, PhysFrame},
@@ -6,11 +8,11 @@ use super::{
 };
 
 use crate::{
-    bitflags::bitflags, unicore::UPSafeCell, util::human_size, MEMORY_END, PAGE_SIZE, TRAMPOLINE,
-    TRAP_CONTEXT, USER_STACK_SIZE,
+    bitflags::bitflags, task, unicore::UPSafeCell, util::human_size, MEMORY_END, PAGE_SIZE,
+    TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
-use logger::info;
+use logger::{debug, info};
 
 // 内核空间
 lazy_static! {
@@ -69,9 +71,9 @@ impl Segment {
 
     /// map unmap 将当前逻辑段到物理内存的映射
     /// 从(传入的)该逻辑段所属的地址空间(AddressSpace)的多级页表中加入或删除
-    pub fn map(&mut self, address_space_page_table: &mut PageTable) {
+    pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
-            self.map_one(address_space_page_table, vpn);
+            self.map_one(page_table, vpn);
         }
     }
 
@@ -80,6 +82,7 @@ impl Segment {
             self.unmap_one(address_space_page_table, vpn);
         }
     }
+
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
@@ -88,6 +91,7 @@ impl Segment {
         let mut current_vpn = self.vpn_range.get_start();
         let len = data.len();
         loop {
+            // 逐页逐页地拷贝
             let src = &data[start..len.min(start + PAGE_SIZE)];
             let dst = &mut page_table
                 .translate(current_vpn)
@@ -103,19 +107,23 @@ impl Segment {
         }
     }
 
-    /// 对逻辑段中的单个虚拟页面进行映射
-    pub fn map_one(&mut self, address_space_page_table: &mut PageTable, vpn: VirtPageNum) {
+    /// 对逻辑段中的单个虚拟页面进行映射, 不需要指定物理页号, 该函数会自己分配一个页面
+    /// 返回分配的页面的物理页号
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
         let ppn = match self.map_type {
             MapType::Identical => PhysPageNum(vpn.0),
             MapType::Framed => {
+                // 分配物理页面
                 let frame = frame_alloc().unwrap();
                 let ret = frame.ppn;
                 self.data_frames.insert(vpn, frame);
                 ret
             }
         };
+        // segment 中包含 self.map_perm 字段, 用于设置该页的权限
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
-        address_space_page_table.map(vpn, ppn, pte_flags);
+        page_table.map(vpn, ppn, pte_flags);
+        ppn
     }
 
     /// 对逻辑段中的单个虚拟页面进行解映射
@@ -127,6 +135,12 @@ impl Segment {
             _ => {}
         }
         page_table.unmap(vpn);
+    }
+
+    fn contains(&self, v_addr: usize) -> bool {
+        let start_addr: VirtAddr = self.vpn_range.get_start().into();
+        let end_addr: VirtAddr = self.vpn_range.get_end().into();
+        start_addr.0 <= v_addr && v_addr <= end_addr.0
     }
 }
 
@@ -150,7 +164,7 @@ impl AddressSpace {
         }
     }
 
-    /// 向地址空间中压入一个逻辑段 (segment)
+    /// 向地址空间中添加一个逻辑段 (segment)
     /// 如果它是以 Framed 方式映射到物理内存，
     /// 还可以可选地在那些被映射到的物理页帧上写入一些初始化数据 data
     fn push(&mut self, mut segment: Segment, data: Option<&[u8]>) {
@@ -159,6 +173,49 @@ impl AddressSpace {
             segment.copy_data(&mut self.page_table, data);
         }
         self.segments.push(segment);
+    }
+
+    /// 以 lazy 的方式添加一个逻辑段, 只有访问该页的时候才会实现物理页分配与映射
+    fn push_lazy(&mut self, segment: Segment) {
+        self.segments.push(segment);
+    }
+
+    /// 用 elf 文件的对应内容填充到虚拟页上
+    pub fn fill_one_page(&mut self, vpn: VirtPageNum, elf_data: &[u8]) {
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+
+        // vpn 转为虚拟地址, 它必然是页对齐的
+        let v_addr = VirtAddr::from(vpn).0;
+        assert_eq!(0, v_addr % PAGE_SIZE);
+
+        let ph = elf
+            .program_iter()
+            .filter(|phdr| {
+                (phdr.virtual_addr() <= v_addr as u64)
+                    && (v_addr as u64 <= phdr.virtual_addr() + phdr.mem_size())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(1, ph.len());
+        let ph = &ph[0];
+        assert_eq!(0, ph.virtual_addr() as usize % PAGE_SIZE);
+
+        //先把需要加载的数据框定
+        let data = &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
+        // 需要加载的内容的起点
+        let start = v_addr - ph.virtual_addr() as usize;
+
+        // 需要加载的内容的大小, 最大一个页面
+        let size = PAGE_SIZE.min(ph.file_size() as usize - start);
+
+        // 划定源数据
+        let src = &data[start..start + size];
+        let pte = self.translate(vpn).unwrap();
+        assert!(pte.valid());
+        let dst = &mut pte.ppn().get_bytes_array()[..src.len()];
+        dst.copy_from_slice(src);
+        unsafe {
+            core::arch::asm!("fence.i");
+        }
     }
 
     /// Assume that no conflicts.
@@ -287,11 +344,14 @@ impl AddressSpace {
     /// 返回 user_sp 和 entry point.
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
         info!("Creating user ELF file mapping");
+
+        // 为应用程序申请一个地址空间
         let mut address_space = Self::new_bare();
         address_space.map_trampoline();
 
         // 用 U flag 映射用户程序
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
         assert_eq!(
@@ -301,15 +361,25 @@ impl AddressSpace {
             magic
         );
 
-        // 数清楚有多少 program header
+        // 计数有多少 program header
         let ph_count = elf_header.pt2.ph_count();
-        let mut max_end_vpn: VirtPageNum = VirtPageNum(0);
+        let mut max_end_vpn: VirtPageNum = VirtPageNum::empty();
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             // 如果需要 load
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 // 计算出起始和结束地址
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
+                // 起始地址应该要页边界对齐
+                assert_eq!(
+                    0,
+                    start_va.0 % PAGE_SIZE,
+                    "ELF program start_vaddr({:#x}) should aligned with 4K",
+                    start_va.0
+                );
+
+                // file_size 表示该段在文件中的大小
+                // mem_size 表示该段在内存中的大小
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
 
                 // 计算权限
@@ -330,10 +400,9 @@ impl AddressSpace {
                 // max_end_vpn 此处被修改, 一直被修改到最后一个 section 的结束
                 // PT_LOAD类型的代码段是根据 p_vaddr 来排布的，这就使得 max_end_vpn 可以严格递增
                 max_end_vpn = segment.vpn_range.get_end();
-                address_space.push(
-                    segment,
-                    Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
-                );
+
+                // 使用 lazy 方式, 只有当触发缺页时才分配物理页面
+                address_space.push_lazy(segment);
             }
         }
 
@@ -367,7 +436,7 @@ impl AddressSpace {
             None,
         );
 
-        // 返回
+        // 返回值
         (
             address_space,
             user_stack_top,
@@ -410,6 +479,40 @@ impl AddressSpace {
 
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
+    }
+
+    pub fn valid_addr(&self, v_addr: usize) -> bool {
+        for segment in &self.segments {
+            if segment.contains(v_addr) {
+                return true;
+            }
+        }
+        false
+    }
+
+    // segment 自身包含着权限，而不是在页中设定
+    pub fn map_page(&mut self, v_addr: usize) -> PhysPageNum {
+        let vpn: VirtPageNum = VirtAddr(v_addr).floor();
+        assert!(!self.translate(vpn).unwrap().valid());
+        for segment in &mut self.segments {
+            if segment.contains(v_addr) {
+                // 建立起映射
+                return segment.map_one(&mut self.page_table, vpn);
+            }
+        }
+        unreachable!("use valid_addr() before alloc_page !");
+    }
+
+    // 修复缺页异常
+    pub fn fix_page_fault(&mut self, v_addr: usize) {
+        // 分配物理页
+        let ppn = self.map_page(v_addr);
+        // 找到虚拟页页号
+        let vpn = VirtAddr(v_addr).floor();
+
+        let elf_data = crate::loader::load_app(task::api::current_tid());
+        // 将 ELF 文件对应虚拟地址中的数据搬迁到此处
+        self.fill_one_page(vpn, elf_data);
     }
 }
 
