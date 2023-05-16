@@ -25,6 +25,7 @@ lazy_static! {
 }
 
 bitflags! {
+    #[derive(Debug, Copy, Clone)]
     pub struct MapPermission: u8 {
         const R = 1 << 1;
         const W = 1 << 2;
@@ -137,10 +138,10 @@ impl Segment {
         page_table.unmap(vpn);
     }
 
-    fn contains(&self, v_addr: usize) -> bool {
+    fn contains(&self, vaddr: usize) -> bool {
         let start_addr: VirtAddr = self.vpn_range.get_start().into();
         let end_addr: VirtAddr = self.vpn_range.get_end().into();
-        start_addr.0 <= v_addr && v_addr <= end_addr.0
+        start_addr.0 <= vaddr && vaddr < end_addr.0
     }
 }
 
@@ -180,29 +181,51 @@ impl AddressSpace {
         self.segments.push(segment);
     }
 
-    /// 用 elf 文件的对应内容填充到虚拟页上
-    pub fn fill_one_page(&mut self, vpn: VirtPageNum, elf_data: &[u8]) {
+    /// 填充虚拟内存, 可能会用到 elf 文件的对应内容。
+    /// 也可能不会, 例如填充栈段就不用 elf 指定
+    pub fn fill_one_page(&mut self, vpn: VirtPageNum) {
+        let elf_data = crate::loader::load_app(task::api::current_tid());
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
         // vpn 转为虚拟地址, 它必然是页对齐的
-        let v_addr = VirtAddr::from(vpn).0;
-        assert_eq!(0, v_addr % PAGE_SIZE);
+        let vaddr = VirtAddr::from(vpn).0;
+        assert_eq!(0, vaddr % PAGE_SIZE);
+
+        // 防御性检验, 该 vaddr 一定是在某一个 segment 中
+        let seg = self.select_seg_by_vaddr(vaddr);
+        assert!(seg.is_some());
 
         let ph = elf
             .program_iter()
             .filter(|phdr| {
-                (phdr.virtual_addr() <= v_addr as u64)
-                    && (v_addr as u64 <= phdr.virtual_addr() + phdr.mem_size())
+                (phdr.virtual_addr() <= vaddr as u64)
+                    && (vaddr as u64 <= phdr.virtual_addr() + phdr.mem_size())
             })
             .collect::<Vec<_>>();
-        assert_eq!(1, ph.len());
-        let ph = &ph[0];
+        //该 vaddr 有可能来自 elf, 也有可能是其他非 elf 的段(例如用户栈就是 kernel 所设定的)
+        assert!(ph.len() <= 1);
+
+        if ph.len() == 1 {
+            self.load_one_page_from_elf(ph[0], &elf, vpn);
+        }
+
+        // 如果是来自其他段, 由于之前已经申请过页面了, 所以直接用就行了
+    }
+
+    /// 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
+    fn load_one_page_from_elf(
+        &mut self,
+        ph: xmas_elf::program::ProgramHeader,
+        elf: &xmas_elf::ElfFile,
+        vpn: VirtPageNum,
+    ) {
+        let vaddr = VirtAddr::from(vpn).0;
         assert_eq!(0, ph.virtual_addr() as usize % PAGE_SIZE);
 
         //先把需要加载的数据框定
         let data = &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
         // 需要加载的内容的起点
-        let start = v_addr - ph.virtual_addr() as usize;
+        let start = vaddr - ph.virtual_addr() as usize;
 
         // 需要加载的内容的大小, 最大一个页面
         let size = PAGE_SIZE.min(ph.file_size() as usize - start);
@@ -415,15 +438,14 @@ impl AddressSpace {
         user_stack_bottom += PAGE_SIZE;
         // 用户栈栈顶, 从栈底延伸出一个 USER_STACK_SIZE 的空间大小
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        address_space.push(
-            Segment::new(
-                user_stack_bottom.into(),
-                user_stack_top.into(),
-                MapType::Framed,
-                MapPermission::R | MapPermission::W | MapPermission::U,
-            ),
-            None,
-        );
+
+        // 同样以 lazy 方式
+        address_space.push_lazy(Segment::new(
+            user_stack_bottom.into(),
+            user_stack_top.into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ));
 
         // map TrapContext
         address_space.push(
@@ -481,21 +503,38 @@ impl AddressSpace {
         self.page_table.translate(vpn)
     }
 
-    pub fn valid_addr(&self, v_addr: usize) -> bool {
+    pub fn is_page_fault(&self, vaddr: usize, perm: MapPermission) -> bool {
         for segment in &self.segments {
-            if segment.contains(v_addr) {
+            // 段内地址包含且权限正确
+            if segment.contains(vaddr) && segment.map_perm.contains(perm | MapPermission::U) {
                 return true;
             }
         }
         false
     }
 
-    // segment 自身包含着权限，而不是在页中设定
-    pub fn map_page(&mut self, v_addr: usize) -> PhysPageNum {
-        let vpn: VirtPageNum = VirtAddr(v_addr).floor();
-        assert!(!self.translate(vpn).unwrap().valid());
+    pub fn select_seg_by_vaddr(&self, vaddr: usize) -> Option<&Segment> {
+        let segs = self
+            .segments
+            .iter()
+            .filter(|seg| seg.contains(vaddr as usize))
+            .collect::<Vec<_>>();
+        assert!(segs.len() <= 1);
+
+        if segs.len() == 1 {
+            Some(segs[0])
+        } else {
+            None
+        }
+    }
+
+    // segment 自身包含着权限，直接取出用, 所以不需要再在参数中传递权限
+    pub fn map_phys_page(&mut self, vaddr: usize) -> PhysPageNum {
+        let vpn: VirtPageNum = VirtAddr(vaddr).floor();
+        let pte = self.translate(vpn);
+        assert!(pte.is_none() || !pte.unwrap().valid());
         for segment in &mut self.segments {
-            if segment.contains(v_addr) {
+            if segment.contains(vaddr) {
                 // 建立起映射
                 return segment.map_one(&mut self.page_table, vpn);
             }
@@ -504,15 +543,14 @@ impl AddressSpace {
     }
 
     // 修复缺页异常
-    pub fn fix_page_fault(&mut self, v_addr: usize) {
+    pub fn fix_page_fault(&mut self, vaddr: usize) {
         // 分配物理页
-        let ppn = self.map_page(v_addr);
+        let ppn = self.map_phys_page(vaddr);
         // 找到虚拟页页号
-        let vpn = VirtAddr(v_addr).floor();
+        let vpn = VirtAddr(vaddr).floor();
 
-        let elf_data = crate::loader::load_app(task::api::current_tid());
-        // 将 ELF 文件对应虚拟地址中的数据搬迁到此处
-        self.fill_one_page(vpn, elf_data);
+        // 有可能需要将 ELF 文件对应虚拟地址中的数据搬迁到此处
+        self.fill_one_page(vpn);
     }
 }
 
