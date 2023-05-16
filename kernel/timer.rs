@@ -1,7 +1,6 @@
-use logger::info;
-
-use crate::qemu_config::*;
 use crate::sbi::set_timer;
+use logger::info;
+use qemu_config::*;
 
 // 每秒执行多少次中断
 const INTERRUPT_PER_SEC: usize = 100;

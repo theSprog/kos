@@ -45,6 +45,6 @@ pub fn sys_yield() -> isize {
     syscall(SYSCALL_SCHED_YIELD, [0, 0, 0])
 }
 
-pub fn sys_get_time() -> isize {
+pub fn sys_get_time_of_day() -> isize {
     syscall(SYSCALL_GETTIMEOFDAY, [0, 0, 0])
 }

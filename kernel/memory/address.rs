@@ -112,6 +112,11 @@ impl From<VirtAddr> for usize {
         }
     }
 }
+impl From<VirtPageNum> for VirtAddr {
+    fn from(v: VirtPageNum) -> Self {
+        Self(v.0 << PAGE_SIZE_BITS)
+    }
+}
 
 impl VirtAddr {
     pub fn floor(&self) -> VirtPageNum {
@@ -134,16 +139,15 @@ impl From<VirtAddr> for VirtPageNum {
         v.floor()
     }
 }
-impl From<VirtPageNum> for VirtAddr {
-    fn from(v: VirtPageNum) -> Self {
-        Self(v.0 << PAGE_SIZE_BITS)
-    }
-}
+// impl From<VirtPageNum> for VirtAddr {
+//     fn from(v: VirtPageNum) -> Self {
+//         Self(v.0 << PAGE_SIZE_BITS)
+//     }
+// }
 
 /// 虚拟页页号
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtPageNum(pub usize);
-pub type VPNRange = SimpleRange<VirtPageNum>;
 
 impl VirtPageNum {
     pub fn empty() -> Self {
@@ -165,6 +169,8 @@ impl VirtPageNum {
         idx
     }
 }
+
+pub type VPNRange = SimpleRange<VirtPageNum>;
 
 pub trait StepByOne {
     fn step(&mut self);

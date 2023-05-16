@@ -6,7 +6,7 @@ use core::{
     fmt::{self, Write},
 };
 
-pub extern crate qemu_config;
+// pub extern crate qemu_config;
 pub extern crate riscv;
 
 #[inline(always)]
@@ -127,6 +127,27 @@ pub fn logger_now() -> usize {
     riscv::register::time::read()
 }
 
+#[macro_export]
+macro_rules! logger_time_ms {
+    () => {
+        $crate::logger_now() / qemu_config::MILLI_UNIT
+    };
+}
+
+#[macro_export]
+macro_rules! logger_time_us {
+    () => {
+        $crate::logger_now() / qemu_config::MICRO_UNIT
+    };
+}
+
+#[macro_export]
+macro_rules! logger_time_s {
+    () => {
+        $crate::logger_now() / qemu_config::SECOND_UNIT
+    };
+}
+
 /// 通用打印
 /// 类似样式
 /// [        79 ms][INFO]   [kernel] Application exited with code 1
@@ -137,27 +158,6 @@ macro_rules! log {
     }
 }
 
-#[macro_export]
-macro_rules! logger_time_ms {
-    () => {
-        $crate::logger_now() / $crate::qemu_config::MILLI_UNIT
-    };
-}
-
-#[macro_export]
-macro_rules! logger_time_us {
-    () => {
-        $crate::logger_now() / $crate::qemu_config::MICRO_UNIT
-    };
-}
-
-#[macro_export]
-macro_rules! logger_time_s {
-    () => {
-        $crate::logger_now() / $crate::qemu_config::SECOND_UNIT
-    };
-}
-
 /// 宏定义中加 $ 和不加 $ 区别:
 /// 加 $ 的 $crate 是去当前 crate(即 logger crate) 中寻找
 /// 不加 $ 的 $crate 是去使用 logger 的那个 crate 中寻找
@@ -166,7 +166,7 @@ macro_rules! logger_time_s {
 macro_rules! error {
     ($($arg:tt)*) => {
         if $crate::LogLevel::ERROR >= crate::LOG_LEVEL {
-            $crate::log!(crate::logger::Color::Red, "ERROR", $($arg)*)
+            $crate::log!($crate::Color::Red, "ERROR", $($arg)*)
         }
     }
 }
@@ -175,7 +175,7 @@ macro_rules! error {
 macro_rules! warn {
     ($($arg:tt)*) => {
         if  $crate::LogLevel::WARN >= crate::LOG_LEVEL{
-            $crate::log!(crate::logger::Color::Yellow, "WARN", $($arg)*)
+            $crate::log!($crate::Color::Yellow, "WARN", $($arg)*)
         }
     }
 }
@@ -184,7 +184,7 @@ macro_rules! warn {
 macro_rules! info {
     ($($arg:tt)*) => {
         if $crate::LogLevel::INFO >= crate::LOG_LEVEL {
-            $crate::log!(crate::logger::Color::Blue, "INFO", $($arg)*)
+            $crate::log!($crate::Color::Blue, "INFO", $($arg)*)
         }
     }
 }
@@ -193,7 +193,7 @@ macro_rules! info {
 macro_rules! debug {
     ($($arg:tt)*) => {
         if $crate::LogLevel::DEBUG >= crate::LOG_LEVEL {
-            $crate::log!(crate::logger::Color::Green, "DEBUG", $($arg)*)
+            $crate::log!($crate::Color::Green, "DEBUG", $($arg)*)
         }
     }
 }
@@ -202,7 +202,7 @@ macro_rules! debug {
 macro_rules! trace {
     ($($arg:tt)*) => {
         if $crate::LogLevel::TRACE >= crate::LOG_LEVEL {
-            $crate::log!(crate::logger::Color::Gray, "TRACE", $($arg)*)
+            $crate::log!($crate::Color::Gray, "TRACE", $($arg)*)
         }
     }
 }

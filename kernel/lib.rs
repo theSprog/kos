@@ -7,17 +7,12 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+
 #[macro_use]
 extern crate lazy_static;
 extern crate alloc;
 extern crate bitflags;
-
-extern crate logger;
-const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
-
-extern crate qemu_config;
-
-extern crate sys_interface;
 
 pub mod console;
 pub mod init;

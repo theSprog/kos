@@ -6,7 +6,7 @@ pub struct TrapContext {
     pub sstatus: Sstatus,
     pub sepc: usize, // 返回值 pc
 
-    pub kernel_satp: usize,  // mode 与 内核空间页表的地址, 见 satp 规范
+    pub kernel_satp: usize,  // 内核空间页表的物理地址
     pub kernel_sp: usize,    // 当前应用的内核栈栈顶的虚拟地址
     pub trap_handler: usize, // 内核中 trap handler 入口点的虚拟地址
 }

@@ -5,11 +5,20 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ['component', 'qemu_config', 'logger', 'sys_interface']
+exclude = [
+   'user',
+   'user_lib',
+]
+
 [dependencies]
-component = {path = "./component"}
+# 内部依赖
+component =  {path = "./component"}
 logger = {path = "./logger", features = ["kernel"]}
 qemu_config = {path = "./qemu_config"}
 sys_interface = {path = "./sys_interface"}
+# 外部依赖
 riscv = { version = "0.10.1" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 hashbrown = "0.13.2"

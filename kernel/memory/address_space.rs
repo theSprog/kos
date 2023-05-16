@@ -2,9 +2,10 @@ use core::{assert_eq, todo, unreachable};
 
 use super::{
     address::*,
-    frame::{frame_alloc, PhysFrame},
+    frame::PhysFrame,
     kernel_view::*,
     page_table::{PTEFlags, PageTable, PageTableEntry},
+    segment::*,
 };
 
 use crate::{
@@ -22,127 +23,6 @@ lazy_static! {
         info!("KERNEL_SPACE initializing...");
         Arc::new(unsafe { UPSafeCell::new(AddressSpace::new_kernel()) })
     };
-}
-
-bitflags! {
-    #[derive(Debug, Copy, Clone)]
-    pub struct MapPermission: u8 {
-        const R = 1 << 1;
-        const W = 1 << 2;
-        const X = 1 << 3;
-        const U = 1 << 4;
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum MapType {
-    Identical, // 恒等映射(虚拟地址 = 物理地址, 主要用于内核)
-    Framed,    // 每个虚拟页面都有一个新分配的物理页帧与之对应
-}
-
-/// 以逻辑段 MapArea 为单位描述一段地址连续的虚拟内存
-/// 例如代码段, 数据段, 只读数据段等
-pub struct Segment {
-    vpn_range: VPNRange, // 一段连续虚拟内存，表示该逻辑段在地址区间中的位置和长度
-    data_frames: BTreeMap<VirtPageNum, PhysFrame>, // 当 MapType 是 Framed 映射时有效
-    map_type: MapType,   // 映射类型
-    map_perm: MapPermission,
-}
-
-impl Segment {
-    pub fn new(
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-        map_type: MapType,
-        map_perm: MapPermission,
-    ) -> Self {
-        // 通过这两个操作扩充了虚拟页面范围, 扩充虚拟地址范围会产生冲突么 ?
-        // 起始点下沉到页边界
-        let start_vpn: VirtPageNum = start_va.floor();
-        // 结束点上浮到页边界
-        let end_vpn: VirtPageNum = end_va.ceil();
-
-        Self {
-            vpn_range: VPNRange::new(start_vpn, end_vpn),
-            data_frames: BTreeMap::new(),
-            map_type,
-            map_perm,
-        }
-    }
-
-    /// map unmap 将当前逻辑段到物理内存的映射
-    /// 从(传入的)该逻辑段所属的地址空间(AddressSpace)的多级页表中加入或删除
-    pub fn map(&mut self, page_table: &mut PageTable) {
-        for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
-        }
-    }
-
-    pub fn unmap(&mut self, address_space_page_table: &mut PageTable) {
-        for vpn in self.vpn_range {
-            self.unmap_one(address_space_page_table, vpn);
-        }
-    }
-
-    /// data: start-aligned but maybe with shorter length
-    /// assume that all frames were cleared before
-    pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
-        assert_eq!(self.map_type, MapType::Framed);
-        let mut start: usize = 0;
-        let mut current_vpn = self.vpn_range.get_start();
-        let len = data.len();
-        loop {
-            // 逐页逐页地拷贝
-            let src = &data[start..len.min(start + PAGE_SIZE)];
-            let dst = &mut page_table
-                .translate(current_vpn)
-                .unwrap()
-                .ppn()
-                .get_bytes_array()[..src.len()];
-            dst.copy_from_slice(src);
-            start += PAGE_SIZE;
-            if start >= len {
-                break;
-            }
-            current_vpn.step();
-        }
-    }
-
-    /// 对逻辑段中的单个虚拟页面进行映射, 不需要指定物理页号, 该函数会自己分配一个页面
-    /// 返回分配的页面的物理页号
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
-        let ppn = match self.map_type {
-            MapType::Identical => PhysPageNum(vpn.0),
-            MapType::Framed => {
-                // 分配物理页面
-                let frame = frame_alloc().unwrap();
-                let ret = frame.ppn;
-                self.data_frames.insert(vpn, frame);
-                ret
-            }
-        };
-        // segment 中包含 self.map_perm 字段, 用于设置该页的权限
-        let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
-        ppn
-    }
-
-    /// 对逻辑段中的单个虚拟页面进行解映射
-    pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-        match self.map_type {
-            MapType::Framed => {
-                self.data_frames.remove(&vpn);
-            }
-            _ => {}
-        }
-        page_table.unmap(vpn);
-    }
-
-    fn contains(&self, vaddr: usize) -> bool {
-        let start_addr: VirtAddr = self.vpn_range.get_start().into();
-        let end_addr: VirtAddr = self.vpn_range.get_end().into();
-        start_addr.0 <= vaddr && vaddr < end_addr.0
-    }
 }
 
 /// 地址空间
@@ -163,6 +43,24 @@ impl AddressSpace {
             page_table: PageTable::new(),
             segments: Vec::new(),
         }
+    }
+
+    // 开启内核内存空间
+    pub fn enable_paging(&self) {
+        let satp = self.page_table.token();
+
+        info!("Enabling paging mechanism");
+        unsafe {
+            // satp : Supervisor Address Translation and Protection
+            // 写入页表基地址(物理地址), 开启分页
+            // 切换任务的时候， satp 也必须被同时切换
+            riscv::register::satp::write(satp);
+            // 使用 sfence.vma 指令刷新清空整个 TLB
+            // sfence.vma 可以使得所有发生在它后面的地址转换都能够看到所有排在它前面的写入操作
+            // 相当于是个内存屏障
+            core::arch::asm!("sfence.vma");
+        }
+        info!("Paging mechanism enabled");
     }
 
     /// 向地址空间中添加一个逻辑段 (segment)
@@ -206,14 +104,14 @@ impl AddressSpace {
         assert!(ph.len() <= 1);
 
         if ph.len() == 1 {
-            self.load_one_page_from_elf(ph[0], &elf, vpn);
+            self.fill_one_page_from_elf(ph[0], &elf, vpn);
         }
 
         // 如果是来自其他段, 由于之前已经申请过页面了, 所以直接用就行了
     }
 
     /// 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
-    fn load_one_page_from_elf(
+    fn fill_one_page_from_elf(
         &mut self,
         ph: xmas_elf::program::ProgramHeader,
         elf: &xmas_elf::ElfFile,
@@ -470,29 +368,11 @@ impl AddressSpace {
     fn map_trampoline(&mut self) {
         let kernel_view = get_kernel_view();
         // 将虚拟空间中的 TRAMPOLINE 与物理空间中的 strampoline 联系起来
-        self.page_table.map(
+        self.page_table.link(
             VirtAddr::from(TRAMPOLINE).into(),
             PhysAddr::from(kernel_view.strampoline).into(),
             PTEFlags::R | PTEFlags::X,
         );
-    }
-
-    // 开启内核内存空间
-    pub fn enable_paging(&self) {
-        let satp = self.page_table.token();
-
-        info!("Activating paging mechanism");
-        unsafe {
-            // satp : Supervisor Address Translation and Protection
-            // 写入页表基地址(物理地址), 开启分页
-            // 切换任务的时候， satp 也必须被同时切换
-            riscv::register::satp::write(satp);
-            // 使用 sfence.vma 指令刷新清空整个 TLB
-            // sfence.vma 可以使得所有发生在它后面的地址转换都能够看到所有排在它前面的写入操作
-            // 相当于是个内存屏障
-            core::arch::asm!("sfence.vma");
-        }
-        info!("Paging mechanism enabled");
     }
 
     pub fn token(&self) -> usize {
@@ -536,7 +416,7 @@ impl AddressSpace {
         for segment in &mut self.segments {
             if segment.contains(vaddr) {
                 // 建立起映射
-                return segment.map_one(&mut self.page_table, vpn);
+                return segment.alloc_one(&mut self.page_table, vpn);
             }
         }
         unreachable!("use valid_addr() before alloc_page !");

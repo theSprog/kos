@@ -7,8 +7,9 @@ use crate::{
     loader::{get_num_app, load_app},
     memory::{
         address::*,
-        address_space::{AddressSpace, MapPermission, KERNEL_SPACE},
+        address_space::{AddressSpace, KERNEL_SPACE},
         kernel_view::get_kernel_view,
+        segment::MapPermission,
     },
     sbi::shutdown,
     trap::{context::TrapContext, trap_handler},
@@ -59,7 +60,7 @@ pub struct TCB {
     pub task_cx: TaskContext,
 
     pub address_space: AddressSpace, // 应用程序的地址空间
-    pub trap_cx_ppn: PhysPageNum,    // 位于应用地址空间次高页的 TrapContext 的物理页号
+    pub trap_cx_ppn: PhysPageNum,    // 位于应用地址空间次高页的 TrapContext 的"物理"页号
     pub base_size: usize, // base_size 统计了应用数据的大小，也就是在应用地址空间中从 0x0 开始到用户栈结束一共包含多少字节
 }
 
@@ -102,6 +103,9 @@ impl TCB {
         tcb
     }
 
+    /// 由于应用的 Trap 上下文不在内核地址空间，
+    /// 因此需要调用 current_trap_cx 来获取当前应用的 Trap 上下文的物理页面
+    /// 内核中由于是恒等映射所以物理页和内核页相等
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
     }

@@ -46,7 +46,9 @@ __alltraps:
     sd t0, 32*8(sp)
     sd t1, 33*8(sp)
 
-    # 现在处理 sp 的问题，sscratch 由于之前的交换所以指向用户栈
+    # 现在处理 sp 的问题，sscratch 由于之前的交换所以指向用户栈, 
+    # 我们要保存的就是该栈指针, 这就是为什么我们之前不保存 x2 的原因, 
+    # 因为之前的 x2(sp) 已经被破坏了 (由于 csrrw sp, sscratch, sp 这句话)
     # 经过 t2 中转并存入 TrapContext 内存区域中
     csrr t2, sscratch
     sd t2, 2*8(sp)
@@ -56,11 +58,12 @@ __alltraps:
     ld t0, 34*8(sp)
     # 加载 trap_handler 到 t1
     ld t1, 36*8(sp)
-    # 通过对 sp 赋值使得栈指针转移到内核栈
+    # 通过对 sp 赋值使得栈指针转移到内核栈, 之前的 sp 指向应用空间的 TrapContext
     ld sp, 35*8(sp)
     # 至此用户态上下文被完全保存
 
     # 切换到内核页表，从而实现地址空间转换
+    # t0 中原本存放的是 kernel_satp, 内核页表物理地址
     csrw satp, t0
     sfence.vma
 
@@ -69,15 +72,16 @@ __alltraps:
 
 # 从 trap_handler 返回后就会直接顺势从 __restore 继续执行, 我们用此恢复上下文
 __restore:
-    # a0: TrapContext in user space(Constant); 
+    # a0: TrapContext in user space(常量); 
     # a1: user space token
     csrw satp, a1
     sfence.vma
-    # 地址空间切换完毕
+    # 地址空间切换完毕, 现在在用户空间
 
+    # 恢复 sscratch 使其指向应用空间的 TrapContext
     csrw sscratch, a0
     mv sp, a0
-    # 目前 sp 指向应用空间的 TrapContext, 开始恢复现场
+    # 目前 sp 指向应用空间的 TrapContext, 这里保存着 trap 之前的现场, 开始恢复现场
     # 每恢复一个寄存器，该寄存器就不能再使用，因此需要先恢复 CSR 寄存器
     ld t0, 32*8(sp) # sstatus
     ld t1, 33*8(sp) # sepc

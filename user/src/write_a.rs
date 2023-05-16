@@ -1,13 +1,13 @@
 #![no_std]
 #![no_main]
 
+use user_lib::get_time_of_day;
+
 #[macro_use]
 extern crate user_lib;
 
 #[no_mangle]
 fn main() -> i32 {
-    for _i in 0..10000 {
-        print!("A");
-    }
+    println!("current time: {}", get_time_of_day());
     0
 }

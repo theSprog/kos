@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 user_lib = { path = "../user_lib"}
+backtrace = { version = "0.3", default-features = false }
 
 [profile.release]
 debug = true

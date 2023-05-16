@@ -12,10 +12,7 @@ use riscv::register::{
 };
 
 use crate::{
-    memory::{
-        address::{VirtAddr, VirtPageNum},
-        address_space::MapPermission,
-    },
+    memory::{address::*, segment},
     syscall::syscall,
     task::{self, TCB},
     timer::set_next_trigger,
@@ -32,12 +29,13 @@ extern "C" {
     pub fn __restore();
 }
 
-// 设置发生 trap 时的模式和地址, 自此以后我们就有用户态与内核态的区分了
+/// 设置发生 trap 时的模式和地址, 自此以后我们就有用户态与内核态的区分了
 pub fn init() {
     info!("Trap initalizing");
     set_kernel_trap_entry();
 }
 
+/// 弱化 S态 –> S态的 Trap 处理过程
 #[no_mangle]
 #[repr(align(4096))]
 pub fn trap_from_kernel() -> ! {
@@ -66,10 +64,11 @@ pub fn trap_return() -> ! {
     // 一旦返回用户态，trap 就可以通过 TRAMPOLINE 陷入内核
     set_user_trap_entry();
     let trap_cx_ptr = TRAP_CONTEXT;
+    // 拿回用户页表
     let user_satp = task::api::current_user_token();
 
-    // 最后我们需要跳转到 __restore ，
-    // 以执行：切换到应用地址空间、从 Trap 上下文中恢复通用寄存器、 sret 继续执行应用
+    // 最后我们需要跳转到 __restore ，以执行：
+    // 切换到应用地址空间、从 Trap 上下文中恢复通用寄存器、 sret 继续执行应用
     // 由于 __alltraps 是对齐到地址空间跳板页面的起始地址 TRAMPOLINE 上的，
     // 则 __restore 的虚拟地址只需在 TRAMPOLINE 基础上加上 __restore 相对于 __alltraps 的偏移量即可
     let restore_va = TRAMPOLINE + __restore as usize - __alltraps as usize;
@@ -88,6 +87,7 @@ pub fn trap_return() -> ! {
 
 /// 处理中断或者系统调用
 /// x10 是返回值
+/// trap handler 只有在内核地址空间中才能访问
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
@@ -131,7 +131,10 @@ pub fn trap_handler() -> ! {
         // 写数据缺页
         Trap::Exception(Exception::StorePageFault) => {
             let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
-            if tcb.address_space.is_page_fault(stval, MapPermission::W) {
+            if tcb
+                .address_space
+                .is_page_fault(stval, segment::MapPermission::W)
+            {
                 tcb.address_space.fix_page_fault(stval);
             } else {
                 warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
@@ -141,7 +144,10 @@ pub fn trap_handler() -> ! {
         // 读数据缺页
         Trap::Exception(Exception::LoadPageFault) => {
             let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
-            if tcb.address_space.is_page_fault(stval, MapPermission::R) {
+            if tcb
+                .address_space
+                .is_page_fault(stval, segment::MapPermission::R)
+            {
                 tcb.address_space.fix_page_fault(stval);
             } else {
                 warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
@@ -152,7 +158,10 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::InstructionPageFault) => {
             let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
 
-            if tcb.address_space.is_page_fault(stval, MapPermission::X) {
+            if tcb
+                .address_space
+                .is_page_fault(stval, segment::MapPermission::X)
+            {
                 tcb.address_space.fix_page_fault(stval);
             } else {
                 warn!("PageFault in application: bad 'execute' instruction = {:#x} for there is unexecutable. kernel killed it.", stval);
@@ -169,7 +178,6 @@ pub fn trap_handler() -> ! {
         }
     }
 
+    // 返回用户地址空间
     trap_return();
 }
-
-fn fun_name(tcb: &mut TCB, stval: usize) {}

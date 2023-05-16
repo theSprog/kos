@@ -4,6 +4,7 @@ pub mod frame;
 pub mod heap_alloc;
 pub mod kernel_view;
 pub mod page_table;
+pub mod segment;
 
 pub fn init() {
     heap_alloc::init_allocator();

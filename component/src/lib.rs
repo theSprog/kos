@@ -2,7 +2,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-extern crate logger;
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 /// 本库用于放置各种可配置组件,

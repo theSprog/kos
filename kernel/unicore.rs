@@ -17,7 +17,8 @@ impl<T> UPSafeCell<T> {
         }
     }
 
-    // 由于是 borrow_mut 所以相比原生的 RefCell 它不再允许多个读操作同时存在
+    /// 以可变借用形式访问
+    /// 由于是 borrow_mut 所以相比原生的 RefCell 它不再允许多个读操作同时存在
     pub(crate) fn exclusive_access(&self) -> RefMut<'_, T> {
         self.inner.borrow_mut()
     }

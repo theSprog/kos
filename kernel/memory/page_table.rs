@@ -3,7 +3,7 @@ use bitflags::*;
 
 use super::{
     address::*,
-    frame::{frame_alloc, PhysFrame},
+    frame::{self, PhysFrame},
 };
 
 /// 页表
@@ -17,7 +17,7 @@ pub struct PageTable {
 
 impl PageTable {
     pub fn new() -> Self {
-        let frame = frame_alloc().unwrap();
+        let frame = frame::api::frame_alloc().unwrap();
         PageTable {
             root_ppn: frame.ppn,
             frames: alloc::vec![frame],
@@ -26,7 +26,7 @@ impl PageTable {
 
     // 建立虚拟页对物理页的映射, flags 是权限设置
     // 从某种意义上说，也是在向虚拟空间申请虚拟内存
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+    pub fn link(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         // 此处如果找不到页表项(物理页耗尽)则会返回 None, 所以我们 unwarp 会 panic
         // 目前的实现方式并不打算对物理页帧耗尽的情形做任何处理而是直接 panic 退出
         let pte = self.find_pte_create(vpn).unwrap();
@@ -35,7 +35,7 @@ impl PageTable {
         // 在所找到的页表项上写上物理地址，从而完成 map
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
-    pub fn unmap(&mut self, vpn: VirtPageNum) {
+    pub fn unlink(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte(vpn).unwrap();
         assert!(pte.valid(), "vpn {:?} is invalid before unmapping", vpn);
         // 置空
@@ -59,7 +59,7 @@ impl PageTable {
             }
             // 无效页面, 需要置为有效
             if !pte.valid() {
-                let frame = frame_alloc().unwrap();
+                let frame = frame::api::frame_alloc().unwrap();
                 // PTEFlags::V 标记被分配
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 self.frames.push(frame);
@@ -106,6 +106,7 @@ impl PageTable {
     /// 当 MODE 设置为 0 的时候，代表所有访存都被视为物理地址；
     /// 而设置为 8 的时候，SV39 分页机制被启用，所有 S/U 特权级的访存被视为一个 39 位的虚拟地址
     /// 它们于是需要经过 MMU 的地址转换流程
+    /// token 就相当于页表的基地址(以物理地址表示)
     pub fn token(&self) -> usize {
         let mode = 0b1000 as usize;
         // << 优先级高于 |
@@ -180,7 +181,7 @@ impl PageTableEntry {
 /// translated_byte_buffer 将用户应用地址空间中一个缓冲区转化为在内核空间中能够直接访问的形式
 /// 之所以用 vec 是因为数据有可能跨页，一旦跨页数据就会被拆开，因此以 Vec 的形式返回
 pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
-    let page_table = PageTable::from_token(token);
+    let page_table = PageTable::from_token(token); // 拿到页表
     let mut start = ptr as usize;
     let end = start + len;
     let mut ret = Vec::new();

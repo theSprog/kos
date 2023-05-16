@@ -6,9 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# 由于我们定义了自己的用户级 panic, 因此在编译本库的时候禁用 kernel 的 panic
 sys_interface = {path = "../sys_interface"}
+# features 选择 user 模式
 logger = {path = "../logger", features = ["user"]}
+
+# 外部依赖
 spin = "0.9.6"
 
 [profile.release]

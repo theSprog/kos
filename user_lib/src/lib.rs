@@ -63,6 +63,6 @@ pub fn exit(exit_code: i32) -> isize {
 pub fn yield_cpu() -> isize {
     sys_yield()
 }
-pub fn get_time() -> isize {
-    sys_get_time()
+pub fn get_time_of_day() -> isize {
+    sys_get_time_of_day()
 }

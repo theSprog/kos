@@ -102,18 +102,6 @@ impl FrameAllocator for StackFrameAllocator {
     }
 }
 
-/// 公开给其他内核模块调用的分配/回收物理页帧的接口
-pub fn frame_alloc() -> Option<PhysFrame> {
-    FRAME_ALLOCATOR
-        .exclusive_access()
-        .alloc()
-        .map(|ppn| PhysFrame::new(ppn))
-}
-/// drop 隐式调用, 所以不公开
-fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
-}
-
 /// 物理页帧分配的接口是调用 frame_alloc 函数得到一个 PhysFrame （如果物理内存还有剩余），
 /// 它就代表了一个物理页帧，当它的生命周期结束之后它所控制的物理页帧将被自动回收
 pub struct PhysFrame {
@@ -133,6 +121,22 @@ impl PhysFrame {
 
 impl Drop for PhysFrame {
     fn drop(&mut self) {
-        frame_dealloc(self.ppn);
+        api::frame_dealloc(self.ppn);
+    }
+}
+
+pub mod api {
+    use super::*;
+    /// 公开给其他内核模块调用的分配/回收物理页帧的接口
+    pub fn frame_alloc() -> Option<PhysFrame> {
+        FRAME_ALLOCATOR
+            .exclusive_access()
+            .alloc()
+            .map(|ppn| PhysFrame::new(ppn))
+    }
+
+    /// drop 隐式调用, 所以不公开
+    pub(super) fn frame_dealloc(ppn: PhysPageNum) {
+        FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
     }
 }
