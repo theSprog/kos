@@ -2,7 +2,7 @@ use core::arch::asm;
 
 use logger::{debug, info};
 
-use crate::{unicore::UPSafeCell, *};
+use crate::{sync::unicore::UPSafeCell, *};
 
 extern "C" {
     pub fn _num_app();

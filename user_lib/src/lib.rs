@@ -9,9 +9,14 @@ pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 #[macro_use]
 pub mod console;
+
+// 向外提供 kernel 配置，例如页大小
+pub use sys_interface::config::*;
+
 mod lang_items;
 mod syscall;
 
+use core::todo;
 use syscall::*;
 
 // 应用程序入口点
@@ -65,4 +70,15 @@ pub fn yield_cpu() -> isize {
 }
 pub fn get_time_of_day() -> isize {
     sys_get_time_of_day()
+}
+
+pub fn brk(addr: usize) -> i32 {
+    // On success, brk() returns zero.  On error, -1 is returned
+    // sys_brk(addr) as i32;
+    todo!();
+}
+
+pub fn sbrk(incrment: usize) -> usize {
+    // 调用 brk 进行实现
+    sys_sbrk(incrment) as usize
 }

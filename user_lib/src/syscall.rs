@@ -1,4 +1,4 @@
-use core::arch::asm;
+use core::{arch::asm, todo};
 
 use sys_interface::syscall::*;
 
@@ -47,4 +47,13 @@ pub fn sys_yield() -> isize {
 
 pub fn sys_get_time_of_day() -> isize {
     syscall(SYSCALL_GETTIMEOFDAY, [0, 0, 0])
+}
+
+pub fn sys_brk(addr: usize) -> isize {
+    todo!();
+}
+
+pub fn sys_sbrk(incrment: usize) -> isize {
+    // 目前 sbrk 暂时借用 brk 系统调用
+    syscall(SYSCALL_BRK, [incrment, 0, 0])
 }

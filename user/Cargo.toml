@@ -30,3 +30,7 @@ path = "src/write_c.rs"
 [[bin]]
 name = "stack_deep"
 path = "src/stack_deep.rs"
+
+[[bin]]
+name = "sbrk"
+path = "src/sbrk.rs"

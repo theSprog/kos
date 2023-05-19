@@ -5,17 +5,18 @@ use logger::info;
 
 use super::address::*;
 
+use crate::lazy_static::lazy_static;
 use crate::{
-    memory::kernel_view::get_kernel_view, unicore::UPSafeCell, util::human_size, MEMORY_END,
-    PAGE_SIZE,
+    memory::kernel_view::get_kernel_view, sync::unicore::UPSafeCell, MEMORY_END, PAGE_SIZE,
 };
-type FrameAllocatorImpl = StackFrameAllocator;
+use component::util::*;
 lazy_static! {
     pub(crate) static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> = {
         info!("FRAME_ALLOCATOR Initializing...");
         unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) }
     };
 }
+type FrameAllocatorImpl = StackFrameAllocator;
 
 pub fn init_frame_allocator() {
     let kernel_view = get_kernel_view();

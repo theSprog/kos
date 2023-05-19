@@ -9,10 +9,9 @@
 
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
-#[macro_use]
-extern crate lazy_static;
 extern crate alloc;
 extern crate bitflags;
+extern crate lazy_static;
 
 pub mod console;
 pub mod init;
@@ -21,26 +20,15 @@ mod lang_items;
 mod loader;
 mod memory;
 mod sbi;
+mod sync;
 mod syscall;
 mod task;
 mod timer;
 mod trap;
-mod unicore;
-mod util;
 
 // 配置信息
 // ---------------------------------------------------------------------
-pub const KB: usize = 1024;
-pub const MB: usize = 1024 * KB;
-pub const PAGE_SIZE: usize = 4 * KB;
-// 单页页宽
-pub const PAGE_SIZE_BITS: usize = 12;
-
-// 用户栈大小, 8MB, 由于有了虚拟内存, 可以开大一点
-pub const USER_STACK_SIZE: usize = 8 * MB;
-// 内核栈大小, 512K, 应该开大一点，因为内核栈有时候会爆栈
-// 比如下面的栈经过测试 3KB 会提示内核栈溢出 (canary 机制, 以及分页后的 guard page 机制)
-pub const KERNEL_STACK_SIZE: usize = 512 * KB;
+use sys_interface::config::*;
 
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
@@ -56,7 +44,7 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 pub const MEMORY_END: usize = 0x8f000000;
 
 /// 内核堆大小 32M
-pub const KERNEL_HEAP_SIZE: usize = 0x2_000_000;
+pub const KERNEL_HEAP_SIZE: usize = 32 * MB;
 
 // 外部组件
 // ----------------------------------------------------------------

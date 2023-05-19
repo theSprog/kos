@@ -1,5 +1,6 @@
 use alloc::format;
 use alloc::string::String;
+use logger::error;
 
 pub fn human_size(size: usize) -> String {
     const K: usize = 1024;

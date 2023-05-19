@@ -1,7 +1,6 @@
-use crate::{
-    timer::get_time_ms, util::human_size, KernelHeapAllocator, KERNEL_HEAP_SIZE, PAGE_SIZE,
-};
+use crate::{timer::get_time_ms, KernelHeapAllocator, KERNEL_HEAP_SIZE, PAGE_SIZE};
 
+use component::util::*;
 use core::{assert_eq, mem::size_of, ops::Range};
 use logger::{debug, info};
 
@@ -50,7 +49,7 @@ pub fn init_allocator() {
         "Kernel heap range: [{:#x}..0x{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
-        heap_range.len() // 现在我们已经可以使用 format! 宏格式化字符串了
+        human_size(heap_range.len()) // 现在我们已经可以使用 format! 宏格式化字符串了
     );
 
     info!("Now String, Vec and other internal data-structures are available");
@@ -82,6 +81,15 @@ pub fn heap_test() {
         end.as_millis(),
         Duration::from(end - start).as_millis()
     );
+
+    api::display_heap_info();
+}
+
+pub mod api {
+    use super::*;
+    pub fn display_heap_info() {
+        HEAP_ALLOCATOR.display();
+    }
 }
 
 fn test_vec(heap_range: &Range<usize>) {

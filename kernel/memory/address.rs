@@ -1,7 +1,7 @@
 //!  本 mod 存放地址相关的数据结构，提供各个地址的转换规则以及辅助函数
 use super::page_table::PageTableEntry;
 use crate::{PAGE_SIZE, PAGE_SIZE_BITS};
-use core::fmt::Debug;
+use core::{fmt::Debug, ops::Add};
 
 /// 物理地址
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -95,7 +95,7 @@ impl PhysPageNum {
 }
 
 /// 虚拟地址
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct VirtAddr(pub usize);
 
 impl From<usize> for VirtAddr {
@@ -139,11 +139,6 @@ impl From<VirtAddr> for VirtPageNum {
         v.floor()
     }
 }
-// impl From<VirtPageNum> for VirtAddr {
-//     fn from(v: VirtPageNum) -> Self {
-//         Self(v.0 << PAGE_SIZE_BITS)
-//     }
-// }
 
 /// 虚拟页页号
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -167,6 +162,20 @@ impl VirtPageNum {
             vpn >>= 9;
         }
         idx
+    }
+}
+
+impl From<usize> for VirtPageNum {
+    fn from(v: usize) -> Self {
+        Self(v)
+    }
+}
+
+impl Add for VirtPageNum {
+    type Output = VirtPageNum;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        VirtPageNum::from(self.0 + rhs.0)
     }
 }
 
@@ -202,6 +211,11 @@ where
     }
     pub fn get_end(&self) -> T {
         self.r
+    }
+
+    // special for heap
+    pub fn set_end(&mut self, end: T) {
+        self.r = end;
     }
 }
 impl<T> IntoIterator for SimpleRange<T>

@@ -12,8 +12,8 @@ use crate::{
         segment::MapPermission,
     },
     sbi::shutdown,
+    sync::unicore::UPSafeCell,
     trap::{context::TrapContext, trap_handler},
-    unicore::UPSafeCell,
     *,
 };
 
@@ -125,12 +125,12 @@ pub struct TaskManager {
 }
 
 impl TaskManager {
-    fn get_current_tcb(&self) -> *mut TCB {
+    fn get_current_tcb(&self) -> &mut TCB {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task_idx;
         let tcb = &mut inner.tasks[current] as *mut TCB;
         drop(inner);
-        tcb
+        unsafe { tcb.as_mut().unwrap() }
     }
 
     fn get_current_tid(&self) -> usize {
@@ -255,6 +255,8 @@ impl TaskManager {
 // 公有接口
 
 pub mod api {
+    use core::assert_eq;
+
     use super::*;
     pub fn start() {
         TASK_MANAGER.start();
@@ -270,7 +272,7 @@ pub mod api {
         TASK_MANAGER.schedule();
     }
 
-    pub fn current_tcb() -> *mut TCB {
+    pub fn current_tcb() -> &'static mut TCB {
         TASK_MANAGER.get_current_tcb()
     }
 
@@ -284,5 +286,24 @@ pub mod api {
 
     pub fn current_trap_cx() -> &'static mut TrapContext {
         TASK_MANAGER.get_current_trap_cx()
+    }
+
+    pub fn sbrk(incrment: usize) -> usize {
+        let tcb = TASK_MANAGER.get_current_tcb();
+        // 默认最后一个是 heap
+        let heap = tcb.address_space.heap();
+        let inc_vaddr = {
+            if incrment % PAGE_SIZE == 0 {
+                incrment // 不需要上取，已经是 PAGE_SIZE 的倍数
+            } else {
+                ((incrment / PAGE_SIZE) + 1) * PAGE_SIZE // 上取到下一个 PAGE_SIZE 的倍数
+            }
+        };
+        assert_eq!(0, inc_vaddr % PAGE_SIZE);
+
+        heap.vpn_range
+            .set_end(heap.vpn_range.get_end() + VirtAddr(inc_vaddr).into());
+
+        VirtAddr::from(heap.vpn_range.get_end()).into()
     }
 }

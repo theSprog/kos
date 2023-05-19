@@ -1,11 +1,16 @@
+use crate::util::*;
 use core::{
     alloc::{GlobalAlloc, Layout},
     assert_eq, assert_ne,
     cmp::max,
     mem::size_of,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     ptr::{null_mut, NonNull},
 };
+use logger::{debug, info};
+use spin::Mutex;
+
+use super::IAllocator;
 
 macro_rules! look {
     ($num:expr, $pos:expr) => {
@@ -17,13 +22,12 @@ macro_rules! look {
 const BLOCK_UNIT: usize = size_of::<usize>();
 
 // 最大管理堆大小, 设为 64 MB
-const MB: usize = 1024 * 1024;
+const KB: usize = 1024;
+const MB: usize = 1024 * KB;
 const MAX_HEAP_SIZE: usize = 64 * MB;
 
 // 需要多少个 bits (最多 1MB = 64MB / (8*8))
 const BITMAP_SIZE: usize = MAX_HEAP_SIZE / (BLOCK_UNIT * 8);
-use logger::{debug, info};
-use spin::Mutex;
 
 pub struct Heap {
     // 用 1bit 代表一个 usize 区域的内存
@@ -31,7 +35,7 @@ pub struct Heap {
     // 位图的有效位末端, 位图有效区域 [0, endpoint)
     endpoint: usize,
 
-    // 堆的起始地址
+    // 堆的起始地址。堆的结束地址: heap_start_ptr + endpoint * BLOCK_UNIT
     heap_start_ptr: usize,
 
     // 附带信息
@@ -80,6 +84,8 @@ impl Heap {
             "end must be aligned with {}",
             size_of::<usize>()
         );
+
+        assert_eq!(0, size % MB, "size({}) must be a multiple of MB", size);
 
         unsafe {
             self.add_to_heap(start, start + size);
@@ -231,12 +237,23 @@ impl Heap {
         let offset = ((byte_idx * 8) + bit_idx) * BLOCK_UNIT;
         (self.heap_start_ptr + offset) as *mut u8
     }
+
+    fn display(&self) {
+        debug!(
+            "kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {:#x} B, allocated = {:#x} B, total = {} MiB",
+            self.heap_start_ptr,
+            self.heap_start_ptr + self.endpoint * BLOCK_UNIT,
+            self.user,
+            self.allocated,
+            self.total * BLOCK_UNIT / MB
+        );
+    }
 }
 
 pub struct LockedHeap(Mutex<Heap>);
 
+// 转发到内部实现
 impl LockedHeap {
-    /// Creates an empty heap
     pub const fn empty() -> Self {
         LockedHeap(Mutex::new(Heap::new()))
     }
@@ -244,7 +261,12 @@ impl LockedHeap {
     pub fn init(&mut self, start: usize, size: usize) {
         self.0.lock().init(start, size);
     }
+
+    pub fn display(&self) {
+        self.0.lock().display();
+    }
 }
+
 impl Deref for LockedHeap {
     type Target = Mutex<Heap>;
 

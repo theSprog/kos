@@ -9,10 +9,12 @@ use super::{
 };
 
 use crate::{
-    bitflags::bitflags, task, unicore::UPSafeCell, util::human_size, MEMORY_END, PAGE_SIZE,
+    bitflags::bitflags, memory::heap_alloc, sync::unicore::UPSafeCell, task, MEMORY_END, PAGE_SIZE,
     TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use component::util::*;
+use lazy_static::lazy_static;
 use logger::{debug, info};
 
 // 内核空间
@@ -43,6 +45,28 @@ impl AddressSpace {
             page_table: PageTable::new(),
             segments: Vec::new(),
         }
+    }
+
+    pub fn page_table(&self) -> &PageTable {
+        &self.page_table
+    }
+
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments
+    }
+
+    // 把倒数第二个 segement 必须设置为 stack 段
+    pub fn stack(&self) -> &Segment {
+        assert!(self.segments.len() >= 2);
+        &self.segments[self.segments.len() - 2]
+    }
+
+    // 把倒数第一个 segement 必须设置为 heap 段
+    // heap 是可变的
+    pub fn heap(&mut self) -> &mut Segment {
+        assert!(self.segments.len() >= 2);
+        let idx = self.segments.len() - 1;
+        &mut self.segments[idx]
     }
 
     // 开启内核内存空间
@@ -82,8 +106,13 @@ impl AddressSpace {
     /// 填充虚拟内存, 可能会用到 elf 文件的对应内容。
     /// 也可能不会, 例如填充栈段就不用 elf 指定
     pub fn fill_one_page(&mut self, vpn: VirtPageNum) {
+        // vpn 转为虚拟地址, 它必然是页对齐的
+        let vaddr = VirtAddr::from(vpn).0;
+        assert_eq!(0, vaddr % PAGE_SIZE);
+        // 防御性检验, 该 vaddr 一定是在某一个 segment 中
+        let seg = self.select_seg_by_vaddr(vaddr);
+        assert!(seg.is_some(), "vadder is not in any segment");
         let elf_data = crate::loader::load_app(task::api::current_tid());
-        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
         // vpn 转为虚拟地址, 它必然是页对齐的
         let vaddr = VirtAddr::from(vpn).0;
@@ -93,21 +122,24 @@ impl AddressSpace {
         let seg = self.select_seg_by_vaddr(vaddr);
         assert!(seg.is_some());
 
-        let ph = elf
-            .program_iter()
-            .filter(|phdr| {
-                (phdr.virtual_addr() <= vaddr as u64)
-                    && (vaddr as u64 <= phdr.virtual_addr() + phdr.mem_size())
-            })
-            .collect::<Vec<_>>();
-        //该 vaddr 有可能来自 elf, 也有可能是其他非 elf 的段(例如用户栈就是 kernel 所设定的)
-        assert!(ph.len() <= 1);
+        {
+            let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
-        if ph.len() == 1 {
-            self.fill_one_page_from_elf(ph[0], &elf, vpn);
+            let ph: Vec<_> = elf
+                .program_iter()
+                .filter(|phdr| {
+                    (phdr.virtual_addr() <= vaddr as u64)
+                        && (vaddr as u64 <= phdr.virtual_addr() + phdr.mem_size())
+                })
+                .collect();
+            //该 vaddr 有可能来自 elf, 也有可能是其他非 elf 的段(例如用户栈就是 kernel 所设定的)
+            assert!(ph.len() <= 1);
+
+            if ph.len() == 1 {
+                self.fill_one_page_from_elf(ph[0], &elf, vpn);
+            }
+            // 如果是来自其他段, 由于之前已经申请过页面了, 所以直接用就行了
         }
-
-        // 如果是来自其他段, 由于之前已经申请过页面了, 所以直接用就行了
     }
 
     /// 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
@@ -117,25 +149,23 @@ impl AddressSpace {
         elf: &xmas_elf::ElfFile,
         vpn: VirtPageNum,
     ) {
-        let vaddr = VirtAddr::from(vpn).0;
-        assert_eq!(0, ph.virtual_addr() as usize % PAGE_SIZE);
+        {
+            let vaddr = VirtAddr::from(vpn).0;
+            assert_eq!(0, ph.virtual_addr() as usize % PAGE_SIZE);
 
-        //先把需要加载的数据框定
-        let data = &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
-        // 需要加载的内容的起点
-        let start = vaddr - ph.virtual_addr() as usize;
+            //先把需要加载的数据框定
+            let data = &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
+            // 需要加载的内容的起点
+            let start = vaddr - ph.virtual_addr() as usize;
+            // 需要加载的内容的大小, 最大一个页面
+            let size = PAGE_SIZE.min(ph.file_size() as usize - start);
 
-        // 需要加载的内容的大小, 最大一个页面
-        let size = PAGE_SIZE.min(ph.file_size() as usize - start);
-
-        // 划定源数据
-        let src = &data[start..start + size];
-        let pte = self.translate(vpn).unwrap();
-        assert!(pte.valid());
-        let dst = &mut pte.ppn().get_bytes_array()[..src.len()];
-        dst.copy_from_slice(src);
-        unsafe {
-            core::arch::asm!("fence.i");
+            // 划定源数据
+            let src = &data[start..start + size];
+            let pte = self.translate(vpn).unwrap();
+            assert!(pte.valid());
+            let dst = &mut pte.ppn().get_bytes_array()[..src.len()];
+            dst.copy_from_slice(src);
         }
     }
 
@@ -258,6 +288,8 @@ impl AddressSpace {
         );
 
         info!("Kernel mapping done");
+        heap_alloc::api::display_heap_info();
+
         address_space
     }
 
@@ -268,25 +300,25 @@ impl AddressSpace {
 
         // 为应用程序申请一个地址空间
         let mut address_space = Self::new_bare();
+
+        // map trampoline
         address_space.map_trampoline();
 
-        // 用 U flag 映射用户程序
-        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
-
-        let elf_header = elf.header;
-        let magic = elf_header.pt1.magic;
-        assert_eq!(
-            magic,
-            [0x7f, b'E', b'L', b'F'],
-            "invalid ELF!, magic number : {:#?}",
-            magic
+        // map TrapContext
+        address_space.push(
+            Segment::new(
+                TRAP_CONTEXT.into(),
+                TRAMPOLINE.into(),
+                MapType::Framed,
+                MapPermission::R | MapPermission::W,
+            ),
+            None,
         );
 
-        // 计数有多少 program header
-        let ph_count = elf_header.pt2.ph_count();
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+
         let mut max_end_vpn: VirtPageNum = VirtPageNum::empty();
-        for i in 0..ph_count {
-            let ph = elf.program_header(i).unwrap();
+        for ph in elf.program_iter() {
             // 如果需要 load
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 // 计算出起始和结束地址
@@ -337,7 +369,7 @@ impl AddressSpace {
         // 用户栈栈顶, 从栈底延伸出一个 USER_STACK_SIZE 的空间大小
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
 
-        // 同样以 lazy 方式
+        // 栈内存同样以 lazy 方式
         address_space.push_lazy(Segment::new(
             user_stack_bottom.into(),
             user_stack_top.into(),
@@ -345,16 +377,16 @@ impl AddressSpace {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ));
 
-        // map TrapContext
-        address_space.push(
-            Segment::new(
-                TRAP_CONTEXT.into(),
-                TRAMPOLINE.into(),
-                MapType::Framed,
-                MapPermission::R | MapPermission::W,
-            ),
-            None,
-        );
+        // 堆内存, 堆向高地址生长, 最初时无内存
+        // 加上 PAGE_SIZE 是为了 guard page
+        address_space.push_lazy(Segment::new(
+            (user_stack_top + PAGE_SIZE).into(),
+            (user_stack_top + PAGE_SIZE).into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ));
+
+        heap_alloc::api::display_heap_info();
 
         // 返回值
         (

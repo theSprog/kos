@@ -23,3 +23,7 @@ pub fn sys_sched_yield() -> isize {
 pub fn sys_get_time_of_day() -> isize {
     timer::get_time_ms() as isize
 }
+
+pub fn sys_sbrk(incrment: usize) -> isize {
+    task::api::sbrk(incrment) as isize
+}

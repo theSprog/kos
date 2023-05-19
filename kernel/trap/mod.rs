@@ -130,7 +130,7 @@ pub fn trap_handler() -> ! {
         // 以下是三个缺页异常
         // 写数据缺页
         Trap::Exception(Exception::StorePageFault) => {
-            let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
+            let tcb = task::api::current_tcb();
             if tcb
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::W)
@@ -143,7 +143,7 @@ pub fn trap_handler() -> ! {
         }
         // 读数据缺页
         Trap::Exception(Exception::LoadPageFault) => {
-            let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
+            let tcb = task::api::current_tcb();
             if tcb
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::R)
@@ -156,7 +156,7 @@ pub fn trap_handler() -> ! {
         }
         // 执行指令缺页
         Trap::Exception(Exception::InstructionPageFault) => {
-            let tcb = unsafe { task::api::current_tcb().as_mut().unwrap() };
+            let tcb = task::api::current_tcb();
 
             if tcb
                 .address_space
