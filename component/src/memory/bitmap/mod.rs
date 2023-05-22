@@ -1,4 +1,5 @@
 use crate::util::*;
+use crate::MB;
 use core::{
     alloc::{GlobalAlloc, Layout},
     assert_eq, assert_ne,
@@ -22,8 +23,6 @@ macro_rules! look {
 const BLOCK_UNIT: usize = size_of::<usize>();
 
 // 最大管理堆大小, 设为 64 MB
-const KB: usize = 1024;
-const MB: usize = 1024 * KB;
 const MAX_HEAP_SIZE: usize = 64 * MB;
 
 // 需要多少个 bits (最多 1MB = 64MB / (8*8))
@@ -62,7 +61,10 @@ impl Heap {
 
     // 管理 size bytes 的堆大小
     pub fn init(&mut self, start: usize, size: usize) {
-        info!("Memory allocator: bitmap allocator");
+        info!(
+            "Memory allocator: bitmap allocator, size: {}",
+            human_size_n(size)
+        );
 
         assert!(
             size <= (8 * self.bitmap.len()) * BLOCK_UNIT,
@@ -105,14 +107,15 @@ impl Heap {
         if let Some(result) = result {
             self.user += layout.size();
             self.allocated += alloc_size;
-            return Ok(result);
+            Ok(result)
         } else {
-            return Err(());
+            Err(())
         }
     }
 
     pub fn dealloc(&mut self, ptr: NonNull<u8>, layout: Layout) {
         let dealloc_size = self.align(max(layout.size(), max(layout.align(), size_of::<usize>())));
+        assert_ne!(dealloc_size, 0);
         let offset = ptr.as_ptr() as usize - self.heap_start_ptr;
         assert_eq!(offset % BLOCK_UNIT, 0);
 
@@ -140,13 +143,14 @@ impl Heap {
 
     fn align(&self, size: usize) -> usize {
         if size / BLOCK_UNIT == 0 {
-            return size;
+            size
         } else {
-            return (size + BLOCK_UNIT - 1) / BLOCK_UNIT * BLOCK_UNIT;
+            (size + BLOCK_UNIT - 1) / BLOCK_UNIT * BLOCK_UNIT
         }
     }
 
     fn find_free(&mut self, units: usize) -> *mut u8 {
+        assert_ne!(units, 0);
         let mut byte_index = 0usize;
         let mut found_bits = 0usize;
 
@@ -192,7 +196,6 @@ impl Heap {
         assert!(fill == 0 || fill == 1);
 
         let (mut byte_idx, mut bit_idx) = start;
-
         for i in bit_idx..8usize {
             if fill == 0 {
                 // 如果填充 0 那么之前一定是 1
@@ -226,7 +229,10 @@ impl Heap {
                 }
                 byte_idx += 1;
             }
-            self.fill((byte_idx, bit_idx), rest, fill);
+
+            if rest != 0 {
+                self.fill((byte_idx, bit_idx), rest, fill);
+            }
         }
     }
 
@@ -239,13 +245,15 @@ impl Heap {
     }
 
     fn display(&self) {
+        // 此处必须使用不分配内存版本的 human_size_n
+        // 因为我们已经把全局堆锁住了, human_size 会无法分配内存而一直阻塞, 形成死锁
         debug!(
-            "kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {:#x} B, allocated = {:#x} B, total = {} MiB",
+            "kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {}, allocated = {}, total = {}",
             self.heap_start_ptr,
             self.heap_start_ptr + self.endpoint * BLOCK_UNIT,
-            self.user,
-            self.allocated,
-            self.total * BLOCK_UNIT / MB
+            human_size_n(self.user),
+            human_size_n(self.allocated),
+            human_size_n(self.total * BLOCK_UNIT)
         );
     }
 }
@@ -284,7 +292,9 @@ unsafe impl GlobalAlloc for LockedHeap {
             .lock()
             .alloc(layout)
             .ok()
-            .map_or(0 as *mut u8, |allocation| allocation.as_ptr())
+            .map_or(core::ptr::null_mut::<u8>(), |allocation| {
+                allocation.as_ptr()
+            })
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {

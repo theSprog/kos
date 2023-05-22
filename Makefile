@@ -1,24 +1,33 @@
 OS_DIR = target/riscv64gc-unknown-none-elf/release
+DEBUG_OS_DIR = target/riscv64gc-unknown-none-elf/debug
 QEMU_FLAGS = -machine virt -nographic -m 256M -smp 4
-QEMU_BIOS = -bios ./boot/rustsbi-qemu.bin -device loader,file=./kos.bin,addr=0x80200000
+QEMU_BIOS = -bios ./boot/rustsbi-qemu.bin -device loader,file=./kos,addr=0x80200000
 QEMU = qemu-system-riscv64
 TOOLS = ~/riscv64-elf-tools/bin
 KERNEL = kos
-KERNEL_BIN = kos.bin
 
-.PHONY: build run debugs debugc clean
+# 允许的指令
+.PHONY: run debugs debugc user_build clean
 
-build: clean
+# 使用原始的进入退出 make
+# 因为 makefile 会调用 python, 在处理路径时不协调
+# 使用 && 连接命令, 只有当前一个命令执行成功才会执行后一个命令
+user_build:
 	@cd ./user && make build && cd ..
+
+build: clean user_build 
 	cargo b --release
 	ln -sf $(OS_DIR)/$(KERNEL) ./$(KERNEL)
-	rust-objcopy --strip-all ./$(KERNEL) -O binary ./$(KERNEL_BIN)
 
 run: build
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_BIOS)
 
+debug_build: clean user_build 
+	cargo b
+	ln -sf $(DEBUG_OS_DIR)/$(KERNEL) ./$(KERNEL)
+
 # server
-debugs: build
+debugs: debug_build
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_BIOS) -s -S
 
 # client
@@ -28,5 +37,4 @@ debugc:
 clean:
 	cd ./user && make clean && cd ..
 	rm -f kos
-	rm -f kos.bin
 	cargo clean

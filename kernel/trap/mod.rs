@@ -4,7 +4,7 @@ use core::{
 };
 
 use alloc::vec::Vec;
-use logger::{info, warn};
+use logger::{debug, info, trace, warn};
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
@@ -12,9 +12,13 @@ use riscv::register::{
 };
 
 use crate::{
-    memory::{address::*, segment},
+    memory::{address::*, page_table::PageTable, segment},
+    process::processor::{
+        self,
+        api::{current_pcb_name, current_pid, current_user_token},
+    },
     syscall::syscall,
-    task::{self, TCB},
+    task::TCB,
     timer::set_next_trigger,
     PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT,
 };
@@ -55,7 +59,7 @@ fn set_kernel_trap_entry() {
 fn set_user_trap_entry() {
     unsafe {
         // 将 stvec 设置为 Direct 模式, 一旦发生 trap 总是陷入 TRAMPOLINE 地址
-        stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
+        stvec::write(TRAMPOLINE, TrapMode::Direct);
     }
 }
 
@@ -65,13 +69,13 @@ pub fn trap_return() -> ! {
     set_user_trap_entry();
     let trap_cx_ptr = TRAP_CONTEXT;
     // 拿回用户页表
-    let user_satp = task::api::current_user_token();
+    let user_satp = processor::api::current_user_token();
 
     // 最后我们需要跳转到 __restore ，以执行：
     // 切换到应用地址空间、从 Trap 上下文中恢复通用寄存器、 sret 继续执行应用
     // 由于 __alltraps 是对齐到地址空间跳板页面的起始地址 TRAMPOLINE 上的，
     // 则 __restore 的虚拟地址只需在 TRAMPOLINE 基础上加上 __restore 相对于 __alltraps 的偏移量即可
-    let restore_va = TRAMPOLINE + __restore as usize - __alltraps as usize;
+    let restore_va = TRAMPOLINE + (__restore as usize - __alltraps as usize);
     unsafe {
         asm!(
             // 清空指令缓存 i-cache
@@ -92,7 +96,7 @@ pub fn trap_return() -> ! {
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     // 调用 current_trap_cx 来获取当前应用的 Trap 上下文的可变引用而不是像之前那样作为参数传入 trap_handler
-    let cx = task::api::current_trap_cx();
+    let cx = processor::api::current_trap_cx();
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
     match scause.cause() {
@@ -100,7 +104,9 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::UserEnvCall) => {
             // 因为我们希望从 ecall 的下一条指令返回
             cx.sepc += 4;
-            // x17: syscallID; x10-x12: 参数
+
+            // x17: syscallID; 
+            // x10-x12: 参数
             cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;
         }
 
@@ -109,63 +115,103 @@ pub fn trap_handler() -> ! {
             // 设置好下一次时钟中断
             set_next_trigger();
             // 切换任务
-            task::api::suspend_and_run_next();
+            processor::api::suspend_and_run_next();
         }
 
         // 内存访问错误，类似写入只读区域, 包括低特权级访问高特权级寄存器
-        Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::LoadFault) => {
-            warn!("PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
-            task::api::exit_and_run_next();
+        Trap::Exception(Exception::LoadFault) => {
+            warn!("LoadFault in application-'{}'(pid={}), bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", current_pcb_name(),current_pid(), stval, cx.sepc);
+            processor::api::exit_and_run_next();
+        }
+
+        Trap::Exception(Exception::StoreFault) => {
+            warn!("StoreFault in application-'{}'(pid={}), bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", current_pcb_name(), current_pid(), stval, cx.sepc);
+            processor::api::exit_and_run_next();
         }
 
         // 如果是来自非法指令, 例如用户态下 sret
         Trap::Exception(Exception::IllegalInstruction) => {
             warn!(
-                "IllegalInstruction in application, stval:{}, cx.sepc: {}. kernel killed it.",
-                stval, cx.sepc
+                "IllegalInstruction in application-'{}'(pid={}), stval:{}, cx.sepc: {}. kernel killed it.",
+                current_pcb_name(),current_pid(),
+                stval,
+                cx.sepc
             );
-            task::api::exit_and_run_next();
+            processor::api::exit_and_run_next();
         }
 
         // 以下是三个缺页异常
         // 写数据缺页
         Trap::Exception(Exception::StorePageFault) => {
-            let tcb = task::api::current_tcb();
+            trace!(
+                "StorePageFault from application-'{}'(pid={})",
+                current_pcb_name(),
+                current_pid()
+            );
+            let tcb = processor::api::current_tcb();
+            // 先判断是不是缺页, 还是说真的是 page_fault
             if tcb
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::W)
             {
-                tcb.address_space.fix_page_fault(stval);
+                // 是否是 copy on write 
+                let vpn = VirtPageNum::from(VirtAddr::from(stval).floor());
+                let user_page_table = tcb.address_space.page_table();
+                let pte = user_page_table.translate(vpn);
+
+                // 页存在且有物理页映射, 但是不可写
+                if pte.is_some() && pte.unwrap().valid() && !pte.unwrap().writable() {
+                    // segment 可写, 但是 pte 表示不可写, 说明是 cow
+                    tcb.address_space.fix_page_fault_from_cow(stval);
+                } else {
+                    // 物理页不存在, 从 elf 文件中加载
+                    assert!(pte.is_none() || !pte.unwrap().valid());
+                    tcb.address_space.fix_page_fault_from_elf(stval);
+                }
             } else {
                 warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
-                task::api::exit_and_run_next();
+                processor::api::exit_and_run_next();
             }
         }
         // 读数据缺页
         Trap::Exception(Exception::LoadPageFault) => {
-            let tcb = task::api::current_tcb();
+            trace!(
+                "LoadPageFault from application-'{}'(pid={})",
+                current_pcb_name(),
+                current_pid()
+            );
+
+            let tcb = processor::api::current_tcb();
             if tcb
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::R)
             {
-                tcb.address_space.fix_page_fault(stval);
+                tcb.address_space.fix_page_fault_from_elf(stval);
             } else {
                 warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
-                task::api::exit_and_run_next();
+                processor::api::exit_and_run_next();
             }
         }
         // 执行指令缺页
         Trap::Exception(Exception::InstructionPageFault) => {
-            let tcb = task::api::current_tcb();
+            trace!(
+                "InstructionPageFault from app-'{}'(pid={})",
+                current_pcb_name(),
+                current_pid()
+            );
 
+            let tcb = processor::api::current_tcb();
             if tcb
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::X)
             {
-                tcb.address_space.fix_page_fault(stval);
+                tcb.address_space.fix_page_fault_from_elf(stval);
             } else {
-                warn!("PageFault in application: bad 'execute' instruction = {:#x} for there is unexecutable. kernel killed it.", stval);
-                task::api::exit_and_run_next();
+                warn!("PageFault in app-'{}'(pid={}): bad 'execute' instruction = {:#x}(addr= {:#x}) for there is unexecutable. kernel killed it.", 
+                current_pcb_name(), 
+                current_pid(),
+                stval, cx.sepc);
+                processor::api::exit_and_run_next();
             }
         }
 

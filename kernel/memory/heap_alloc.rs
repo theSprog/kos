@@ -49,7 +49,7 @@ pub fn init_allocator() {
         "Kernel heap range: [{:#x}..0x{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
-        human_size(heap_range.len()) // 现在我们已经可以使用 format! 宏格式化字符串了
+        human_size(heap_range.len())
     );
 
     info!("Now String, Vec and other internal data-structures are available");
@@ -79,7 +79,7 @@ pub fn heap_test() {
     info!(
         "Heap test passed! good luck, End Time: [{:4} ms], Time consumption: [{:4} ms]",
         end.as_millis(),
-        Duration::from(end - start).as_millis()
+        (end - start).as_millis()
     );
 
     api::display_heap_info();
@@ -102,8 +102,8 @@ fn test_vec(heap_range: &Range<usize>) {
     for i in 0..len {
         v.push(i);
     }
-    for i in 0..len {
-        assert_eq!(v[i], i);
+    for (i, item) in v.iter().enumerate().take(len) {
+        assert_eq!(*item, i);
     }
     debug!("size of Vec<usize> is {}", core::mem::size_of_val(&v));
 

@@ -21,9 +21,9 @@ impl From<usize> for PhysAddr {
         Self(v & ((1 << PA_WIDTH_SV39) - 1))
     }
 }
-impl Into<usize> for PhysAddr {
-    fn into(self) -> usize {
-        self.0
+impl From<PhysAddr> for usize {
+    fn from(val: PhysAddr) -> Self {
+        val.0
     }
 }
 impl From<PhysPageNum> for PhysAddr {
@@ -56,9 +56,9 @@ impl From<usize> for PhysPageNum {
         Self(v & ((1 << PPN_WIDTH_SV39) - 1))
     }
 }
-impl Into<usize> for PhysPageNum {
-    fn into(self) -> usize {
-        self.0
+impl From<PhysPageNum> for usize {
+    fn from(val: PhysPageNum) -> Self {
+        val.0
     }
 }
 // 从物理地址中取出页号
@@ -81,6 +81,8 @@ impl PhysPageNum {
             core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 1 << 9)
         }
     }
+
+    // 取出一个 page_size 的数据
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
         let pa: PhysAddr = (*self).into();
         unsafe {
@@ -88,6 +90,7 @@ impl PhysPageNum {
             core::slice::from_raw_parts_mut(pa.0 as *mut u8, PAGE_SIZE)
         }
     }
+
     pub fn get_mut<T>(&self) -> &'static mut T {
         let pa: PhysAddr = (*self).into();
         unsafe { (pa.0 as *mut T).as_mut().unwrap() }
@@ -152,16 +155,24 @@ impl VirtPageNum {
     // 一个 VirtPageNum 分为三个部分, 分别指向下一级别页目录号
     pub fn indexes(&self) -> [usize; 3] {
         let mut vpn = self.0;
-        let mut idx = [0usize; 3];
+        let mut idxs = [0usize; 3];
 
         // 高位是高层页表, 低位是低层页表, 因此需要逆转
         // |  0级  |  1级  |  2级   |
         for i in (0..3).rev() {
             // 取出 9 位
-            idx[i] = vpn & 0b1_1111_1111;
+            idxs[i] = vpn & 0b1_1111_1111;
             vpn >>= 9;
         }
-        idx
+        idxs
+    }
+}
+
+impl core::ops::Sub for VirtPageNum {
+    type Output = usize;
+
+    fn sub(self, other: VirtPageNum) -> Self::Output {
+        self.0 - other.0
     }
 }
 

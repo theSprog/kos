@@ -1,4 +1,4 @@
-use crate::trap::trap_return;
+use crate::{memory::kernel_view, process::pid, trap::trap_return};
 
 // 按照 C 方式解释，编译器不得重排它们
 #[repr(C)]
@@ -17,6 +17,18 @@ impl TaskContext {
         Self {
             ra: trap_return as usize,
             sp: kstack_ptr,
+            s: [0; 12],
+        }
+    }
+
+    pub fn idle() -> TaskContext {
+        // 生成一个 idle 进程的 TaskContext
+        const IDLE_PID: usize = 0;
+        let (bottom, top) = kernel_view::get_kernel_view().kernel_stack_range(IDLE_PID);
+
+        Self {
+            ra: 0 as usize,
+            sp: top,
             s: [0; 12],
         }
     }

@@ -10,27 +10,78 @@ user_lib = { path = "../user_lib"}
 backtrace = { version = "0.3", default-features = false }
 
 [profile.release]
-debug = true
-
+opt-level = 3
+lto = "fat"
 
 
 # -----------------------------------------
-[[bin]]
-name = "write_a"
-path = "src/write_a.rs"
+# [[bin]]
+# name = "usertests"
+# path = "src/usertests.rs"
+
 
 [[bin]]
-name = "write_b"
-path = "src/write_b.rs"
+name = "init"
+path = "src/init.rs"
 
-[[bin]]
-name = "write_c"
-path = "src/write_c.rs"
+# [[bin]]
+# name = "user_shell"
+# path = "src/user_shell.rs"
 
-[[bin]]
-name = "stack_deep"
-path = "src/stack_deep.rs"
 
-[[bin]]
-name = "sbrk"
-path = "src/sbrk.rs"
+# [[bin]]
+# name = "matrix"
+# path = "src/matrix.rs"
+
+# [[bin]]
+# name = "fantastic_text"
+# path = "src/fantastic_text.rs"
+
+# [[bin]]
+# name = "usertests-simple"
+# path = "src/usertests-simple.rs"
+
+# [[bin]]
+# name = "forktest2"
+# path = "src/forktest2.rs"
+
+# [[bin]]
+# name = "forkexec"
+# path = "src/forkexec.rs"
+
+# [[bin]]
+# name = "exit"
+# path = "src/exit.rs"
+
+# [[bin]]
+# name = "forktest_simple"
+# path = "src/forktest_simple.rs"
+
+# [[bin]]
+# name = "forktree"
+# path = "src/forktree.rs"
+
+# [[bin]]
+# name = "sleep"
+# path = "src/sleep.rs"
+
+
+# [[bin]]
+# name = "forktest"
+# path = "src/forktest.rs"
+
+# [[bin]]
+# name = "sleep_simple"
+# path = "src/sleep_simple.rs"
+
+# [[bin]]
+# name = "stack_overflow"
+# path = "src/stack_overflow.rs"
+
+# [[bin]]
+# name = "yield"
+# path = "src/yield.rs"
+
+# [[bin]]
+# name = "hello_world"
+# path = "src/hello_world.rs"

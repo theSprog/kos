@@ -78,8 +78,8 @@ impl KernelView {
     // }
 
     // 每个应用程序的内核栈地址
-    pub fn kernel_stack_range(&self, app_id: usize) -> (usize, usize) {
-        let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    pub fn kernel_stack_range(&self, pid: usize) -> (usize, usize) {
+        let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
         let bottom = top - KERNEL_STACK_SIZE;
         (bottom, top)
     }

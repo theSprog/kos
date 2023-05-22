@@ -16,8 +16,6 @@ pub fn main() -> ! {
         panic!("kernel init failed!");
     }
 
-    init();
-
     // if init exit we have nothing to do so we must panic
     panic!("Process 'init' should not be exited!");
 }

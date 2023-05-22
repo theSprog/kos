@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 
-use crate::write;
+use crate::{read, write};
 
 struct Console;
 
@@ -32,4 +32,12 @@ macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
         $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
+}
+
+pub fn getchar() -> u8 {
+    const STDIN: usize = 0;
+    let mut c = [0u8; 1];
+    let recv = read(STDIN, &mut c);
+    assert_eq!(recv, 1);
+    c[0]
 }

@@ -32,9 +32,10 @@ impl PageTable {
         let pte = self.find_pte_create(vpn).unwrap();
         assert!(!pte.valid(), "vpn {:?} is mapped before mapping", vpn);
         // 使用 PTEFlags::V 标记在虚拟空间中已分配
-        // 在所找到的页表项上写上物理地址，从而完成 map
+        // 在所找到的页表项上写上物理地址，从而完成 link
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
+
     pub fn unlink(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte(vpn).unwrap();
         assert!(pte.valid(), "vpn {:?} is invalid before unmapping", vpn);
@@ -42,14 +43,26 @@ impl PageTable {
         *pte = PageTableEntry::empty();
     }
 
+    // 重新将 vpn 与 ppn 进行连接, ppn 必须先前存在
+    pub fn relink(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        // 找到 pte
+        let pte = self.find_pte(vpn).unwrap();
+        // relink 的 ppn 一定要先前存在
+        assert!(pte.valid(), "relink but ppn {:?} does not exist", ppn);
+        // 重新设置权限, 注意该页表项仍然有效, 需要置为 PTEFlags::V
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+    }
+
     // 给定虚拟页号，找到页表项，找不到就建立
-    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         // 分解页号
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
-        for i in 0..3 {
-            let pte = &mut ppn.get_pte_array()[idxs[i]];
+        for (i, &idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[idx];
+
+            // 注意:
             // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
             // 这个检查工作应该由 find_pte_create 的调用者完成
             if i == 2 {
@@ -57,29 +70,36 @@ impl PageTable {
                 result = Some(pte);
                 break;
             }
-            // 无效页面, 需要置为有效
+
+            // 中途无效页, 需要置为有效
             if !pte.valid() {
                 let frame = frame::api::frame_alloc().unwrap();
                 // PTEFlags::V 标记被分配
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 self.frames.push(frame);
             }
+
             // 进入下一级页表
             ppn = pte.ppn();
         }
         result
     }
 
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
-        for i in 0..3 {
-            let pte = &mut ppn.get_pte_array()[idxs[i]];
+        for (i, &idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[idx];
+            // 注意:
+            // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
+            // 这个检查工作应该由 find_pte 的调用者完成
             if i == 2 {
                 result = Some(pte);
                 break;
             }
+
+            // 中途无效页, 说明不存在映射
             if !pte.valid() {
                 return None;
             }
@@ -108,7 +128,7 @@ impl PageTable {
     /// 它们于是需要经过 MMU 的地址转换流程
     /// token 就相当于页表的基地址(以物理地址表示)
     pub fn token(&self) -> usize {
-        let mode = 0b1000 as usize;
+        let mode = 0b1000_usize;
         // << 优先级高于 |
         mode << 60 | self.root_ppn.0
     }
@@ -177,35 +197,43 @@ impl PageTableEntry {
     }
 }
 
-/// 查询给定 token 的地址空间页表从而访问数据, 一般而言是在内核访问用户空间数据的时候
-/// translated_byte_buffer 将用户应用地址空间中一个缓冲区转化为在内核空间中能够直接访问的形式
-/// 之所以用 vec 是因为数据有可能跨页，一旦跨页数据就会被拆开，因此以 Vec 的形式返回
-pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
-    let page_table = PageTable::from_token(token); // 拿到页表
-    let mut start = ptr as usize;
-    let end = start + len;
-    let mut ret = Vec::new();
+pub mod api {
+    use super::*;
 
-    // start 和 end 可能在不同的物理页, 因此逐个处理
-    while start < end {
-        let start_va = VirtAddr::from(start);
-        let mut vpn = start_va.floor();
-        let ppn = page_table.translate(vpn).unwrap().ppn();
-        vpn.step();
+    /// 查询给定 token 的地址空间页表从而访问数据, 一般而言是在内核访问用户空间数据的时候
+    /// translated_byte_buffer 将用户应用地址空间中一个缓冲区转化为在内核空间中能够直接访问的形式
+    /// 之所以用 vec 是因为数据有可能跨页，一旦跨页数据就会被拆开，因此以 Vec 的形式返回
+    pub fn translated_byte_buffer(
+        token: usize,
+        ptr: *const u8,
+        len: usize,
+    ) -> Vec<&'static mut [u8]> {
+        let page_table = PageTable::from_token(token); // 拿到页表
+        let mut start = ptr as usize;
+        let end = start + len;
+        let mut ret = Vec::new();
 
-        //先设定为下一页页首
-        let mut end_va: VirtAddr = vpn.into();
-        // 比较 end 和 下一页页首的大小，以此判断数据是否跨页
-        end_va = end_va.min(VirtAddr::from(end));
+        // start 和 end 可能在不同的物理页, 因此逐个处理
+        while start < end {
+            let start_va = VirtAddr::from(start);
+            let mut vpn = start_va.floor();
+            let ppn = page_table.translate(vpn).unwrap().ppn();
+            vpn.step();
 
-        if end_va.page_offset() == 0 {
-            // 如果跨页
-            ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..]);
-        } else {
-            // 没有跨页
-            ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..end_va.page_offset()]);
+            //先设定为下一页页首
+            let mut end_va: VirtAddr = vpn.into();
+            // 比较 end 和 下一页页首的大小，以此判断数据是否跨页
+            end_va = end_va.min(VirtAddr::from(end));
+
+            if end_va.page_offset() == 0 {
+                // 如果跨页
+                ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..]);
+            } else {
+                // 没有跨页
+                ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..end_va.page_offset()]);
+            }
+            start = end_va.into();
         }
-        start = end_va.into();
+        ret
     }
-    ret
 }

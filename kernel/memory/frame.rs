@@ -5,7 +5,6 @@ use logger::info;
 
 use super::address::*;
 
-use crate::lazy_static::lazy_static;
 use crate::{
     memory::kernel_view::get_kernel_view, sync::unicore::UPSafeCell, MEMORY_END, PAGE_SIZE,
 };
@@ -81,21 +80,19 @@ impl FrameAllocator for StackFrameAllocator {
         // 尝试从已经释放的页中分配内存
         if let Some(ppn) = self.recycled.pop() {
             Some(ppn.into())
+        } else if self.current != self.end {
+            self.current += 1;
+            Some((self.current - 1).into())
         } else {
-            if self.current != self.end {
-                self.current += 1;
-                Some((self.current - 1).into())
-            } else {
-                // 实在没有内存页可分配了
-                None
-            }
+            // 实在没有内存页可分配了
+            None
         }
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // 有效性检查
-        if ppn >= self.current || self.recycled.iter().find(|&v| *v == ppn).is_some() {
-            // 未分配怎么可能被释放？
+        if ppn >= self.current || self.recycled.iter().any(|v| *v == ppn) {
+            // 未分配怎么可能被释放？出错
             panic!("Frame ppn={:#x} has not been allocated!", ppn);
         }
         // 加入 recycled 重复利用
@@ -133,7 +130,7 @@ pub mod api {
         FRAME_ALLOCATOR
             .exclusive_access()
             .alloc()
-            .map(|ppn| PhysFrame::new(ppn))
+            .map(PhysFrame::new) // 把 PhysPageNum 转为 PhysFrame
     }
 
     /// drop 隐式调用, 所以不公开

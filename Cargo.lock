@@ -59,8 +59,10 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "component"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "logger",
  "spin 0.9.8",
+ "sys_interface",
 ]
 
 [[package]]
@@ -74,6 +76,12 @@ name = "crt0stack"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9274b445ee572d50bdeb17a1101be829becc565b5c12b21a697af4d360b48e8d"
+
+[[package]]
+name = "either"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
 name = "embedded-graphics"
@@ -109,6 +117,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "executor"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bfaefc810fbc9e17eeac9fd39fbb4eb3a886437a008ca7b885739de3ef2685b"
+dependencies = [
+ "spin 0.9.8",
+ "woke",
+]
+
+[[package]]
 name = "float-cmp"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -127,6 +145,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "kos"
 version = "0.1.0"
 dependencies = [
@@ -134,7 +161,9 @@ dependencies = [
  "component",
  "crt0stack",
  "embedded-graphics",
+ "executor",
  "hashbrown",
+ "itertools",
  "lazy_static",
  "logger",
  "no-std-net",
@@ -370,6 +399,12 @@ name = "volatile"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
+
+[[package]]
+name = "woke"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f84a0acf95762131790eb4f458d5b9c8ae90dc521f8c5901906203764b261b0b"
 
 [[package]]
 name = "xmas-elf"

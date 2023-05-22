@@ -1,8 +1,10 @@
 #![no_std]
 #![feature(linkage)]
 #![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
 #![allow(dead_code)]
 
+extern crate alloc;
 extern crate logger;
 // 定义 logger 层级
 pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
@@ -12,67 +14,80 @@ pub mod console;
 
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
+pub mod constant;
 
 mod lang_items;
+mod start;
 mod syscall;
 
 use core::todo;
 use syscall::*;
 
-// 应用程序入口点
-#[no_mangle]
-#[link_section = ".text.entry"]
-pub extern "C" fn _start() -> ! {
-    clear_bss();
-    let exit_code = main();
-    // 进程退出后调用 exit
-    // 发生 panic 的进程不应该到此处，而会进入 panic 处理
-    exit(exit_code);
-
-    // 应该不可达
-    unreachable!()
-}
-
-// 定义弱符号 main, 如果用户没有定义 main 则会进入该函数
-// 否则会进入用户定义的 main 中
-#[linkage = "weak"]
-#[no_mangle]
-fn main() -> i32 {
-    panic!("Cannot find main!");
-}
-
-fn clear_bss() {
-    extern "C" {
-        // bss 起始处
-        fn start_bss();
-        // bss 结束处
-        fn end_bss();
-    }
-
-    let start_bss = start_bss as usize;
-    let end_bss = end_bss as usize;
-    // 将 bss 清零
-    unsafe {
-        // 优化后的版本, 更快
-        core::ptr::write_bytes(start_bss as *mut u8, 0, end_bss - start_bss);
-    }
-}
-
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
+pub fn read(fd: usize, buf: &mut [u8]) -> isize {
+    sys_read(fd, buf)
+}
+
 pub fn exit(exit_code: i32) -> isize {
     sys_exit(exit_code)
 }
 pub fn yield_cpu() -> isize {
     sys_yield()
 }
-pub fn get_time_of_day() -> isize {
-    sys_get_time_of_day()
+pub fn get_time_ms() -> isize {
+    sys_get_time_ms()
 }
 
-pub fn brk(addr: usize) -> i32 {
+pub fn getpid() -> isize {
+    sys_getpid()
+}
+pub fn fork() -> isize {
+    sys_fork()
+}
+pub fn exec(path: &str) -> isize {
+    sys_exec(path)
+}
+
+// wait 任意子进程结束
+// 如果要等待的子进程不存在则返回 -1；
+pub fn wait(exit_code: &mut i32) -> isize {
+    loop {
+        // 参数 -1 表示等待任何一个子进程
+        match sys_waitpid(-1, exit_code as *mut _) {
+            // 返回值 -2 表示未结束
+            -2 => {
+                yield_cpu();
+            }
+            // -1 or a real pid
+            exit_pid => return exit_pid,
+        }
+    }
+}
+
+// waitpid 等待特定子进程结束
+pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
+    loop {
+        match sys_waitpid(pid as isize, exit_code as *mut _) {
+            -2 => {
+                yield_cpu();
+            }
+            // -1 or a real pid
+            exit_pid => return exit_pid,
+        }
+    }
+}
+pub fn sleep(period_ms: usize) {
+    // 以毫秒的形式返回值
+    let start = sys_get_time_ms();
+    while sys_get_time_ms() < start + period_ms as isize {
+        sys_yield();
+    }
+}
+
+pub fn brk(_addr: usize) -> i32 {
     // On success, brk() returns zero.  On error, -1 is returned
     // sys_brk(addr) as i32;
     todo!();

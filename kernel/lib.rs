@@ -11,6 +11,7 @@ const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 extern crate alloc;
 extern crate bitflags;
+#[macro_use]
 extern crate lazy_static;
 
 pub mod console;
@@ -19,6 +20,7 @@ pub mod init;
 mod lang_items;
 mod loader;
 mod memory;
+mod process;
 mod sbi;
 mod sync;
 mod syscall;
@@ -26,6 +28,7 @@ mod task;
 mod timer;
 mod trap;
 
+use process::PCB;
 // 配置信息
 // ---------------------------------------------------------------------
 use sys_interface::config::*;
@@ -55,3 +58,6 @@ type KernelHeapAllocator = LockedHeap;
 // 使用 buddy 伙伴系统分配内存
 // use component::memory::buddy::LockedHeap;
 // type KernelHeapAllocator = LockedHeap;
+
+use component::process::FIFOManager;
+type PCBManager = FIFOManager<PCB>;

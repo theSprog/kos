@@ -7,6 +7,7 @@ pub mod page_table;
 pub mod segment;
 
 pub fn init() {
+    // 启动全局内存分配
     heap_alloc::init_allocator();
     frame::init_frame_allocator();
 

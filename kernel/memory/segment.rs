@@ -1,4 +1,4 @@
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, sync::Arc};
 
 use crate::{bitflags::bitflags, PAGE_SIZE};
 
@@ -9,6 +9,7 @@ use super::{
 };
 
 bitflags! {
+    // 注意这里没有 V 有效位, 他是需要手动设置 PTEFlags 的
     #[derive(Debug, Copy, Clone)]
     pub struct MapPermission: u8 {
         const R = 1 << 1;
@@ -28,7 +29,7 @@ pub enum MapType {
 /// 例如代码段, 数据段, 只读数据段等
 pub struct Segment {
     pub vpn_range: VPNRange, // 一段连续虚拟内存，表示该逻辑段在地址区间中的位置和长度
-    pub data_frames: BTreeMap<VirtPageNum, PhysFrame>, // 当 MapType 是 Framed 映射时有效
+    pub data_frames: BTreeMap<VirtPageNum, Arc<PhysFrame>>, // 当 MapType 是 Framed 映射时有效
     pub map_type: MapType,   // 映射类型
     pub map_perm: MapPermission,
 }
@@ -54,17 +55,84 @@ impl Segment {
         }
     }
 
+    /// 从另一个进程拷贝过来, 同时更新页表
+    pub fn from_another(another: &Segment, new_page_table: &mut PageTable) -> Self {
+        // 另一个一定是用户态进程
+        assert!(another.map_perm.contains(MapPermission::U));
+
+        // 复制物理页映射, 新进程一定包含这些页映射。
+        // 同时更新新进程的页表
+        let mut data_frames = BTreeMap::new();
+        for (vpn, pf) in &another.data_frames {
+            // Arc 复制引用计数
+            data_frames.insert(*vpn, pf.clone());
+
+            let ppn = pf.ppn;
+            let pte_flags = PTEFlags::from_bits(another.map_perm.bits()).unwrap();
+            // link 过程中会创建不存在的页目录项和页表项
+            new_page_table.link(*vpn, ppn, pte_flags)
+        }
+
+        Self {
+            vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
+            data_frames,
+            map_type: another.map_type,
+            map_perm: another.map_perm,
+        }
+    }
+
+    // trap 不会复制父进程的页映射, 因为父子进程几乎必定不同, cow 没有意义
+    pub fn from_trap(trap_seg: &Segment) -> Self {
+        assert!(trap_seg
+            .map_perm
+            .contains(MapPermission::R | MapPermission::W));
+
+        // trap 必然只有一页, 否则出错
+        assert_eq!(
+            1,
+            trap_seg.vpn_range.get_end() - trap_seg.vpn_range.get_start()
+        );
+        Self {
+            vpn_range: VPNRange::new(trap_seg.vpn_range.get_start(), trap_seg.vpn_range.get_end()),
+            data_frames: BTreeMap::new(),
+            map_type: trap_seg.map_type,
+            map_perm: trap_seg.map_perm,
+        }
+    }
+
     /// map unmap 将当前逻辑段到物理内存的映射
     /// 从(传入的)该逻辑段所属的地址空间(AddressSpace)的多级页表中加入或删除
+    /// 需要注意的是 map 会申请内存, 他是给 vpn 申请一个物理页面
     pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
             self.alloc_one(page_table, vpn);
         }
     }
 
-    pub fn unmap(&mut self, address_space_page_table: &mut PageTable) {
+    pub fn unmap(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
-            self.dealloc_one(address_space_page_table, vpn);
+            self.dealloc_one(page_table, vpn);
+        }
+    }
+
+    // 将自身 (segment) 权限重新 map 一次
+    pub fn remap(&mut self, page_table: &mut PageTable) {
+        // 遍历所有已分配物理内存的 linked 的映射
+        for (vpn, frame) in self.data_frames.iter() {
+            let ppn = frame.ppn;
+            let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
+            page_table.relink(*vpn, ppn, pte_flags)
+        }
+    }
+
+    // 子进程的专属 map
+    pub fn map_by_fork(&mut self, page_table: &mut PageTable) {
+        // 遍历所有 linked 的映射
+        for (vpn, frame) in self.data_frames.iter() {
+            let ppn = frame.ppn;
+            let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
+            // 只是单纯的 link
+            page_table.link(*vpn, ppn, pte_flags)
         }
     }
 
@@ -98,10 +166,10 @@ impl Segment {
         let ppn = match self.map_type {
             MapType::Identical => PhysPageNum(vpn.0),
             MapType::Framed => {
-                // 分配物理页面
+                // 分配物理页面, 必须将其保存至一个容器中, 否则生命周期只限于本作用域
                 let frame = frame::api::frame_alloc().unwrap();
                 let ret = frame.ppn;
-                self.data_frames.insert(vpn, frame);
+                self.data_frames.insert(vpn, Arc::new(frame));
                 ret
             }
         };
@@ -111,10 +179,33 @@ impl Segment {
         ppn
     }
 
-    /// 对逻辑段中的单个虚拟页面进行解映射
+    // 由于 cow 重新分配一个物理页面
+    pub fn realloc_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
+        let ppn = match self.map_type {
+            MapType::Identical => unreachable!("This is just for user cow!"),
+            MapType::Framed => {
+                // 分配物理页面, 必须将其保存至一个容器中, 否则生命周期只限于本作用域
+                let frame = frame::api::frame_alloc().unwrap();
+                let ret = frame.ppn;
+                assert!(self.data_frames.contains_key(&vpn));
+                self.data_frames.insert(vpn, Arc::new(frame));
+                ret
+            }
+        };
+        // segment 中包含 self.map_perm 字段, 用于设置该页的权限
+        let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
+        assert!(pte_flags.contains(PTEFlags::W));
+        page_table.relink(vpn, ppn, pte_flags);
+        ppn
+    }
+
+    /// 对逻辑段中的单个虚拟页面进行解映射, 同时物理资源也被释放
     pub fn dealloc_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         match self.map_type {
             MapType::Framed => {
+                // 这里有意思的是, 我们没有显式调用 frame_dealloc,
+                // 当离开作用域后, 由于 RAII, frame_dealloc 会被自动调用
+                // 因为 remove 会移出所有权, 如果引用计数归零则说明没有页表项指向该页面
                 self.data_frames.remove(&vpn);
             }
             _ => {}
