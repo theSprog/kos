@@ -4,7 +4,7 @@ pub mod scheduler;
 
 mod stack;
 
-use core::cell::{RefMut, UnsafeCell};
+use core::cell::RefMut;
 
 use alloc::{
     string::String,
@@ -13,11 +13,14 @@ use alloc::{
 };
 
 use crate::{
-    memory::{address::*, address_space::AddressSpace, kernel_view::get_kernel_view},
+    loader::load_app,
+    memory::{
+        address_space::{AddressSpace, KERNEL_SPACE},
+        kernel_view::get_kernel_view,
+    },
     sync::unicore::UPSafeCell,
     task::{context::TaskContext, TaskStatus, TCB},
-    trap::context::TrapContext,
-    TRAP_CONTEXT,
+    trap::{context::TrapContext, trap_handler},
 };
 
 use self::{pid::Pid, stack::KernelStack};
@@ -34,39 +37,39 @@ pub struct PCB {
 }
 
 impl PCB {
-    pub fn inner(&self) -> RefMut<'_, PCBInner> {
+    pub fn ex_inner(&self) -> RefMut<'_, PCBInner> {
         self.inner.exclusive_access()
     }
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
     pub fn set_priority(&mut self, priority: u8) {
-        self.inner.exclusive_access().priority = priority;
+        self.ex_inner().set_priority(priority);
     }
     pub fn priority(&self) -> u8 {
-        self.inner.exclusive_access().priority
+        self.ex_inner().priority()
     }
 
-    pub fn new(elf_data: &[u8], prog_name: &str) -> Self {
+    pub fn new(elf_data: &[u8], cmd: &str) -> Self {
         let kernel_view = get_kernel_view();
 
         // 分配 pid
         let pid = pid::api::pid_alloc();
         // 确定内核栈位置
         let kernel_stack = KernelStack::new(&pid);
-        let tcb = TCB::new(elf_data, pid.0);
+        let tcb = TCB::new_once(elf_data, pid.0);
 
-        // 每一个 pcb 默认优先级都是 100
+        // 每一个 pcb 默认优先级都是 5
         Self {
             pid,
             kernel_stack,
-            inner: unsafe { UPSafeCell::new(PCBInner::new_bare(tcb, 100, prog_name)) },
+            inner: unsafe { UPSafeCell::new(PCBInner::new_bare(tcb, 5, cmd)) },
         }
     }
 
-    pub fn fork(self: &Arc<PCB>) -> Arc<PCB> {
+    pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         // 访问父进程
-        let mut parent_inner = self.inner();
+        let mut parent_inner = self.ex_inner();
         // 拷贝用户空间
         let address_space = AddressSpace::from_fork(&mut parent_inner.tcb.address_space);
 
@@ -74,10 +77,8 @@ impl PCB {
         let pid_handle = pid::api::pid_alloc();
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
-        let trap_cx_ppn = address_space
-            .translate(VirtAddr::from(TRAP_CONTEXT).into())
-            .unwrap()
-            .ppn();
+        let trap_cx_ppn = address_space.trap_ppn();
+
         let new_tcb = TCB {
             task_status: TaskStatus::Ready,
             task_cx: TaskContext::goto_trap_return(kernel_stack_top),
@@ -93,7 +94,7 @@ impl PCB {
             // 父进程是 self, 没有子进程
             parent: Some(Arc::downgrade(self)),
             children: Vec::new(),
-            prog_name: Some(String::from(parent_inner.prog_name())),
+            cmd: String::from(parent_inner.cmd()),
             exit_code: 0,
         };
 
@@ -107,7 +108,7 @@ impl PCB {
         parent_inner.children.push(new_pcb.clone());
         // modify kernel_sp in trap_cx
         // **** access children PCB exclusively
-        let trap_cx = new_pcb.inner().trap_cx();
+        let trap_cx = new_pcb.ex_inner().trap_cx();
         trap_cx.kernel_sp = kernel_stack_top;
         // return
         new_pcb
@@ -116,16 +117,49 @@ impl PCB {
         // **** release children PCB automatically
     }
 
-    pub fn exec(&self, elf_data: &[u8]) {
-        todo!()
+    pub fn exec(&self, app_name: &str) -> isize {
+        // self 即子进程自身
+        let pid = processor::api::current_pid();
+        let app = load_app(app_name);
+        if app.is_none() {
+            return -1;
+        }
+
+        let (elf_data, cmd) = app.unwrap();
+
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data, pid);
+        let trap_cx_ppn = address_space.trap_ppn();
+
+        // **** access inner exclusively
+        let mut inner = self.ex_inner();
+        // 替换地址空间, 原来的地址空间全部被回收, 页表也更换了
+        inner.tcb.address_space = address_space;
+        // 更新 trap_cx ppn
+        inner.tcb.trap_cx_ppn = trap_cx_ppn;
+        // 更新 base_size
+        inner.tcb.base_size = user_sp;
+        // 更新名称
+        inner.cmd = cmd;
+
+        // 取出进程的 trap_cx 并更新
+        let trap_cx = inner.trap_cx();
+        *trap_cx = TrapContext::app_init_context(
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.exclusive_access().token(),
+            self.kernel_stack.get_top(), // 复用子进程自身的 kernel_stack
+            trap_handler as usize,
+        );
+
+        0
     }
 }
 
 pub struct PCBInner {
     tcb: TCB,
 
-    prog_name: Option<String>,
-    // 进程优先级, 0~255
+    cmd: String,
+    // 进程优先级, 1~10
     // 有些调度算法不会关注优先级, 例如 FIFO
     priority: u8,
 
@@ -142,14 +176,15 @@ pub struct PCBInner {
 }
 
 impl PCBInner {
-    pub fn new_bare(tcb: TCB, priority: u8, prog_name: &str) -> Self {
+    pub fn new_bare(tcb: TCB, priority: u8, cmd: &str) -> Self {
+        assert!(priority > 0 && priority <= 10); // 1-10 优先级
         Self {
             priority,
             tcb,
             count: 0,
             parent: None,
             children: Vec::new(),
-            prog_name: Some(String::from(prog_name)),
+            cmd: String::from(cmd),
             exit_code: 0,
         }
     }
@@ -159,11 +194,17 @@ impl PCBInner {
         unsafe { tcb.as_mut().unwrap() }
     }
 
-    pub fn prog_name(&self) -> &str {
-        if let Some(prog_name) = &self.prog_name {
-            return prog_name;
-        }
-        ""
+    pub fn cmd(&self) -> &str {
+        &self.cmd
+    }
+
+    pub fn priority(&self) -> u8 {
+        self.priority
+    }
+
+    pub fn set_priority(&mut self, priority: u8) {
+        assert!(priority > 0 && priority <= 10);
+        self.priority = priority
     }
 
     pub fn status(&self) -> TaskStatus {
@@ -171,6 +212,10 @@ impl PCBInner {
     }
     pub fn set_status(&mut self, status: TaskStatus) {
         self.tcb.task_status = status;
+    }
+
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code
     }
     pub fn inc_count(&mut self) {
         self.count += 1;
@@ -188,5 +233,13 @@ impl PCBInner {
     pub fn task_cx(&mut self) -> &'static mut TaskContext {
         let ctx = &mut self.tcb.task_cx as *mut TaskContext;
         unsafe { ctx.as_mut().unwrap() }
+    }
+
+    pub fn children_mut(&mut self) -> &mut Vec<Arc<PCB>> {
+        &mut self.children
+    }
+
+    pub fn children(&self) -> &Vec<Arc<PCB>> {
+        &self.children
     }
 }

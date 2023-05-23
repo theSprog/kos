@@ -1,8 +1,6 @@
-use core::arch::asm;
-
-use crate::{sync::unicore::UPSafeCell, *};
-use alloc::vec::Vec;
-use logger::{debug, info, trace};
+use crate::{task::INIT, *};
+use alloc::{format, string::String, vec::Vec};
+use logger::{debug, info, trace, warn};
 
 extern "C" {
     pub fn _num_app();
@@ -17,11 +15,10 @@ pub fn get_num_app() -> usize {
 lazy_static! {
     pub static ref APP_CONTAINER: Vec<&'static str> = {
         info!("APP_CONTAINER initializing...");
-        let num_app_ptr = _num_app as usize as *const usize;
         let num_app = get_num_app();
 
         let start = _app_names as usize as *const u8;
-        let apps = get_app_names(num_app, start);
+        let apps = gen_app_names_vec(num_app, start);
 
         debug!("avaliable apps: {:?}", apps);
         apps
@@ -30,31 +27,47 @@ lazy_static! {
 
 pub fn init() {
     assert!(APP_CONTAINER.len() > 0, "There must be at least one app!");
+    assert!(
+        APP_CONTAINER
+            .iter()
+            .map(|app| app.split("/").last().unwrap())
+            .any(|app_name| app_name == INIT),
+        "cannot find '{INIT}' app!"
+    );
 }
 
-pub fn load_app(app_name: &str) -> &'static [u8] {
-    if let Some(data) = get_app_data_by_name(app_name) {
-        return data;
-    }
-    panic!("failed to find app '{app_name}'");
+/// 按照名称寻找 app, 会添加 search path
+pub fn load_app(app_name: &str) -> Option<(&'static [u8], String)> {
+    let search_path = format!("{}{}", USER_PROG_PATH, app_name);
+    get_app_data_by_path(search_path)
 }
 
-fn get_app_data_by_name(name: &str) -> Option<&'static [u8]> {
+/// 不会添加 search path 的版本, 只会向给定 path 的路径去搜索
+pub fn load_cmd(cmd_path: String) -> Option<&'static [u8]> {
+    get_app_data_by_path(cmd_path).map(|data| data.0)
+}
+
+/// 按照路径寻找 app
+fn get_app_data_by_path(app_path: String) -> Option<(&'static [u8], String)> {
     // 我们假设 app 的 name 声明与存放的序关系是一致的
     // 例如首先声明 "app1", 那么地址处也是首先存放 app1 的数据
-    trace!("extracting app data from '{}'", name);
+    trace!("extracting app data from '{}'", app_path);
     let num_app = get_num_app();
-    (0..num_app)
-        .find(|&i| APP_CONTAINER[i] == name)
-        .map(|i| get_app_data_by_id(i + 1))
+    let app_data = (0..num_app)
+        .find(|&i| APP_CONTAINER[i] == app_path)
+        .map(|i| get_app_data_by_id(i));
+
+    if app_data.is_none() {
+        warn!("failed to find app '{app_path}'");
+        return None;
+    }
+
+    Some((app_data.unwrap(), app_path))
 }
 
-fn get_app_data_by_id(pid: usize) -> &'static [u8] {
+fn get_app_data_by_id(app_id: usize) -> &'static [u8] {
     // // 之所以要 num_app+1 是因为最后还有个 app_??_end 也要占用空间, 用来表示结束
     // // 从首个 usize 之后的地方开始读 app 数据, 这就是为什么要 add(1) 跳过一个 usize
-    assert!(pid > 0);
-    // 之所以要 -1 是因为 0 已经被 idle 占据, 第一个用户进程从 1 开始, 但是却在第 0 个位置
-    let app_id = pid - 1;
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_num_app();
     let app_start = unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1) };
@@ -67,7 +80,7 @@ fn get_app_data_by_id(pid: usize) -> &'static [u8] {
     }
 }
 
-fn get_app_names(num_app: usize, mut start: *const u8) -> Vec<&'static str> {
+fn gen_app_names_vec(num_app: usize, mut start: *const u8) -> Vec<&'static str> {
     let mut apps = Vec::new();
 
     unsafe {

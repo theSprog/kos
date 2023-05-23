@@ -1,14 +1,14 @@
 use alloc::{collections::VecDeque, sync::Arc};
 
-use super::IPCBManager;
+use super::IScheduler;
 
-pub struct FIFOManager<PCB> {
+pub struct FIFO<PCB> {
     // 就绪队列
     ready_queue: VecDeque<Arc<PCB>>,
 }
 
 /// A simple FIFO scheduler.
-impl<PCB> FIFOManager<PCB> {
+impl<PCB> FIFO<PCB> {
     pub fn new() -> Self {
         Self {
             ready_queue: VecDeque::new(),
@@ -16,7 +16,7 @@ impl<PCB> FIFOManager<PCB> {
     }
 }
 
-impl<PCB> IPCBManager<PCB> for FIFOManager<PCB> {
+impl<PCB> IScheduler<PCB> for FIFO<PCB> {
     fn add_ready(&mut self, task: Arc<PCB>) {
         self.ready_queue.push_back(task);
     }

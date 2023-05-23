@@ -50,7 +50,7 @@ pub fn main() -> i32 {
     for _ in 0..NUM {
         let pid = fork();
         if pid == 0 {
-            let current_time = get_time();
+            let current_time = get_time_ms();
             let times = (current_time as i32 as isize) * (current_time as i32 as isize) % 1000;
             work(times * 10);
         }

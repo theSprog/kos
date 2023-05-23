@@ -1,17 +1,17 @@
-use alloc::vec::Vec;
-use bitflags::*;
-
 use super::{
     address::*,
     frame::{self, PhysFrame},
 };
+use alloc::string::String;
+use alloc::vec::Vec;
+use bitflags::*;
 
 /// 页表
 pub struct PageTable {
     // 页表起始页号
     root_ppn: PhysPageNum,
 
-    // 已经被分配的物理页
+    // 已经被分配的中途物理页(非叶子的页目录项)
     frames: Vec<PhysFrame>,
 }
 
@@ -22,6 +22,70 @@ impl PageTable {
             root_ppn: frame.ppn,
             frames: alloc::vec![frame],
         }
+    }
+
+    pub fn clear(&mut self) {
+        // 置空
+        self.root_ppn.0 = 0;
+        self.frames.clear();
+    }
+
+    // 给定虚拟页号，找到页表项，找不到就建立
+    pub fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        // 分解页号
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        assert_ne!(ppn.0, 0, "root_ppn has been removed");
+
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, &idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[idx];
+
+            // 注意:
+            // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
+            // 这个检查工作应该由 find_pte_create 的调用者完成
+            if i == 2 {
+                // 已经是最后一级页表了
+                result = Some(pte);
+                break;
+            }
+
+            // 中途无效页, 需要置为有效
+            if !pte.valid() {
+                let frame = frame::api::frame_alloc().unwrap();
+                // PTEFlags::V 标记被分配
+                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                self.frames.push(frame);
+            }
+
+            // 进入下一级页表
+            ppn = pte.ppn();
+        }
+        result
+    }
+
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        assert_ne!(ppn.0, 0, "root_ppn has been removed");
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, &idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[idx];
+            // 注意:
+            // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
+            // 这个检查工作应该由 find_pte 的调用者完成
+            if i == 2 {
+                result = Some(pte);
+                break;
+            }
+
+            // 中途无效页, 说明不存在映射
+            if !pte.valid() {
+                return None;
+            }
+            ppn = pte.ppn();
+        }
+        result
     }
 
     // 建立虚拟页对物理页的映射, flags 是权限设置
@@ -53,61 +117,6 @@ impl PageTable {
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
 
-    // 给定虚拟页号，找到页表项，找不到就建立
-    pub fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        // 分解页号
-        let idxs = vpn.indexes();
-        let mut ppn = self.root_ppn;
-        let mut result: Option<&mut PageTableEntry> = None;
-        for (i, &idx) in idxs.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[idx];
-
-            // 注意:
-            // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
-            // 这个检查工作应该由 find_pte_create 的调用者完成
-            if i == 2 {
-                // 已经是最后一级页表了
-                result = Some(pte);
-                break;
-            }
-
-            // 中途无效页, 需要置为有效
-            if !pte.valid() {
-                let frame = frame::api::frame_alloc().unwrap();
-                // PTEFlags::V 标记被分配
-                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
-                self.frames.push(frame);
-            }
-
-            // 进入下一级页表
-            ppn = pte.ppn();
-        }
-        result
-    }
-
-    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        let idxs = vpn.indexes();
-        let mut ppn = self.root_ppn;
-        let mut result: Option<&mut PageTableEntry> = None;
-        for (i, &idx) in idxs.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[idx];
-            // 注意:
-            // 仅负责从VPN查到页表项，但是并不要求这个页表项必须合法，
-            // 这个检查工作应该由 find_pte 的调用者完成
-            if i == 2 {
-                result = Some(pte);
-                break;
-            }
-
-            // 中途无效页, 说明不存在映射
-            if !pte.valid() {
-                return None;
-            }
-            ppn = pte.ppn();
-        }
-        result
-    }
-
     // 临时创建一个专用来手动查页表的 PageTable
     // 它仅有一个从传入的 satp token 中得到的多级页表根节点的物理页号
     pub fn from_token(satp: usize) -> Self {
@@ -120,6 +129,19 @@ impl PageTable {
     // 从一个虚拟页号手动查询页表, 拿到最后的页表项
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.find_pte(vpn).map(|pte| pte.clone())
+    }
+
+    // 将虚拟地址翻译为物理地址
+    pub fn translate_vaddr(&self, vaddr: VirtAddr) -> Option<PhysAddr> {
+        self.find_pte(vaddr.clone().floor()).map(|pte| {
+            // 求出物理页页地址
+            let aligned_pa: PhysAddr = pte.ppn().into();
+            // 算出页内偏移量
+            let offset = vaddr.page_offset();
+
+            let aligned_pa_usize: usize = aligned_pa.into();
+            (aligned_pa_usize + offset).into()
+        })
     }
 
     /// 用于设定 satp csr 寄存器
@@ -235,5 +257,35 @@ pub mod api {
             start = end_va.into();
         }
         ret
+    }
+
+    // 将用户态传入的 C 风格 str 转成 rust 的 String
+    pub fn translated_user_cstr(token: usize, ptr: *const u8) -> String {
+        let page_table = PageTable::from_token(token);
+        let mut string: String = String::new();
+        let mut vaddr = ptr as usize;
+        loop {
+            let ch: u8 = *(page_table
+                .translate_vaddr(VirtAddr::from(vaddr))
+                .unwrap()
+                .get_mut());
+            if ch == 0 {
+                break;
+            } else {
+                string.push(ch as char);
+                vaddr += 1;
+            }
+        }
+        string
+    }
+
+    // 泛型函数, 将用户空间的指针 ptr 转为内核可访问的可变引用
+    pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
+        let page_table = PageTable::from_token(token);
+        let vaddr = ptr as usize;
+        page_table
+            .translate_vaddr(VirtAddr::from(vaddr))
+            .unwrap()
+            .get_mut()
     }
 }

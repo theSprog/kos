@@ -2,37 +2,39 @@ pub mod context;
 pub mod switch;
 
 use crate::process::scheduler;
-use core::todo;
 
 use crate::{
-    loader::{get_num_app, load_app},
+    loader::load_app,
     memory::{
         address::*,
         address_space::{AddressSpace, KERNEL_SPACE},
         kernel_view::get_kernel_view,
-        segment::MapPermission,
     },
-    sbi::shutdown,
-    sync::unicore::UPSafeCell,
     trap::{context::TrapContext, trap_handler},
     *,
 };
 
 use self::context::TaskContext;
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
 use logger::info;
 
 // INIT 进程名称
-const INIT: &str = "init";
+pub const INIT: &str = "init";
 
 lazy_static! {
     /// init 进程
     pub static ref INITPROC: Arc<PCB> =
     {
-        info!("init proc initializing...");
-        Arc::new(PCB::new(load_app(INIT), INIT))
+        info!("{INIT} proc initializing...");
+        if let Some((init_data, init_path)) = load_app(INIT) {
+            Arc::new(PCB::new(init_data, &init_path))
+        }else {
+            panic!("Failed to find '{INIT}' proc");
+        }
     };
+
+    pub static ref TCB_ONCE: &'static bool = &false;
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -65,20 +67,19 @@ pub struct TCB {
 impl TCB {
     /// pid 在该函数内惟一的作用就是决定内核栈的位置
     /// task_cx 需要用到该位置
-    pub fn new(elf_data: &[u8], pid: usize) -> TCB {
+    /// 注意该函数只应该调用一次, 剩下的全都是用 fork 创建出来
+    pub fn new_once(elf_data: &[u8], pid: usize) -> TCB {
         let kernel_view = get_kernel_view();
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data);
+
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data, pid);
 
         // 查询 TrapContext 的物理页号
-        let trap_cx_ppn = address_space
-            .translate(VirtAddr::from(TRAP_CONTEXT).into())
-            .unwrap()
-            .ppn();
+        let trap_cx_ppn = address_space.trap_ppn();
 
         let task_status = TaskStatus::Ready;
 
         // 不需要在内核空间中申请内核栈, 外部的进程已经完成这件事了
-        let (kernel_stack_bottom, kernel_stack_top) = kernel_view.kernel_stack_range(pid);
+        let (_, kernel_stack_top) = kernel_view.kernel_stack_range(pid);
         // KERNEL_SPACE.exclusive_access().insert_framed_segment(
         //     kernel_stack_bottom.into(),
         //     kernel_stack_top.into(),

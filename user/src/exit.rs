@@ -5,7 +5,7 @@
 extern crate user_lib;
 use user_lib::*;
 
-const MAGIC: i32 = -0x10384;
+const MAGIC: i32 = -12345;
 
 #[no_mangle]
 pub fn main() -> i32 {

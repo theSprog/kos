@@ -7,11 +7,12 @@
 extern crate alloc;
 extern crate logger;
 // 定义 logger 层级
-pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::WARN;
 
 #[macro_use]
 pub mod console;
 
+use alloc::format;
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
 pub mod constant;
@@ -48,33 +49,36 @@ pub fn fork() -> isize {
     sys_fork()
 }
 pub fn exec(path: &str) -> isize {
-    sys_exec(path)
+    // 手动在末尾加上 \0
+    sys_exec(&format!("{}\0", path))
 }
 
-// wait 任意子进程结束
-// 如果要等待的子进程不存在则返回 -1；
+/// wait 任意子进程结束
+/// 如果要等待的子进程不存在则返回 -1；
 pub fn wait(exit_code: &mut i32) -> isize {
     loop {
         // 参数 -1 表示等待任何一个子进程
         match sys_waitpid(-1, exit_code as *mut _) {
-            // 返回值 -2 表示未结束
+            // 返回值 -2 表示进程未结束
             -2 => {
+                // -2 不应该返回给用户
                 yield_cpu();
             }
-            // -1 or a real pid
+            // 返回值为 -1 表示不存在
             exit_pid => return exit_pid,
         }
     }
 }
 
-// waitpid 等待特定子进程结束
+/// waitpid 等待特定子进程结束
+/// 用户可观察到的要么是 -1, 要么是一个正数 pid
 pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
     loop {
         match sys_waitpid(pid as isize, exit_code as *mut _) {
             -2 => {
                 yield_cpu();
             }
-            // -1 or a real pid
+            // 返回值为 -1 表示不存在该进程
             exit_pid => return exit_pid,
         }
     }

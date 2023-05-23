@@ -59,5 +59,5 @@ type KernelHeapAllocator = LockedHeap;
 // use component::memory::buddy::LockedHeap;
 // type KernelHeapAllocator = LockedHeap;
 
-use component::process::FIFOManager;
-type PCBManager = FIFOManager<PCB>;
+use component::process::FIFO;
+type Scheduler = FIFO<PCB>;

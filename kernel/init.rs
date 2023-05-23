@@ -1,8 +1,8 @@
-use component::util::{human_size, human_size_n};
+use component::util::human_size_n;
 use logger::{debug, info};
 
 use crate::memory::kernel_view::get_kernel_view;
-use crate::{loader, process, task, trap, KB};
+use crate::{loader, process, task, trap};
 use crate::{memory, timer};
 
 pub fn kernel_start() -> bool {

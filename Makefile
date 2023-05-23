@@ -36,5 +36,10 @@ debugc:
 
 clean:
 	cd ./user && make clean && cd ..
+	cd ./user_lib && cargo clean && cd ..
+	cd ./component && cargo clean && cd ..
+	cd ./logger && cargo clean && cd ..
+	cd ./qemu_config && cargo clean && cd ..
+	cd ./sys_interface && cargo clean && cd ..
 	rm -f kos
 	cargo clean

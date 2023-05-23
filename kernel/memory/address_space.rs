@@ -1,23 +1,19 @@
-use core::{assert_eq, todo, unreachable};
+use core::{assert_eq, unreachable};
 
 use super::{
     address::*,
-    frame::PhysFrame,
     kernel_view::*,
     page_table::{PTEFlags, PageTable, PageTableEntry},
     segment::*,
 };
 
 use crate::{
-    bitflags::bitflags,
-    memory::heap_alloc,
-    process::processor::{self, api::current_pcb_name},
-    sync::unicore::UPSafeCell,
-    task, MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
+    memory::heap_alloc, process::processor::api::current_cmd_name, sync::unicore::UPSafeCell,
+    MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec};
 use component::util::*;
-use logger::{debug, info};
+use logger::info;
 
 // 内核空间
 lazy_static! {
@@ -48,7 +44,7 @@ impl AddressSpace {
             segments: Vec::new(),
         }
     }
-    pub fn from_fork(user_space: &mut AddressSpace) -> Self {
+    pub fn from_fork(user_space: &mut Self) -> Self {
         let mut new_space = Self::new_bare();
         // map trampoline
         new_space.map_trampoline();
@@ -57,7 +53,7 @@ impl AddressSpace {
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
         let trap_seg = Segment::from_trap(&user_space.segments[0]);
         let trap_ppn = user_space
-            .translate(trap_seg.vpn_range.get_start())
+            .translate_vpn(trap_seg.vpn_range.get_start())
             .unwrap()
             .ppn();
         // 向新 address_space 添加一个段, 并且放置初始内容
@@ -115,6 +111,12 @@ impl AddressSpace {
         heap_seg
     }
 
+    // 回收所有空间, 同时回收页表
+    pub fn release_space(&mut self) {
+        self.segments.clear();
+        self.page_table.clear();
+    }
+
     // 开启内核内存空间
     pub fn enable_paging(&self) {
         let satp = self.page_table.token();
@@ -168,7 +170,7 @@ impl AddressSpace {
 
         {
             // 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
-            let elf_data = crate::loader::load_app(&current_pcb_name());
+            let elf_data = crate::loader::load_cmd(current_cmd_name()).unwrap();
             let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
             let ph: Vec<_> = elf
@@ -194,10 +196,10 @@ impl AddressSpace {
                 let start = vaddr - ph.virtual_addr() as usize;
                 // 需要加载的内容的大小, 最大一个页面
                 let size = PAGE_SIZE.min(ph.file_size() as usize - start);
-
+                assert_ne!(size, 0);
                 // 划定源数据
                 let src = &data[start..start + size];
-                let pte = self.translate(vpn).unwrap();
+                let pte = self.translate_vpn(vpn).unwrap();
                 assert!(pte.valid());
                 let dst = &mut pte.ppn().get_bytes_array()[..src.len()];
                 dst.copy_from_slice(src);
@@ -333,8 +335,8 @@ impl AddressSpace {
 
     /// 映射 ELF 的 sections 以及 trampoline、TrapContext(用于地址空间切换) 和 user stack,
     /// 返回 user_sp 和 entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
-        info!("Creating user ELF file mapping");
+    pub fn from_elf(elf_data: &[u8], pid: usize) -> (Self, usize, usize) {
+        info!("Creating user ELF file mapping for pid={}", pid);
 
         // 为应用程序申请一个地址空间
         let mut address_space = Self::new_bare();
@@ -392,8 +394,21 @@ impl AddressSpace {
                 // PT_LOAD类型的代码段是根据 p_vaddr 来排布的，这就使得 max_end_vpn 可以严格递增
                 max_end_vpn = segment.vpn_range.get_end();
 
-                // 使用 lazy 方式, 只有当触发缺页时才分配物理页面
-                address_space.push_lazy(segment);
+                if ph_flags.is_write() {
+                    // 如果是可写的则使用 lazy 方式, 只有当触发缺页时才分配物理页面
+                    address_space.push_lazy(segment);
+                } else {
+                    // 必定不可写
+                    assert!(!segment.map_perm.contains(MapPermission::W));
+                    // 只读页面则立即加载
+                    address_space.push(
+                        segment,
+                        Some(
+                            &elf.input
+                                [ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
+                        ),
+                    );
+                }
             }
         }
 
@@ -450,8 +465,18 @@ impl AddressSpace {
         self.page_table.token()
     }
 
-    pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+    pub fn translate_vpn(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
+    }
+
+    // 找到该地址空间的 trap 的 ppn
+    pub fn trap_ppn(&self) -> PhysPageNum {
+        let trap = self.translate_vpn(VirtAddr::from(TRAP_CONTEXT).into());
+        assert!(
+            trap.is_some(),
+            "trap should be initialized in address_space"
+        );
+        trap.unwrap().ppn()
     }
 
     pub fn is_page_fault(&self, vaddr: usize, perm: MapPermission) -> bool {
@@ -483,7 +508,7 @@ impl AddressSpace {
     // 此函数会分配物理页面
     pub fn map_phys_page(&mut self, vaddr: usize) -> PhysPageNum {
         let vpn: VirtPageNum = VirtAddr(vaddr).floor();
-        let pte = self.translate(vpn);
+        let pte = self.translate_vpn(vpn);
         // 此前没有分配过
         assert!(pte.is_none() || !pte.unwrap().valid());
         for segment in &mut self.segments {
@@ -511,19 +536,34 @@ impl AddressSpace {
         let vpn: VirtPageNum = VirtAddr(vaddr).floor();
         let pte = self.page_table.find_pte(vpn).unwrap();
         assert!(pte.valid());
+        // 找到引发故障的源物理页面
+        let src_ppn = pte.ppn();
 
         for segment in &mut self.segments {
             if segment.contains(vaddr) {
-                // 分配物理页面, 权限包含在该 segment 中
-                // 找到源物理页面
-                let src_ppn = pte.ppn();
-                // realloc_one 内部会更新 data_frames, 自动将 Arc 引用计数减一
-                // 同时不需要显式 relink 因为 realloc_one 内部会完成
-                let dst_ppn = segment.realloc_one(&mut self.page_table, vpn);
-                // 从源物理页拷贝到目的物理页
-                dst_ppn
-                    .get_bytes_array()
-                    .copy_from_slice(src_ppn.get_bytes_array());
+                assert!(segment.data_frames.contains_key(&vpn));
+                let pf = segment.data_frames.get(&vpn).unwrap();
+                assert_eq!(pf.ppn, src_ppn);
+
+                // 只有一个进程引向该页面
+                if Arc::strong_count(pf) == 1 {
+                    assert!(segment.map_perm.contains(MapPermission::W));
+                    let pte_flags = PTEFlags::from_bits(segment.map_perm.bits()).unwrap();
+                    // 重新为其赋予可写权限
+                    self.page_table.relink(vpn, src_ppn, pte_flags);
+                } else {
+                    // 有多个进程引用该页面, 重新分配一页
+                    // 分配物理页面, 权限包含在该 segment 中
+                    // realloc_one 内部会更新 data_frames, 自动将 Arc 引用计数减一
+                    // 同时不需要显式 relink 因为 realloc_one 内部会完成
+                    let dst_ppn = segment.realloc_one(&mut self.page_table, vpn);
+                    // 从源物理页拷贝到目的物理页
+                    dst_ppn
+                        .get_bytes_array()
+                        .copy_from_slice(src_ppn.get_bytes_array());
+                }
+
+                // 一旦修复立即返回
                 return;
             }
         }
@@ -538,13 +578,11 @@ impl AddressSpace {
             .enumerate()
             .find(|(_, seg)| seg.vpn_range.get_start() == start_vpn)
         {
-            // 将 seg 从 page_table 中全部释放
+            // 将本 seg 从 page_table 中全部释放
             seg.unmap(&mut self.page_table);
             // 同时 segments 中也删除对应的 segment
             self.segments.remove(idx);
         }
-
-        unreachable!()
     }
 }
 

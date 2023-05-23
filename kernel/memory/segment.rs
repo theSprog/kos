@@ -1,6 +1,7 @@
 use alloc::{collections::BTreeMap, sync::Arc};
+use logger::trace;
 
-use crate::{bitflags::bitflags, PAGE_SIZE};
+use crate::{bitflags::bitflags, process::processor, PAGE_SIZE};
 
 use super::{
     address::*,
@@ -56,7 +57,7 @@ impl Segment {
     }
 
     /// 从另一个进程拷贝过来, 同时更新页表
-    pub fn from_another(another: &Segment, new_page_table: &mut PageTable) -> Self {
+    pub fn from_another(another: &Self, new_page_table: &mut PageTable) -> Self {
         // 另一个一定是用户态进程
         assert!(another.map_perm.contains(MapPermission::U));
 
@@ -125,17 +126,6 @@ impl Segment {
         }
     }
 
-    // 子进程的专属 map
-    pub fn map_by_fork(&mut self, page_table: &mut PageTable) {
-        // 遍历所有 linked 的映射
-        for (vpn, frame) in self.data_frames.iter() {
-            let ppn = frame.ppn;
-            let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
-            // 只是单纯的 link
-            page_table.link(*vpn, ppn, pte_flags)
-        }
-    }
-
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
@@ -169,6 +159,7 @@ impl Segment {
                 // 分配物理页面, 必须将其保存至一个容器中, 否则生命周期只限于本作用域
                 let frame = frame::api::frame_alloc().unwrap();
                 let ret = frame.ppn;
+                assert!(!self.data_frames.contains_key(&vpn));
                 self.data_frames.insert(vpn, Arc::new(frame));
                 ret
             }
@@ -181,6 +172,10 @@ impl Segment {
 
     // 由于 cow 重新分配一个物理页面
     pub fn realloc_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
+        trace!(
+            "realloc_one alloc new page for pid={}",
+            processor::api::current_pid()
+        );
         let ppn = match self.map_type {
             MapType::Identical => unreachable!("This is just for user cow!"),
             MapType::Framed => {

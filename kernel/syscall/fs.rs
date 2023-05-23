@@ -1,5 +1,3 @@
-use logger::info;
-
 use crate::*;
 use crate::{memory::page_table, process::processor, sbi::*};
 

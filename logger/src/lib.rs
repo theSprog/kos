@@ -109,9 +109,9 @@ pub fn print(color: i32, level: &'static str, args: fmt::Arguments) {
 pub enum Color {
     Red = 31,
     Yellow = 93,
-    Blue = 35,
+    Purple = 35,
     Green = 32,
-    Gray = 34,
+    Blue = 94,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -184,7 +184,7 @@ macro_rules! warn {
 macro_rules! info {
     ($($arg:tt)*) => {
         if $crate::LogLevel::INFO >= crate::LOG_LEVEL {
-            $crate::log!($crate::Color::Blue, "INFO", $($arg)*)
+            $crate::log!($crate::Color::Purple, "INFO", $($arg)*)
         }
     }
 }
@@ -202,7 +202,7 @@ macro_rules! debug {
 macro_rules! trace {
     ($($arg:tt)*) => {
         if $crate::LogLevel::TRACE >= crate::LOG_LEVEL {
-            $crate::log!($crate::Color::Gray, "TRACE", $($arg)*)
+            $crate::log!($crate::Color::Blue, "TRACE", $($arg)*)
         }
     }
 }
