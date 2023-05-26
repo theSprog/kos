@@ -30,7 +30,6 @@ volatile = "0.4.6"
 tinybmp = "0.4.0"
 virtio-drivers = "0.4.0"
 sbi-rt = {version = "0.0.2", features = ["legacy"]}
-crt0stack ={version= "0.1.0", default-features = false}
 no-std-net = "0.6.0"
 executor = "0.8.4"
 itertools = {version = "0.10.5", default-features = false, features = ["use_alloc"]}

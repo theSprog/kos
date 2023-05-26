@@ -148,7 +148,7 @@ pub mod api {
         // 已经把 pcb 取出, current 为 None
         let pcb = take_current_pcb().unwrap();
         let pid = pcb.getpid();
-        assert_ne!(pid, 1); // init 进程不能退出
+        assert_ne!(pid, 1, "init should not exit!"); // init 进程不能退出
         debug!(
             "process-'{}'(pid={}) exited with code {}",
             pcb.ex_inner().cmd(),
@@ -186,7 +186,7 @@ pub mod api {
     pub(crate) fn sbrk(incrment: usize) -> usize {
         let tcb = current_tcb();
         // 默认最后一个是 heap
-        let heap = tcb.address_space.heap();
+        let heap = tcb.address_space.heap_mut();
 
         if incrment == 0 {
             // 获取当前堆顶

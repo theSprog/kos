@@ -8,11 +8,17 @@ use super::{
 };
 
 use crate::{
-    memory::heap_alloc, process::processor::api::current_cmd_name, sync::unicore::UPSafeCell,
+    memory::{heap_alloc, page_table},
+    process::processor::api::current_cmd_name,
+    sync::unicore::UPSafeCell,
+    trap::context::TrapContext,
     MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
 use alloc::{sync::Arc, vec::Vec};
-use component::util::*;
+use component::{
+    crt0::{Builder, Entry},
+    util::*,
+};
 use logger::info;
 
 // 内核空间
@@ -44,31 +50,32 @@ impl AddressSpace {
             segments: Vec::new(),
         }
     }
-    pub fn from_fork(user_space: &mut Self) -> Self {
+    pub fn from_fork(parent_space: &mut Self) -> Self {
         let mut new_space = Self::new_bare();
         // map trampoline
         new_space.map_trampoline();
 
         // 从 user_space 复制 trap_context,
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
-        let trap_seg = Segment::from_trap(&user_space.segments[0]);
-        let trap_ppn = user_space
-            .translate_vpn(trap_seg.vpn_range.get_start())
-            .unwrap()
-            .ppn();
+        let trap_seg = Segment::from_trap(&parent_space.segments[0]);
+        let trap_content = parent_space.trap_ppn().get_bytes_array();
+
         // 向新 address_space 添加一个段, 并且放置初始内容
-        new_space.push(trap_seg, Some(trap_ppn.get_bytes_array()));
+        // 注意这不能够 COW 因为两个进程的 trap 必定不一样(至少返回值不一样)
+        new_space.push(trap_seg, Some(trap_content));
 
         // 复制 segment/user_stack/heap, 跳过 trap_segment
-        for seg in user_space.segments.iter_mut().skip(1) {
+        for seg in parent_space.segments.iter_mut().skip(1) {
             if seg.map_perm.contains(MapPermission::W) {
                 // 移除写权限, 父进程和子进程之后都不能写该 Segment
                 // 一旦发生写, 那么会触发故障从而修复写故障, 实现 cow
                 seg.map_perm.remove(MapPermission::W);
                 // 先将所有写权限擦除
-                seg.remap(&mut user_space.page_table);
+                seg.remap(&mut parent_space.page_table);
 
+                // 子进程同样没有写权限
                 let mut new_seg = Segment::from_another(seg, &mut new_space.page_table);
+
                 new_seg.map_perm.insert(MapPermission::W);
                 new_space.push_lazy(new_seg);
 
@@ -92,9 +99,10 @@ impl AddressSpace {
     }
 
     // 把倒数第二个 segement 必须设置为 stack 段
-    pub fn stack(&self) -> &Segment {
+    pub fn stack_mut(&mut self) -> &mut Segment {
         assert!(self.segments.len() >= 2);
-        let stack_seg = &self.segments[self.segments.len() - 2];
+        let idx = self.segments.len() - 2;
+        let stack_seg = &mut self.segments[idx];
         // 必然是用户态访问
         assert!(stack_seg.map_perm.contains(MapPermission::U));
         stack_seg
@@ -102,7 +110,7 @@ impl AddressSpace {
 
     // 把倒数第一个 segement 必须设置为 heap 段
     // heap 是可变的
-    pub fn heap(&mut self) -> &mut Segment {
+    pub fn heap_mut(&mut self) -> &mut Segment {
         assert!(self.segments.len() >= 2);
         let idx = self.segments.len() - 1;
         let heap_seg = &mut self.segments[idx];
@@ -370,6 +378,7 @@ impl AddressSpace {
                     "ELF program start_vaddr({:#x}) should aligned with 4K",
                     start_va.0
                 );
+                assert_ne!(ph.mem_size(), 0, "zeroed memory?");
 
                 // file_size 表示该段在文件中的大小
                 // mem_size 表示该段在内存中的大小
@@ -421,14 +430,20 @@ impl AddressSpace {
         user_stack_bottom += PAGE_SIZE;
         // 用户栈栈顶, 从栈底延伸出一个 USER_STACK_SIZE 的空间大小
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+        info!("user_stack_top = {:#x} for pid={}", user_stack_top, pid);
 
-        // 栈内存同样以 lazy 方式
-        address_space.push_lazy(Segment::new(
+        let mut stack_seg = Segment::new(
             user_stack_bottom.into(),
             user_stack_top.into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
-        ));
+        );
+        // 由于 crt0 的空间需要提前分配一页
+        stack_seg.alloc_one(
+            &mut address_space.page_table,
+            (stack_seg.vpn_range.get_end().0 - 1).into(),
+        );
+        address_space.push_lazy(stack_seg);
 
         // 堆内存, 堆向高地址生长, 最初时无内存
         // 加上 PAGE_SIZE 是为了 guard page
@@ -583,6 +598,28 @@ impl AddressSpace {
             // 同时 segments 中也删除对应的 segment
             self.segments.remove(idx);
         }
+    }
+
+    pub(crate) fn push_crt0(&mut self, trap_cx: &mut TrapContext) {
+        // 波动栈指针
+        trap_cx.x[2] -= PAGE_SIZE;
+
+        let stack_frame_top =
+            page_table::api::translated_one_page(self.token(), trap_cx.x[2] as *const u8);
+
+        let mut builder_arg = Builder::new(stack_frame_top, trap_cx.x[2]);
+
+        builder_arg.push("cmd").unwrap();
+        builder_arg.push("args1").unwrap();
+        builder_arg.push("args2").unwrap();
+        let mut builder_env = builder_arg.done().unwrap();
+
+        builder_env.push("HOME=/root").unwrap();
+        let mut builder_aux = builder_env.done().unwrap();
+
+        let auxv = [Entry::Gid(1000), Entry::Uid(1001), Entry::Platform("RISCV")];
+        auxv.iter().for_each(|e| builder_aux.push(e).unwrap());
+        let handle = builder_aux.done().unwrap();
     }
 }
 

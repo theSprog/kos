@@ -72,12 +72,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6548a0ad5d2549e111e1f6a11a6c2e2d00ce6a3dafe22948d67c2b443f775e52"
 
 [[package]]
-name = "crt0stack"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9274b445ee572d50bdeb17a1101be829becc565b5c12b21a697af4d360b48e8d"
-
-[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,7 +153,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.2.1",
  "component",
- "crt0stack",
  "embedded-graphics",
  "executor",
  "hashbrown",

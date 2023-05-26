@@ -70,7 +70,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     let pcb = current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
     if inner
-        .children_mut()
+        .children()
         .iter()
         .find(|p| pid == -1 || pid as usize == p.getpid())
         .is_none()

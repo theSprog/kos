@@ -7,7 +7,7 @@
 extern crate alloc;
 extern crate logger;
 // 定义 logger 层级
-pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::WARN;
+pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 #[macro_use]
 pub mod console;
@@ -48,9 +48,9 @@ pub fn getpid() -> isize {
 pub fn fork() -> isize {
     sys_fork()
 }
-pub fn exec(path: &str) -> isize {
+pub fn exec(name: &str) -> isize {
     // 手动在末尾加上 \0
-    sys_exec(&format!("{}\0", path))
+    sys_exec(&format!("{}\0", name))
 }
 
 /// wait 任意子进程结束

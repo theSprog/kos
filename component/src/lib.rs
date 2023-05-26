@@ -9,6 +9,7 @@ const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 extern crate alloc;
 extern crate lazy_static;
 
+pub mod crt0;
 /// 本库用于放置各种可配置组件,
 /// 包括内存分配算法, 进程调度算法, 文件系统 等等
 pub mod device_tree;

@@ -205,6 +205,7 @@ impl StepByOne for VirtPageNum {
     }
 }
 
+// [l, r)
 #[derive(Copy, Clone)]
 pub struct SimpleRange<T>
 where

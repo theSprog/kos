@@ -59,11 +59,11 @@ impl PCB {
         let kernel_stack = KernelStack::new(&pid);
         let tcb = TCB::new_once(elf_data, pid.0);
 
-        // 每一个 pcb 默认优先级都是 5
+        // init 默认优先级是 3, 或者继承自父优先级
         Self {
             pid,
             kernel_stack,
-            inner: unsafe { UPSafeCell::new(PCBInner::new_bare(tcb, 5, cmd)) },
+            inner: unsafe { UPSafeCell::new(PCBInner::new_bare(tcb, 3, cmd)) },
         }
     }
 
@@ -149,7 +149,12 @@ impl PCB {
             KERNEL_SPACE.exclusive_access().token(),
             self.kernel_stack.get_top(), // 复用子进程自身的 kernel_stack
             trap_handler as usize,
+            &inner.tcb,
+            pid,
         );
+
+        // 压入 crt0 栈
+        inner.tcb.address_space.push_crt0(trap_cx);
 
         0
     }
@@ -159,7 +164,7 @@ pub struct PCBInner {
     tcb: TCB,
 
     cmd: String,
-    // 进程优先级, 1~10
+    // 进程优先级, 1~5
     // 有些调度算法不会关注优先级, 例如 FIFO
     priority: u8,
 
@@ -177,7 +182,7 @@ pub struct PCBInner {
 
 impl PCBInner {
     pub fn new_bare(tcb: TCB, priority: u8, cmd: &str) -> Self {
-        assert!(priority > 0 && priority <= 10); // 1-10 优先级
+        assert!((1..=5).contains(&priority)); // 1-5 优先级
         Self {
             priority,
             tcb,
@@ -203,7 +208,7 @@ impl PCBInner {
     }
 
     pub fn set_priority(&mut self, priority: u8) {
-        assert!(priority > 0 && priority <= 10);
+        assert!((1..=5).contains(&priority));
         self.priority = priority
     }
 
@@ -218,7 +223,8 @@ impl PCBInner {
         self.exit_code
     }
     pub fn inc_count(&mut self) {
-        self.count += 1;
+        // 60 是 1-5 的最小公倍数
+        self.count += 60;
     }
     pub fn is_zombie(&self) -> bool {
         self.status() == TaskStatus::Zombie

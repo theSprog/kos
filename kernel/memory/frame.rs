@@ -108,10 +108,10 @@ pub struct PhysFrame {
 
 impl PhysFrame {
     pub fn new(ppn: PhysPageNum) -> Self {
-        // 清理页数据
         let bytes_array = ppn.get_bytes_array();
-        for i in bytes_array {
-            *i = 0;
+        unsafe {
+            // 清理页数据
+            core::ptr::write_bytes(bytes_array.as_mut_ptr(), 0, bytes_array.len());
         }
         Self { ppn }
     }

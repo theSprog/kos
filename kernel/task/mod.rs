@@ -86,7 +86,7 @@ impl TCB {
         //     MapPermission::R | MapPermission::W,
         // );
 
-        let tcb = Self {
+        let mut tcb = Self {
             task_status,
             task_cx: TaskContext::goto_trap_return(kernel_stack_top),
             address_space,
@@ -102,7 +102,13 @@ impl TCB {
             KERNEL_SPACE.exclusive_access().token(),
             kernel_stack_top,
             trap_handler as usize,
+            &tcb,
+            pid,
         );
+
+        // 准备 crt0 栈
+        tcb.address_space.push_crt0(trap_cx);
+
         tcb
     }
 }

@@ -107,12 +107,17 @@ impl PageTable {
         *pte = PageTableEntry::empty();
     }
 
-    // 重新将 vpn 与 ppn 进行连接, ppn 必须先前存在
+    // 重新将 vpn 与 ppn 进行连接, vpn 所对应的 ppn 必须先前存在
+    // 因为这是专门用于 cow 机制
     pub fn relink(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         // 找到 pte
         let pte = self.find_pte(vpn).unwrap();
         // relink 的 ppn 一定要先前存在
-        assert!(pte.valid(), "relink but ppn {:?} does not exist", ppn);
+        assert!(
+            pte.valid(),
+            "relink but vpn {:?} does not link one ppn before",
+            vpn
+        );
         // 重新设置权限, 注意该页表项仍然有效, 需要置为 PTEFlags::V
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
@@ -220,6 +225,8 @@ impl PageTableEntry {
 }
 
 pub mod api {
+    use sys_interface::config::PAGE_SIZE;
+
     use super::*;
 
     /// 查询给定 token 的地址空间页表从而访问数据, 一般而言是在内核访问用户空间数据的时候
@@ -257,6 +264,21 @@ pub mod api {
             start = end_va.into();
         }
         ret
+    }
+
+    pub fn translated_one_page(token: usize, ptr: *const u8) -> &'static mut [u8] {
+        let page_table = PageTable::from_token(token); // 拿到页表
+        let start = ptr as usize;
+        assert_eq!(
+            0,
+            start % PAGE_SIZE,
+            "Invalid ptr start for start {}",
+            start
+        );
+
+        let vpn = VirtPageNum::from(VirtAddr::from(start));
+        let ppn = page_table.translate(vpn).unwrap().ppn();
+        ppn.get_bytes_array()
     }
 
     // 将用户态传入的 C 风格 str 转成 rust 的 String

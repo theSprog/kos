@@ -74,8 +74,8 @@ pub fn sys_fork() -> isize {
 }
 
 /// 只将字符串起始地址传入, 因此需要用户调用该系统调用时先将 \0 准备好
-pub fn sys_exec(path: &str) -> isize {
-    syscall(SYSCALL_EXECVE, [path.as_ptr() as usize, 0, 0])
+pub fn sys_exec(name: &str) -> isize {
+    syscall(SYSCALL_EXECVE, [name.as_ptr() as usize, 0, 0])
 }
 
 /// 如果要等待的子进程不存在则返回 -1；

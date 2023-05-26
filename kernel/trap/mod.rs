@@ -106,6 +106,8 @@ pub fn trap_handler() -> ! {
             // x17: syscallID; 
             // x10-x12: 参数
             if cx.x[17] == SYSCALL_EXECVE {
+                // exec 会将当前地址空间替换为新的地址空间
+                // 这其中也包括 trap 的 ppn 也被替换，因此在 syscall 前后 trap ppn 不同
                 let old_cx = cx;
 
                 let ret = syscall(old_cx.x[17], [old_cx.x[10], old_cx.x[11], old_cx.x[12]]);
