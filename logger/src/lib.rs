@@ -9,6 +9,7 @@ use core::{
 // pub extern crate qemu_config;
 pub extern crate riscv;
 
+// kernel 专属
 #[inline(always)]
 fn logger_sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret;
@@ -24,6 +25,7 @@ fn logger_sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize
     ret
 }
 
+// 用户态专属
 #[inline(always)]
 fn logger_syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
@@ -53,7 +55,6 @@ impl Console {
     fn user_console_write(&mut self, s: &str) {
         const SYS_STDOUT: usize = 1;
         // 见 sys_interface 接口定义
-        const SYSCALL_WRITE: usize = 64;
         logger_syscall(SYSCALL_WRITE, [SYS_STDOUT, s.as_ptr() as usize, s.len()]);
     }
 }
@@ -81,6 +82,7 @@ pub fn logger_print(args: fmt::Arguments) {
 }
 
 use spin::Mutex;
+use sys_interface::syscall::SYSCALL_WRITE;
 static LOGGER_LOCK: Mutex<()> = Mutex::new(());
 #[allow(unused_variables)]
 pub fn print(color: i32, level: &'static str, args: fmt::Arguments) {

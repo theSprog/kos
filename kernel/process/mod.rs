@@ -117,7 +117,7 @@ impl PCB {
         // **** release children PCB automatically
     }
 
-    pub fn exec(&self, app_name: &str) -> isize {
+    pub fn exec(&self, app_name: &str, args: Vec<String>, envs: Vec<String>) -> isize {
         // self 即子进程自身
         let pid = processor::api::current_pid();
         let app = load_app(app_name);
@@ -125,7 +125,7 @@ impl PCB {
             return -1;
         }
 
-        let (elf_data, cmd) = app.unwrap();
+        let elf_data = app.unwrap();
 
         let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data, pid);
         let trap_cx_ppn = address_space.trap_ppn();
@@ -139,7 +139,7 @@ impl PCB {
         // 更新 base_size
         inner.tcb.base_size = user_sp;
         // 更新名称
-        inner.cmd = cmd;
+        inner.cmd = String::from(app_name);
 
         // 取出进程的 trap_cx 并更新
         let trap_cx = inner.trap_cx();
@@ -149,12 +149,11 @@ impl PCB {
             KERNEL_SPACE.exclusive_access().token(),
             self.kernel_stack.get_top(), // 复用子进程自身的 kernel_stack
             trap_handler as usize,
-            &inner.tcb,
             pid,
         );
 
         // 压入 crt0 栈
-        inner.tcb.address_space.push_crt0(trap_cx);
+        inner.tcb.address_space.push_crt0(trap_cx, &args, &envs);
 
         0
     }

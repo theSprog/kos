@@ -224,7 +224,7 @@ impl<'a> Builder<'a, Aux> {
     /// Add a new Entry
     #[inline]
     pub fn push(&mut self, entry: &Entry) -> Result<()> {
-        let (key, value): (usize, usize) = match *entry {
+        let (key, value): (usize, usize) = match entry {
             Entry::Platform(x) => {
                 self.push_data(0u8)?;
                 (AT_PLATFORM, self.push_data(x.as_bytes())? as _)
@@ -238,25 +238,25 @@ impl<'a> Builder<'a, Aux> {
                 (AT_EXECFN, self.push_data(x.as_bytes())? as _)
             }
             Entry::Random(x) => (AT_RANDOM, self.push_data(&x[..])? as _),
-            Entry::ExecFd(v) => (AT_EXECFD, v),
-            Entry::PHdr(v) => (AT_PHDR, v),
-            Entry::PHent(v) => (AT_PHENT, v),
-            Entry::PHnum(v) => (AT_PHNUM, v),
-            Entry::PageSize(v) => (AT_PAGESZ, v),
-            Entry::Base(v) => (AT_BASE, v),
-            Entry::Flags(v) => (AT_FLAGS, v),
-            Entry::Entry(v) => (AT_ENTRY, v),
-            Entry::NotElf(v) => (AT_NOTELF, v as usize),
-            Entry::Uid(v) => (AT_UID, v),
-            Entry::EUid(v) => (AT_EUID, v),
-            Entry::Gid(v) => (AT_GID, v),
-            Entry::EGid(v) => (AT_EGID, v),
-            Entry::HwCap(v) => (AT_HWCAP, v),
-            Entry::ClockTick(v) => (AT_CLKTCK, v),
-            Entry::Secure(v) => (AT_SECURE, v as usize),
-            Entry::HwCap2(v) => (AT_HWCAP2, v),
-            Entry::SysInfo(v) => (AT_SYSINFO, v),
-            Entry::SysInfoEHdr(v) => (AT_SYSINFO_EHDR, v),
+            Entry::ExecFd(v) => (AT_EXECFD, *v),
+            Entry::PHdr(v) => (AT_PHDR, *v),
+            Entry::PHent(v) => (AT_PHENT, *v),
+            Entry::PHnum(v) => (AT_PHNUM, *v),
+            Entry::PageSize(v) => (AT_PAGESZ, *v),
+            Entry::Base(v) => (AT_BASE, *v),
+            Entry::Flags(v) => (AT_FLAGS, *v),
+            Entry::Entry(v) => (AT_ENTRY, *v),
+            Entry::NotElf(v) => (AT_NOTELF, *v as usize),
+            Entry::Uid(v) => (AT_UID, *v),
+            Entry::EUid(v) => (AT_EUID, *v),
+            Entry::Gid(v) => (AT_GID, *v),
+            Entry::EGid(v) => (AT_EGID, *v),
+            Entry::HwCap(v) => (AT_HWCAP, *v),
+            Entry::ClockTick(v) => (AT_CLKTCK, *v),
+            Entry::Secure(v) => (AT_SECURE, *v as usize),
+            Entry::HwCap2(v) => (AT_HWCAP2, *v),
+            Entry::SysInfo(v) => (AT_SYSINFO, *v),
+            Entry::SysInfoEHdr(v) => (AT_SYSINFO_EHDR, *v),
         };
         self.push_item(key)?;
         self.push_item(value)?;
@@ -310,269 +310,3 @@ impl<'a> Builder<'a, Aux> {
         Ok(Handle(self.stack, start_idx))
     }
 }
-
-// #[cfg(test)]
-// #[allow(clippy::integer_arithmetic)]
-// mod tests {
-//     use super::*;
-
-//     use core::mem::{transmute, MaybeUninit};
-
-//     #[repr(C, align(32))]
-//     struct Aligned<T>(T);
-
-//     struct Stack<'a> {
-//         idx: usize,
-//         stack: &'a mut [u8],
-//     }
-
-//     impl<'a> Stack<'a> {
-//         #[inline(always)]
-//         fn new(slice: &'a mut [u8]) -> Self {
-//             Self {
-//                 idx: slice.len(),
-//                 stack: slice,
-//             }
-//         }
-//         #[inline(always)]
-//         fn push(&mut self, val: impl Serializable) {
-//             self.idx -= val.into_buf(&mut self.stack[..self.idx]).unwrap();
-//         }
-
-//         #[inline(always)]
-//         fn pop_l<T: Sized + Copy>(&mut self) -> T {
-//             let mut val = MaybeUninit::<T>::uninit();
-//             let size = size_of::<T>();
-//             assert!((self.idx + size) <= self.stack.len(), "Stack underflow");
-
-//             unsafe {
-//                 let ptr: *mut T = &mut self.stack[self.idx] as *mut u8 as _;
-//                 val.as_mut_ptr().write(ptr.read());
-//             }
-//             self.idx += size;
-//             unsafe { val.assume_init() }
-//         }
-
-//         #[inline(always)]
-//         fn pop_slice<T: Sized + Copy>(&mut self, val: &mut [T]) {
-//             let size = size_of::<T>() * val.len();
-//             assert!((self.idx + size) <= self.stack.len(), "Stack underflow");
-
-//             unsafe {
-//                 let ptr: *mut T = &mut self.stack[self.idx] as *mut u8 as _;
-//                 core::ptr::copy_nonoverlapping(ptr, val.as_mut_ptr(), val.len());
-//             }
-//             self.idx += size;
-//         }
-//     }
-
-//     #[test]
-//     fn stack() {
-//         let mut stack = Aligned([1u8; 16]);
-//         let stack = stack.0.as_mut();
-//         let mut sp = Stack::new(stack);
-//         sp.push(16usize);
-//         sp.push(&[1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8][..]);
-//         assert_eq!(
-//             sp.stack,
-//             &mut [1, 2, 3, 4, 5, 6, 7, 8, 16, 0, 0, 0, 0, 0, 0, 0,]
-//         );
-//     }
-
-//     #[test]
-//     fn stack_slice() {
-//         let mut stack = Aligned([1u8; 16]);
-//         let stack = stack.0.as_mut();
-//         let mut sp = Stack::new(stack);
-//         sp.push(&b"Hello World"[..]);
-//         assert_eq!(
-//             sp.stack,
-//             &mut [1, 1, 1, 1, 1, 72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100]
-//         );
-//     }
-
-//     #[test]
-//     fn stack_unaligned() {
-//         let mut stack = Aligned([0xFFu8; 24]);
-//         let stack = stack.0.as_mut();
-//         let mut sp = Stack::new(stack);
-//         sp.push(1u8);
-//         sp.push(2usize);
-//         sp.push(3u8);
-//         assert_eq!(
-//             sp.stack,
-//             &mut [
-//                 255, 255, 255, 255, 255, 255, 255, 3, // 3. u3
-//                 2, 0, 0, 0, 0, 0, 0, 0, // 2. u64
-//                 255, 255, 255, 255, 255, 255, 255, 1 // 1. u8
-//             ]
-//         );
-//     }
-
-//     #[test]
-//     fn stack_pop() {
-//         let mut stack = Aligned([1u8; 16]);
-//         let stack = stack.0.as_mut();
-//         {
-//             let mut sp = Stack::new(stack);
-//             sp.push(16usize);
-//             sp.push(&[1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8][..]);
-//             let mut sliceval = [0u8; 8];
-//             sp.pop_slice(&mut sliceval);
-//             assert_eq!(sliceval, [1, 2, 3, 4, 5, 6, 7, 8]);
-//             let lval: u64 = sp.pop_l();
-//             assert_eq!(lval, 16u64);
-//         }
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn stack_underflow() {
-//         let mut stack = Aligned([1u8; 16]);
-//         let stack = stack.0.as_mut();
-//         {
-//             let mut sp = Stack::new(stack);
-//             sp.push(16usize);
-//             sp.push(&[1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8][..]);
-//             let mut sliceval = [0u8; 8];
-//             sp.pop_slice(&mut sliceval);
-//             assert_eq!(sliceval, [1, 2, 3, 4, 5, 6, 7, 8]);
-//             let lval: u64 = sp.pop_l();
-//             assert_eq!(lval, 16u64);
-//             let lval_u8: u8 = sp.pop_l();
-//             eprintln!("{}", lval_u8);
-//         }
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn stack_overflow() {
-//         let mut stack = Aligned([1u8; 16]);
-//         let stack = stack.0.as_mut();
-//         {
-//             let mut sp = Stack::new(stack);
-//             sp.push(16usize);
-//             sp.push(16usize);
-//             sp.push(16usize);
-//         }
-//     }
-
-//     #[test]
-//     fn stack_alignment() {
-//         // Prepare the crt0 stack.
-//         let mut aligned = Aligned([0u8; 1024]);
-//         let mut error = false;
-//         for i in 0..32 {
-//             let mut builder = Builder::new(&mut aligned.0[i..]);
-//             builder.push("arg").unwrap();
-//             // Set the environment
-//             let mut builder = builder.done().unwrap();
-//             builder.push("LANG=C").unwrap();
-
-//             // Set the aux vector
-//             let mut builder = builder.done().unwrap();
-//             builder.push(&Entry::ExecFilename("/init")).unwrap();
-//             builder.push(&Entry::Platform("x86_64")).unwrap();
-//             builder.push(&Entry::Uid(1000)).unwrap();
-//             builder.push(&Entry::EUid(1000)).unwrap();
-//             builder.push(&Entry::Gid(1000)).unwrap();
-//             builder.push(&Entry::EGid(1000)).unwrap();
-//             builder.push(&Entry::PageSize(4096)).unwrap();
-//             builder.push(&Entry::Secure(false)).unwrap();
-//             builder.push(&Entry::ClockTick(100)).unwrap();
-//             builder.push(&Entry::Flags(0)).unwrap(); // TODO: https://github.com/enarx/enarx/issues/386
-//             builder.push(&Entry::HwCap(0)).unwrap(); // TODO: https://github.com/enarx/enarx/issues/386
-//             builder.push(&Entry::HwCap2(0)).unwrap(); // TODO: https://github.com/enarx/enarx/issues/386
-//             builder.push(&Entry::Random([0u8; 16])).unwrap();
-
-//             let handle = builder.done().unwrap();
-//             let alignment = (&*handle as *const _ as usize) % align_of::<Stack>();
-//             eprintln!("offset: {}, alignment: {}", i, alignment);
-//             error |= alignment != 0;
-//         }
-//         assert!(!error);
-//     }
-
-//     #[test]
-//     fn builder() {
-//         use std::ffi::CStr;
-
-//         let prog = "/init";
-
-//         let auxv = [
-//             Entry::Random([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
-//             Entry::Gid(1000),
-//             Entry::Uid(1000),
-//             Entry::Platform("x86_64"),
-//             Entry::ExecFilename(prog),
-//         ];
-
-//         let mut stack = [1u8; 512];
-//         let stack = stack.as_mut();
-
-//         let mut builder = Builder::new(stack);
-//         builder.push(prog).unwrap();
-//         let mut builder = builder.done().unwrap();
-//         builder.push("HOME=/root").unwrap();
-//         let mut builder = builder.done().unwrap();
-//         auxv.iter().for_each(|e| builder.push(e).unwrap());
-//         let handle = builder.done().unwrap();
-
-//         let spindex: usize = handle.1;
-//         let mut prep_stack = Stack {
-//             stack: &mut handle.0[spindex..],
-//             idx: 0,
-//         };
-//         let argc: u64 = prep_stack.pop_l();
-//         assert_eq!(argc, 1);
-
-//         let arg: *const std::os::raw::c_char = prep_stack.pop_l();
-//         let cstr = unsafe { CStr::from_ptr(arg) };
-//         let s = cstr.to_string_lossy();
-//         assert_eq!(s, prog);
-//         let arg: *const std::os::raw::c_char = prep_stack.pop_l();
-//         assert_eq!(arg, core::ptr::null());
-
-//         let arg: *const std::os::raw::c_char = prep_stack.pop_l();
-//         let cstr = unsafe { CStr::from_ptr(arg) };
-//         let s = cstr.to_string_lossy();
-//         assert_eq!(s, "HOME=/root");
-//         let arg: *const std::os::raw::c_char = prep_stack.pop_l();
-//         assert_eq!(arg, core::ptr::null());
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_RANDOM);
-//         let s: &[u8; 16] = unsafe { transmute(value) };
-//         assert_eq!(s, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_GID);
-//         assert_eq!(value, 1000);
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_UID);
-//         assert_eq!(value, 1000);
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_PLATFORM);
-//         let cstr = unsafe { CStr::from_ptr(value as *const u8 as _) };
-//         let s = cstr.to_string_lossy();
-//         assert_eq!(s, "x86_64");
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_EXECFN);
-//         let cstr = unsafe { CStr::from_ptr(value as _) };
-//         let s = cstr.to_string_lossy();
-//         assert_eq!(s, prog);
-
-//         let key: usize = prep_stack.pop_l();
-//         let value: usize = prep_stack.pop_l();
-//         assert_eq!(key, AT_NULL);
-//         assert_eq!(value, 0);
-//     }
-// }

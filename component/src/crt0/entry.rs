@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use alloc::string::String;
+
 /// An auxiliary vector entry
-#[derive(Debug, PartialEq)]
-pub enum Entry<'a> {
+#[derive(Debug, PartialEq, Clone)]
+pub enum Entry {
     /// file descriptor of program
     ExecFd(usize), // core does not have RawFd
 
@@ -43,7 +45,7 @@ pub enum Entry<'a> {
     EGid(usize),
 
     /// string identifying CPU for optimizations
-    Platform(&'a str),
+    Platform(String),
 
     /// arch dependent hints at CPU capabilities
     HwCap(usize),
@@ -55,7 +57,7 @@ pub enum Entry<'a> {
     Secure(bool),
 
     /// string identifying real platform, may differ from Platform.
-    BasePlatform(&'a str),
+    BasePlatform(String),
 
     /// address of 16 random bytes
     Random([u8; 16]),
@@ -64,7 +66,7 @@ pub enum Entry<'a> {
     HwCap2(usize),
 
     /// filename of program
-    ExecFilename(&'a str),
+    ExecFilename(String),
 
     /// pointer to the vDSO page (deprecated)
     SysInfo(usize),

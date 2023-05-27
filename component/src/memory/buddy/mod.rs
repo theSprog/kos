@@ -16,8 +16,6 @@ extern crate spin;
 use logger::info;
 use spin::Mutex;
 
-use crate::util::human_size_n;
-
 mod linked_list;
 
 /// A heap that uses buddy system with configurable order.
@@ -91,10 +89,6 @@ impl<const ORDER: usize> Heap<ORDER> {
 
     /// Add a range of memory [start, start+size) to the heap
     pub fn init(&mut self, start: usize, size: usize) {
-        info!(
-            "Memory allocator: buddy allocator, size: {}",
-            human_size_n(size)
-        );
         unsafe {
             self.add_to_heap(start, start + size);
         }

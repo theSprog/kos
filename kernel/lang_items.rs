@@ -1,6 +1,4 @@
-use core::{arch::asm, panic::PanicInfo};
-
-use logger::info;
+use core::panic::PanicInfo;
 
 use crate::sbi::shutdown;
 

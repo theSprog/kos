@@ -16,6 +16,7 @@ use crate::{
 
 use self::context::TaskContext;
 
+use alloc::format;
 use alloc::sync::Arc;
 use logger::info;
 
@@ -27,8 +28,9 @@ lazy_static! {
     pub static ref INITPROC: Arc<PCB> =
     {
         info!("{INIT} proc initializing...");
-        if let Some((init_data, init_path)) = load_app(INIT) {
-            Arc::new(PCB::new(init_data, &init_path))
+        let init_proc_path = &format!("{}/{}", USER_PROG_PATH, INIT);
+        if let Some(init_data) = load_app(init_proc_path) {
+            Arc::new(PCB::new(init_data, init_proc_path))
         }else {
             panic!("Failed to find '{INIT}' proc");
         }
@@ -86,7 +88,7 @@ impl TCB {
         //     MapPermission::R | MapPermission::W,
         // );
 
-        let mut tcb = Self {
+        let tcb = Self {
             task_status,
             task_cx: TaskContext::goto_trap_return(kernel_stack_top),
             address_space,
@@ -102,12 +104,11 @@ impl TCB {
             KERNEL_SPACE.exclusive_access().token(),
             kernel_stack_top,
             trap_handler as usize,
-            &tcb,
             pid,
         );
 
         // 准备 crt0 栈
-        tcb.address_space.push_crt0(trap_cx);
+        tcb.address_space.init_crt0(trap_cx);
 
         tcb
     }

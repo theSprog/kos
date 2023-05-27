@@ -17,6 +17,4 @@ pub const KERNEL_STACK_SIZE: usize = 64 * KB;
 pub const USER_HEAP_SIZE: usize = 128 * MB;
 
 // 以当前 work_space 为起始目录
-pub const USER_PROG_PATH: &str = "./user/prog/";
-
-pub const STACK_MAGIC_NUMBER: usize = 0x12345678;
+pub const USER_PROG_PATH: &str = "./user/prog";

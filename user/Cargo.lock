@@ -120,6 +120,7 @@ dependencies = [
  "qemu_config",
  "riscv",
  "spin 0.9.8",
+ "sys_interface",
 ]
 
 [[package]]
@@ -220,6 +221,7 @@ name = "user_lib"
 version = "0.1.0"
 dependencies = [
  "component",
+ "lazy_static",
  "logger",
  "spin 0.9.8",
  "sys_interface",

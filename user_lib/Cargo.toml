@@ -10,6 +10,8 @@ sys_interface = {path = "../sys_interface"}
 # features 选择 user 模式
 logger = {path = "../logger", features = ["user"]}
 component = {path = "../component"}
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+
 
 # 外部依赖
 spin = "0.9.6"

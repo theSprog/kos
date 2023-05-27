@@ -7,7 +7,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::DEBUG;
 
 extern crate alloc;
 extern crate bitflags;

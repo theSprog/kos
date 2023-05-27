@@ -1,5 +1,5 @@
 use crate::{task::INIT, *};
-use alloc::{format, string::String, vec::Vec};
+use alloc::vec::Vec;
 use logger::{debug, info, trace, warn};
 
 extern "C" {
@@ -37,18 +37,12 @@ pub fn init() {
 }
 
 /// 按照名称寻找 app, 会添加 search path
-pub fn load_app(app_name: &str) -> Option<(&'static [u8], String)> {
-    let search_path = format!("{}{}", USER_PROG_PATH, app_name);
-    get_app_data_by_path(search_path)
-}
-
-/// 不会添加 search path 的版本, 只会向给定 path 的路径去搜索
-pub fn load_cmd(cmd_path: String) -> Option<&'static [u8]> {
-    get_app_data_by_path(cmd_path).map(|data| data.0)
+pub fn load_app(app_name: &str) -> Option<&'static [u8]> {
+    get_app_data_by_path(app_name)
 }
 
 /// 按照路径寻找 app
-fn get_app_data_by_path(app_path: String) -> Option<(&'static [u8], String)> {
+fn get_app_data_by_path(app_path: &str) -> Option<&'static [u8]> {
     // 我们假设 app 的 name 声明与存放的序关系是一致的
     // 例如首先声明 "app1", 那么地址处也是首先存放 app1 的数据
     trace!("extracting app data from '{}'", app_path);
@@ -62,7 +56,7 @@ fn get_app_data_by_path(app_path: String) -> Option<(&'static [u8], String)> {
         return None;
     }
 
-    Some((app_data.unwrap(), app_path))
+    app_data
 }
 
 fn get_app_data_by_id(app_id: usize) -> &'static [u8] {

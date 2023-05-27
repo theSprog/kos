@@ -61,11 +61,6 @@ impl Heap {
 
     // 管理 size bytes 的堆大小
     pub fn init(&mut self, start: usize, size: usize) {
-        info!(
-            "Memory allocator: bitmap allocator, size: {}",
-            human_size_n(size)
-        );
-
         assert!(
             size <= (8 * self.bitmap.len()) * BLOCK_UNIT,
             "Heap size 0x{:x} overflow for upper bound of bitmap(upper bound: 0x{:x})",
@@ -247,8 +242,8 @@ impl Heap {
     fn display(&self) {
         // 此处必须使用不分配内存版本的 human_size_n
         // 因为我们已经把全局堆锁住了, human_size 会无法分配内存而一直阻塞, 形成死锁
-        debug!(
-            "kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {}, allocated = {}, total = {}",
+        info!(
+            "Mem Display: kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {}, allocated = {}, total = {}",
             self.heap_start_ptr,
             self.heap_start_ptr + self.endpoint * BLOCK_UNIT,
             human_size_n(self.user),

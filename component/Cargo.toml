@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # 内部依赖
-logger = {path = "../logger"}
+logger = {path = "../logger", features = ["kernel"]}
 sys_interface = {path = "../sys_interface"}
 
 # 外部依赖

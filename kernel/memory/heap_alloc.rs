@@ -46,7 +46,7 @@ pub fn init_allocator() {
         .init(heap_range.start, KERNEL_HEAP_SIZE); // 以起点和长度作为参数
 
     info!(
-        "Kernel heap range: [{:#x}..0x{:#x}), size: {}",
+        "Kernel heap range: [{:#x}..{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
         human_size(heap_range.len())
@@ -81,8 +81,6 @@ pub fn heap_test() {
         end.as_millis(),
         (end - start).as_millis()
     );
-
-    api::display_heap_info();
 }
 
 pub mod api {

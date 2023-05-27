@@ -4,7 +4,7 @@
 #![feature(fmt_internals)]
 
 use sys_interface::config::*;
-const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::INFO;
 
 extern crate alloc;
 extern crate lazy_static;

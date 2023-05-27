@@ -290,7 +290,7 @@ pub mod api {
             let ch: u8 = *(page_table
                 .translate_vaddr(VirtAddr::from(vaddr))
                 .unwrap()
-                .get_mut());
+                .get());
             if ch == 0 {
                 break;
             } else {
@@ -309,5 +309,14 @@ pub mod api {
             .translate_vaddr(VirtAddr::from(vaddr))
             .unwrap()
             .get_mut()
+    }
+
+    pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
+        let page_table = PageTable::from_token(token);
+        let vaddr = ptr as usize;
+        page_table
+            .translate_vaddr(VirtAddr::from(vaddr))
+            .unwrap()
+            .get()
     }
 }

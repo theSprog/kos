@@ -74,8 +74,11 @@ pub fn sys_fork() -> isize {
 }
 
 /// 只将字符串起始地址传入, 因此需要用户调用该系统调用时先将 \0 准备好
-pub fn sys_exec(name: &str) -> isize {
-    syscall(SYSCALL_EXECVE, [name.as_ptr() as usize, 0, 0])
+pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *const u8) -> isize {
+    syscall(
+        SYSCALL_EXECVE,
+        [filename as usize, args as usize, envs as usize],
+    )
 }
 
 /// 如果要等待的子进程不存在则返回 -1；
@@ -83,4 +86,9 @@ pub fn sys_exec(name: &str) -> isize {
 /// 否则返回结束的子进程的进程 ID。
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(SYSCALL_WAIT4, [pid as usize, exit_code as usize, 0])
+}
+
+pub fn sys_shutdown() -> ! {
+    syscall(SYSCALL_SHUTDOWN, [0, 0, 0]);
+    unreachable!();
 }

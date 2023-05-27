@@ -1,17 +1,17 @@
 use core::arch::asm;
 
-use component::crt0::{self, Entry, Reader};
 use component::memory::buddy::LockedHeap;
-use logger::info;
 use sys_interface::config::USER_HEAP_SIZE;
 
 use crate::{exit, sbrk};
+
+pub static mut CRT0_SP: *const usize = core::ptr::null_mut();
 
 // 应用程序入口点
 #[no_mangle]
 #[link_section = ".text.entry"]
 pub extern "C" fn _start() -> ! {
-    read_stack();
+    read_crt0();
     clear_bss();
     let heap_start = sbrk(0);
     // 拨动堆顶指针
@@ -25,30 +25,9 @@ pub extern "C" fn _start() -> ! {
     unreachable!()
 }
 
-fn read_stack() {
+fn read_crt0() {
     unsafe {
-        let mut fp: *const usize;
-        asm!("mv {}, fp", out(reg) fp);
-        // 测试是否得到内核放在栈上的数据
-        let reader = Reader::from_ptr(fp);
-
-        assert_eq!(reader.count(), 3);
-
-        let mut reader_arg = reader.done();
-        assert_eq!(reader_arg.next(), Some("cmd"));
-        assert_eq!(reader_arg.next(), Some("args1"));
-        assert_eq!(reader_arg.next(), Some("args2"));
-        assert_eq!(reader_arg.next(), None);
-
-        let mut reader_env = reader_arg.done();
-        assert_eq!(reader_env.next(), Some("HOME=/root"));
-        assert_eq!(reader_env.next(), None);
-
-        let mut reader_aux = reader_env.done();
-        assert_eq!(reader_aux.next(), Some(Entry::Gid(1000)));
-        assert_eq!(reader_aux.next(), Some(Entry::Uid(1001)));
-        assert_eq!(reader_aux.next(), Some(Entry::Platform("RISCV")));
-        assert_eq!(reader_aux.next(), None);
+        asm!("mv {}, fp", out(reg) CRT0_SP);
     }
 }
 

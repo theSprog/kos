@@ -6,7 +6,7 @@ use crate::{memory::address::*, task::TCB};
 use crate::{sync::unicore::UPSafeCell, task::context::TaskContext, trap::context::TrapContext};
 use alloc::string::String;
 use alloc::sync::Arc;
-use logger::info;
+use logger::*;
 use sys_interface::config::PAGE_SIZE;
 
 use crate::{sbi::shutdown, task::INITPROC};
@@ -48,7 +48,7 @@ impl Processor {
 }
 
 pub mod api {
-    use logger::debug;
+    use logger::{debug, trace};
 
     use super::*;
 
@@ -101,7 +101,7 @@ pub mod api {
 
         // 如果找得到下一个进程
         if let Some(pcb_next) = scheduler::fetch() {
-            debug!("schedule next process: {}", pcb_next.getpid());
+            trace!("schedule next process: {}", pcb_next.getpid());
             // 互斥访问下一个 PCB
             let mut pcb_next_inner = pcb_next.ex_inner();
             let pcb_next_cx_ptr = pcb_next_inner.task_cx() as *const TaskContext;

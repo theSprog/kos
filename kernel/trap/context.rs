@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use logger::info;
 use riscv::register::sstatus::{self, Sstatus, SPP};
-use sys_interface::config::{PAGE_SIZE, STACK_MAGIC_NUMBER};
+use sys_interface::config::PAGE_SIZE;
 
 use crate::{memory::page_table, task::TCB};
 
@@ -37,10 +37,9 @@ impl TrapContext {
         kernel_satp: usize,
         kernel_sp: usize,
         trap_handler: usize,
-        tcb: &TCB,
         pid: usize,
     ) -> Self {
-        info!("app_init_context called with pid={}", pid);
+        info!("app_init_context() called with pid={}", pid);
         // CSR sstatus
         let sstatus = sstatus::read();
         //设置返回的特权级：User mode。换句话说返回后( sret )进入 User 态

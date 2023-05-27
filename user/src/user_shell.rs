@@ -9,7 +9,7 @@ extern crate user_lib;
 
 use alloc::string::String;
 use user_lib::console::getchar;
-use user_lib::constant::*;
+use user_lib::{constant::*, shutdown};
 use user_lib::{exec, fork, waitpid};
 const PROMPT: &str = ">> ";
 
@@ -27,12 +27,17 @@ fn run_shell() -> i32 {
         let c = getchar();
         match c {
             LF | CR => {
+                // 敲下回车
                 println!("");
                 if !line.is_empty() {
+                    if line == "quit" {
+                        shutdown();
+                    }
+
                     let pid = fork();
                     if pid == 0 {
                         // child process
-                        if exec(&line) == -1 {
+                        if exec(&line, None) == -1 {
                             println!("Error when executing!");
                             return -4;
                         }
@@ -60,6 +65,8 @@ fn run_shell() -> i32 {
             }
         }
     }
+
+    0
 }
 
 fn backspace(line: &mut String) {

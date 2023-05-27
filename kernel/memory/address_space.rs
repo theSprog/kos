@@ -14,12 +14,18 @@ use crate::{
     trap::context::TrapContext,
     MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use component::{
     crt0::{Builder, Entry},
     util::*,
 };
 use logger::info;
+use sys_interface::config::USER_PROG_PATH;
 
 // 内核空间
 lazy_static! {
@@ -178,14 +184,14 @@ impl AddressSpace {
 
         {
             // 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
-            let elf_data = crate::loader::load_cmd(current_cmd_name()).unwrap();
+            let elf_data = crate::loader::load_app(&current_cmd_name()).unwrap();
             let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
             let ph: Vec<_> = elf
                 .program_iter()
                 .filter(|phdr| {
                     (phdr.virtual_addr() <= vaddr as u64)
-                        && (vaddr as u64 <= phdr.virtual_addr() + phdr.mem_size())
+                        && ((vaddr as u64) < (phdr.virtual_addr() + phdr.mem_size()))
                 })
                 .collect();
             //该 vaddr 有可能来自 elf, 也有可能是其他非 elf 的段(例如用户栈就是 kernel 所设定的)
@@ -421,7 +427,7 @@ impl AddressSpace {
             }
         }
 
-        // map user stack with U flags
+        // 用户栈
         // 此前的修改使得 max_end_vpn 已经在最后一个 section 的结尾地址处了
         let max_end_va: VirtAddr = max_end_vpn.into();
         // 用户栈栈底
@@ -445,11 +451,12 @@ impl AddressSpace {
         );
         address_space.push_lazy(stack_seg);
 
-        // 堆内存, 堆向高地址生长, 最初时无内存
+        // 用户堆内存, 堆向高地址生长, 最初时无内存
         // 加上 PAGE_SIZE 是为了 guard page
+        let heap_start_va = (user_stack_top + PAGE_SIZE).into();
         address_space.push_lazy(Segment::new(
-            (user_stack_top + PAGE_SIZE).into(),
-            (user_stack_top + PAGE_SIZE).into(),
+            heap_start_va,
+            heap_start_va,
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
         ));
@@ -538,7 +545,7 @@ impl AddressSpace {
     // 修复缺页异常
     pub fn fix_page_fault_from_elf(&mut self, vaddr: usize) {
         // 分配物理页
-        let ppn = self.map_phys_page(vaddr);
+        let _ppn = self.map_phys_page(vaddr);
         // 找到虚拟页页号
         let vpn = VirtAddr(vaddr).floor();
 
@@ -600,8 +607,41 @@ impl AddressSpace {
         }
     }
 
-    pub(crate) fn push_crt0(&mut self, trap_cx: &mut TrapContext) {
-        // 波动栈指针
+    pub(crate) fn push_crt0(
+        &mut self,
+        trap_cx: &mut TrapContext,
+        args: &[String],
+        envs: &[String],
+    ) {
+        // 拨动栈指针
+        trap_cx.x[2] -= PAGE_SIZE;
+
+        let stack_frame_top =
+            page_table::api::translated_one_page(self.token(), trap_cx.x[2] as *const u8);
+
+        let mut builder_arg = Builder::new(stack_frame_top, trap_cx.x[2]);
+        for arg in args {
+            builder_arg.push(arg).unwrap();
+        }
+
+        let mut builder_env = builder_arg.done().unwrap();
+        for env in envs {
+            builder_env.push(env).unwrap();
+        }
+
+        let mut builder_aux = builder_env.done().unwrap();
+
+        let auxv = [
+            Entry::Gid(1000),
+            Entry::Uid(1001),
+            Entry::Platform("RISCV".to_string()),
+        ];
+        auxv.iter().for_each(|e| builder_aux.push(e).unwrap());
+    }
+
+    // 专为 init 进程准备的
+    pub(crate) fn init_crt0(&self, trap_cx: &mut TrapContext) {
+        // 拨动栈指针
         trap_cx.x[2] -= PAGE_SIZE;
 
         let stack_frame_top =
@@ -609,17 +649,20 @@ impl AddressSpace {
 
         let mut builder_arg = Builder::new(stack_frame_top, trap_cx.x[2]);
 
-        builder_arg.push("cmd").unwrap();
-        builder_arg.push("args1").unwrap();
-        builder_arg.push("args2").unwrap();
+        builder_arg.push("init").unwrap();
         let mut builder_env = builder_arg.done().unwrap();
 
-        builder_env.push("HOME=/root").unwrap();
+        builder_env
+            .push(&format!("HOME={}", USER_PROG_PATH))
+            .unwrap();
         let mut builder_aux = builder_env.done().unwrap();
 
-        let auxv = [Entry::Gid(1000), Entry::Uid(1001), Entry::Platform("RISCV")];
+        let auxv = [
+            Entry::Gid(1000),
+            Entry::Uid(1001),
+            Entry::Platform("RISCV".to_string()),
+        ];
         auxv.iter().for_each(|e| builder_aux.push(e).unwrap());
-        let handle = builder_aux.done().unwrap();
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
     },
     timer,
 };
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 use logger::*;
 
 /// processor exits and submit an exit code
@@ -56,11 +56,45 @@ pub fn sys_fork() -> isize {
     new_pid as isize
 }
 
-pub fn sys_exec(app_name: *const u8) -> isize {
+pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *const u8) -> isize {
+    let pid = processor::api::current_pid();
     let token = processor::api::current_user_token();
-    let app_name = page_table::api::translated_user_cstr(token, app_name);
+    let app_name = page_table::api::translated_user_cstr(token, filename);
+    let args = {
+        let mut vec = Vec::new();
+        let mut args_ptr = args;
+        loop {
+            let ptr = page_table::api::translated_ref(token, args_ptr);
+            if *ptr == core::ptr::null() {
+                // 到达末尾
+                break;
+            }
+            let arg = page_table::api::translated_user_cstr(token, *ptr);
+            vec.push(arg);
+            args_ptr = unsafe { args_ptr.add(1) };
+        }
+        vec
+    };
+    let envs = {
+        let mut vec = Vec::new();
+        let mut envs_ptr = envs;
+        loop {
+            let ptr = page_table::api::translated_ref(token, envs_ptr);
+            if *ptr == core::ptr::null() {
+                // 到达末尾
+                break;
+            }
+            let env = page_table::api::translated_user_cstr(token, *ptr);
+            vec.push(env);
+            envs_ptr = unsafe { envs_ptr.add(1) };
+        }
+        vec
+    };
+
+    debug!("pid = {}, args: {:?}", pid, args);
+    debug!("pid = {}, envs: {:?}", pid, envs);
     let pcb = current_pcb().unwrap();
-    pcb.exec(&app_name)
+    pcb.exec(&app_name, args, envs)
 }
 
 /// 如果当前的进程不存在一个进程 ID 为 pid（pid==-1 或 pid > 0）的子进程，则返回 -1；

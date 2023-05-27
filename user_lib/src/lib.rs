@@ -6,22 +6,28 @@
 
 extern crate alloc;
 extern crate logger;
+#[macro_use]
+extern crate lazy_static;
+
 // 定义 logger 层级
 pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 #[macro_use]
 pub mod console;
 
-use alloc::format;
+use alloc::{format, string::String, vec::Vec};
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
 pub mod constant;
+
+mod env;
+pub use env::Env;
 
 mod lang_items;
 mod start;
 mod syscall;
 
-use core::todo;
+use core::{ptr, todo};
 use syscall::*;
 
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
@@ -48,9 +54,54 @@ pub fn getpid() -> isize {
 pub fn fork() -> isize {
     sys_fork()
 }
-pub fn exec(name: &str) -> isize {
-    // 手动在末尾加上 \0
-    sys_exec(&format!("{}\0", name))
+pub fn exec(name: &str, new_env: Option<Env>) -> isize {
+    let args: Vec<String> = name.split(" ").map(|s| String::from(s)).collect();
+
+    // 准备新的 env
+    let new_env = match new_env {
+        // args 参数替换
+        Some(mut new_env) => {
+            new_env.args_mut().clear();
+            new_env.args_mut().extend(args);
+            new_env
+        }
+        None => {
+            // 否则新建一个
+            let mut new_env = Env::from(Env::new());
+            new_env.args_mut().clear();
+            new_env.args_mut().extend(args);
+            new_env
+        }
+    };
+
+    //  --------------------argv---------------------------------------
+    // 之所以需要一个新 vec 是因为要保存这些 C 字符串变量的生命周期
+    let args_vec: Vec<String> = new_env
+        .args()
+        .iter()
+        .map(|arg| format!("{}\0", arg))
+        .collect();
+    // 收集各个字符串的指针
+    let mut args_ptr_vec: Vec<_> = args_vec.iter().map(|arg| (*arg).as_ptr()).collect();
+    // 最后一个指针设为 null 表示数组结束
+    args_ptr_vec.push(ptr::null());
+    let args_ptr = args_ptr_vec.as_ptr();
+
+    // -------------------envs-------------------------------------
+    let envs_vec: Vec<String> = new_env
+        .envs()
+        .iter()
+        .map(|(k, v)| format!("{}={}\0", k, v))
+        .collect();
+    let mut envs_ptr_vec: Vec<_> = envs_vec.iter().map(|arg| (*arg).as_ptr()).collect();
+    envs_ptr_vec.push(ptr::null());
+    let envs_ptr = envs_ptr_vec.as_ptr();
+
+    // -----------可执行文件路径--------------------------------
+    let new_envs = new_env.envs();
+    assert!(new_envs.contains_key("HOME"));
+    let filename = format!("{}/{}\0", new_envs.get("HOME").unwrap(), new_env.args()[0]);
+    sys_execve(filename.as_ptr() as *const u8, args_ptr, envs_ptr)
 }
 
 /// wait 任意子进程结束
@@ -100,4 +151,8 @@ pub fn brk(_addr: usize) -> i32 {
 pub fn sbrk(incrment: usize) -> usize {
     // 调用 brk 进行实现
     sys_sbrk(incrment) as usize
+}
+
+pub fn shutdown() -> ! {
+    sys_shutdown();
 }

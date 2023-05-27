@@ -9,8 +9,9 @@ use user_lib::*;
 #[no_mangle]
 fn main() -> i32 {
     // 执行 user_shell
+
     if fork() == 0 {
-        exec("user_shell");
+        exec("user_shell", None);
     } else {
         loop {
             let mut exit_code: i32 = 0;
@@ -19,13 +20,13 @@ fn main() -> i32 {
             // pid 返回退出的子进程 pid 号
             let pid = wait(&mut exit_code);
 
-            // 子进程尚不存在
+            // 尚不存在死亡的子进程
             if pid == -1 {
                 yield_cpu();
                 continue;
             }
             println!(
-                "[initproc] Released a zombie process, pid={}, exit_code={}",
+                "[init] Released a zombie process, pid={}, exit_code={}",
                 pid, exit_code,
             );
         }
