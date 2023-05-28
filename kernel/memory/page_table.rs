@@ -291,6 +291,11 @@ pub mod api {
                 .translate_vaddr(VirtAddr::from(vaddr))
                 .unwrap()
                 .get());
+            assert!(
+                ch < 0b1000_0000,
+                "only supports ascii characters but got {}",
+                ch
+            );
             if ch == 0 {
                 break;
             } else {

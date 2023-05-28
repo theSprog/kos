@@ -30,8 +30,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         // 严格来说这里不应该直接 panic,
         // 否则的话应用程序只需要一个非法系统调用就可以把 kernel 打挂
         _ => panic!(
-            "Unsupported SYSCALL_ID: {}, SYSCALL_NAME: {}",
-            syscall_id, SYSCALL_CALL_NAME[syscall_id]
+            "Unsupported SYSCALL_ID: {}, SYSCALL_NAME: {}, args: {:?}",
+            syscall_id, SYSCALL_CALL_NAME[syscall_id], args
         ),
     }
 }

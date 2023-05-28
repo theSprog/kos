@@ -65,7 +65,7 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
         let mut args_ptr = args;
         loop {
             let ptr = page_table::api::translated_ref(token, args_ptr);
-            if *ptr == core::ptr::null() {
+            if ptr.is_null() {
                 // 到达末尾
                 break;
             }
@@ -80,7 +80,7 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
         let mut envs_ptr = envs;
         loop {
             let ptr = page_table::api::translated_ref(token, envs_ptr);
-            if *ptr == core::ptr::null() {
+            if ptr.is_null() {
                 // 到达末尾
                 break;
             }
@@ -103,11 +103,10 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     let pcb = current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
-    if inner
+    if !inner
         .children()
         .iter()
-        .find(|p| pid == -1 || pid as usize == p.getpid())
-        .is_none()
+        .any(|p| pid == -1 || pid as usize == p.getpid())
     {
         // 孩子中不存在所指定 pid 的进程
         return -1;

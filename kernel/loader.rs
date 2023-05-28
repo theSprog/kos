@@ -30,7 +30,7 @@ pub fn init() {
     assert!(
         APP_CONTAINER
             .iter()
-            .map(|app| app.split("/").last().unwrap())
+            .map(|app| app.split('/').last().unwrap())
             .any(|app_name| app_name == INIT),
         "cannot find '{INIT}' app!"
     );
@@ -49,7 +49,7 @@ fn get_app_data_by_path(app_path: &str) -> Option<&'static [u8]> {
     let num_app = get_num_app();
     let app_data = (0..num_app)
         .find(|&i| APP_CONTAINER[i] == app_path)
-        .map(|i| get_app_data_by_id(i));
+        .map(get_app_data_by_id);
 
     if app_data.is_none() {
         warn!("failed to find app '{app_path}'");
@@ -80,7 +80,7 @@ fn gen_app_names_vec(num_app: usize, mut start: *const u8) -> Vec<&'static str> 
     unsafe {
         for _ in 0..num_app {
             let mut end = start;
-            while end.read_volatile() != '\0' as u8 {
+            while end.read_volatile() != b'\0' {
                 end = end.add(1);
             }
             let slice = core::slice::from_raw_parts(start, end as usize - start as usize);

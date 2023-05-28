@@ -223,7 +223,7 @@ impl AddressSpace {
         }
     }
 
-    /// Assume that no conflicts.
+    /// 假设 seg 之间没有两个段占用同一页面
     /// 插入一个以 framed 方式为映射的逻辑段, 供 User 调用
     pub fn insert_framed_segment(
         &mut self,
@@ -593,14 +593,15 @@ impl AddressSpace {
         unreachable!();
     }
 
-    pub fn remove_segment_by_start_vpn(&mut self, start_vpn: VirtPageNum) {
+    pub fn release_kernel_stack_segment(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, seg)) = self
             .segments
             .iter_mut()
             .enumerate()
             .find(|(_, seg)| seg.vpn_range.get_start() == start_vpn)
         {
-            // 将本 seg 从 page_table 中全部释放
+            // 将 kernel stack seg 从 page_table 中全部释放
+            // 由于内核栈是立即分配的所以才能够将 seg 中的所有 vpn 都 dealloc_one
             seg.unmap(&mut self.page_table);
             // 同时 segments 中也删除对应的 segment
             self.segments.remove(idx);
@@ -666,6 +667,7 @@ impl AddressSpace {
     }
 }
 
+#[allow(clippy::bool_assert_comparison)]
 pub fn remap_test() {
     let kernel_view = get_kernel_view();
     let kernel_space = KERNEL_SPACE.exclusive_access();

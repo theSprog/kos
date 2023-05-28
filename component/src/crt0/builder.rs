@@ -113,7 +113,7 @@ impl<'a, T> Builder<'a, T> {
         if self.data <= self.items {
             Err(OutOfSpace)
         } else {
-            Ok((self.stack_vbase + self.data) as *const ())
+            Ok((self.stack_vbase.checked_add(self.data).ok_or(OutOfSpace)?) as *const ())
         }
     }
 

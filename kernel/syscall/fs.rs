@@ -1,3 +1,5 @@
+use logger::*;
+
 use crate::*;
 use crate::{memory::page_table, process::processor, sbi::*};
 
@@ -31,7 +33,6 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         FD_STDIN => {
             assert_eq!(len, 1, "Only support len = 1 in FD_STDIN!");
             let c = console_getchar(); // 阻塞式 IO;
-            assert_ne!(c, 0);
             let ch = c as u8;
             let mut buffers = page_table::api::translated_byte_buffer(
                 processor::api::current_user_token(),

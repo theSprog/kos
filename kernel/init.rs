@@ -48,7 +48,7 @@ fn clear_bss() {
 
 fn print_banner() {
     crate::println!("{}", include_str!("banner"));
-    info!("KOS: A Simple RISC-V Operating System Written In Rust");
+    info!("KOS: A Simple RISC-V64 Operating System Written In Rust");
     let kernel_view = get_kernel_view();
     let kernel_range = kernel_view.kernel_range();
     debug!(

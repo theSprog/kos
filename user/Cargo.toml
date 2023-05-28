@@ -35,9 +35,9 @@ path = "src/user_shell.rs"
 # name = "forkexec"
 # path = "src/forkexec.rs"
 
-# [[bin]]
-# name = "mem"
-# path = "src/mem.rs"
+[[bin]]
+name = "mem"
+path = "src/mem.rs"
 
 # [[bin]]
 # name = "text"

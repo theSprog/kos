@@ -45,7 +45,7 @@ impl Segment {
         // 通过这两个操作扩充了虚拟页面范围, 扩充虚拟地址范围会产生冲突么 ?
         // 起始点下沉到页边界
         let start_vpn: VirtPageNum = start_va.floor();
-        // 结束点上浮到页边界
+        // 结束点上浮到页边界, 作为末尾页号(界限)
         let end_vpn: VirtPageNum = end_va.ceil();
 
         Self {

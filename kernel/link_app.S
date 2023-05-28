@@ -2,14 +2,16 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 2
+    .quad 3
     .quad app_0_start
     .quad app_1_start
-    .quad app_1_end
+    .quad app_2_start
+    .quad app_2_end
 
     .global _app_names
 _app_names:
     .string "./user/prog/init"
+    .string "./user/prog/mem"
     .string "./user/prog/user_shell"
 
     .section .data
@@ -25,5 +27,13 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "./user/prog/user_shell"
+    .incbin "./user/prog/mem"
 app_1_end:
+
+    .section .data
+    .global app_2_start
+    .global app_2_end
+    .align 3
+app_2_start:
+    .incbin "./user/prog/user_shell"
+app_2_end:

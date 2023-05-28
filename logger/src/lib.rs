@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![allow(clippy::crate_in_macro_def)]
 
 use core::{
     arch::asm,

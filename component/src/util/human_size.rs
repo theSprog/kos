@@ -53,21 +53,20 @@ pub fn human_size_n(size: usize) -> &'static str {
 
     let cur_slot_idx = SLOT_IDX.load(Ordering::SeqCst);
     // 这是一个静态变量(引用 SLOTS)，故大写
-    let mut BUFFER = unsafe { &mut SLOTS[cur_slot_idx] };
-    clear_buffer(&mut BUFFER);
+    let BUFFER = unsafe { &mut SLOTS[cur_slot_idx] };
+    clear_buffer(BUFFER);
 
     let mut cur_size = size;
-    let mut suffix_index = 0;
     let mut cur_idx = 0;
 
-    for bound in BOUNDS {
+    for (suffix_index, bound) in BOUNDS.into_iter().enumerate() {
         let aligned = cur_size - cur_size % bound;
         let content = aligned / bound;
-        cur_size = cur_size - aligned;
+        cur_size -= aligned;
 
         // content == 0 没有必要写, 除非是传入的参数本就为 0, 即 0 B
         if content != 0 || suffix_index == SUFFIXES.len() - 1 {
-            cur_idx = write_size(&mut BUFFER, cur_idx, content, SUFFIXES[suffix_index]);
+            cur_idx = write_size(BUFFER, cur_idx, content, SUFFIXES[suffix_index]);
 
             if cur_size == 0 {
                 break;
@@ -76,8 +75,6 @@ pub fn human_size_n(size: usize) -> &'static str {
             BUFFER[cur_idx] = b'+';
             cur_idx += 1;
         }
-
-        suffix_index += 1;
     }
 
     unsafe {
@@ -90,8 +87,8 @@ pub fn human_size_n(size: usize) -> &'static str {
 }
 
 fn clear_buffer(buffer: &mut [u8; 32]) {
-    for i in 0..buffer.len() {
-        buffer[i] = 0;
+    for byte in buffer {
+        *byte = 0;
     }
 }
 

@@ -164,7 +164,7 @@ pub fn trap_handler() -> ! {
                 .is_page_fault(stval, segment::MapPermission::W)
             {
                 // 是否是 copy on write 
-                let vpn = VirtPageNum::from(VirtAddr::from(stval).floor());
+                let vpn = VirtAddr::from(stval).floor();
                 let user_page_table = tcb.address_space.page_table();
                 let pte = user_page_table.translate(vpn);
 

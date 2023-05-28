@@ -5,8 +5,9 @@ use super::*;
 use core::marker::PhantomData;
 
 /// Convert a usize (pointer) to a string.
+/// # Safety
 #[allow(clippy::integer_arithmetic)]
-pub unsafe fn u2s<'a>(ptr: usize) -> core::result::Result<String, FromUtf8Error> {
+pub unsafe fn u2s(ptr: usize) -> core::result::Result<String, FromUtf8Error> {
     let ptr = ptr as *const u8;
 
     // 寻找结束符 '\0'

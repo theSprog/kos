@@ -65,8 +65,6 @@ fn run_shell() -> i32 {
             }
         }
     }
-
-    0
 }
 
 fn backspace(line: &mut String) {
