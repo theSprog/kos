@@ -17,6 +17,7 @@ extern crate lazy_static;
 pub mod console;
 pub mod init;
 
+mod clock;
 mod lang_items;
 mod loader;
 mod memory;
@@ -25,7 +26,6 @@ mod sbi;
 mod sync;
 mod syscall;
 mod task;
-mod timer;
 mod trap;
 
 use process::PCB;

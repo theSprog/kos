@@ -1,125 +1,170 @@
-use alloc::format;
-use alloc::string::String;
+use core::{
+    cmp,
+    fmt::{self, Display},
+    marker::PhantomData,
+};
 
-/// 分配内存版本, 在全局内存分配器前不可用
-/// 使用 human_size_n 代替
-pub fn human_size(size: usize) -> String {
-    if size < KB {
-        format!("{}B", size)
-    } else if size < MB {
-        let kbs = size / KB;
-        let rest = size % KB;
-        if rest == 0 {
-            format!("{}KB", kbs)
-        } else {
-            format!("{}KB+{}", kbs, human_size(rest))
-        }
-    } else {
-        let mbs = size / MB;
-        let rest = size % MB;
-        if rest == 0 {
-            format!("{}MB", mbs)
-        } else {
-            format!("{}MB+{}", mbs, human_size(rest))
-        }
+use num::{rational::Ratio, FromPrimitive};
+use sys_interface::config::{GB, KB, MB};
+
+pub fn debug_size(size: usize) -> DebugSizeFormatter {
+    DebugSizeFormatter::new(size)
+}
+
+pub fn dec_size(size: usize) -> SizeFormatter<DecSuffix> {
+    SizeFormatter::new(size)
+}
+
+pub fn bin_size(size: usize) -> SizeFormatter<BinSuffix> {
+    SizeFormatter::new(size)
+}
+
+pub struct DebugSizeFormatter {
+    size: usize,
+}
+impl DebugSizeFormatter {
+    pub fn new(size: usize) -> Self {
+        Self { size }
     }
 }
 
-// 不分配内存版本
-use core::sync::atomic::{AtomicUsize, Ordering};
-use sys_interface::config::{KB, MB};
-
-/// 之前的版本使用单一 SLOT: [u8; 32], 但这有个坏处:
-/// 多次调用 human_size 会改变前面的返回值的内容, 因此才需要使用 SLOTS 将之前的内容缓存起来
-/// 在 info!("{}", human_size(1)); 不会有影响
-/// 但是在 info!("{} {}", human_size(1), human_size(2)); 后面的结果会把前面的结果覆盖
-/// 这是因为之前的版本共用同一个 SLOT 的缘故
-static mut SLOTS: [[u8; 32]; SLOT_COUNT] = [[0; 32]; SLOT_COUNT];
-
-/// 由于多线程操作可能取到同一个 slot, 因此使用原子操作
-static SLOT_IDX: AtomicUsize = AtomicUsize::new(0);
-
-/// 严格来说, 当有多个线程使用 SLOTS 而 SLOT_COUNT 又不够大时
-/// 仍然有可能出现数据竞争, 多个线程同时由于 SLOT_IDX 回绕从而操作同一个 SLOT
-/// 甚至于当格式化中使用 `{}` 同时调用 human_size 过多时也会出现这个情况
-const SLOT_COUNT: usize = 16;
-
-/// 这个函数很拧巴, 它为了不分配内存使用了大量丑陋的操作
-/// 但特点也很明显, 该函数不分配内存, 有点类似于一个 C 函数了
-#[allow(non_snake_case)]
-pub fn human_size_n(size: usize) -> &'static str {
-    const SUFFIXES: [&str; 3] = ["MB", "KB", "B"];
-    const BOUNDS: [usize; 3] = [MB, KB, 1];
-
-    let cur_slot_idx = SLOT_IDX.load(Ordering::SeqCst);
-    // 这是一个静态变量(引用 SLOTS)，故大写
-    let BUFFER = unsafe { &mut SLOTS[cur_slot_idx] };
-    clear_buffer(BUFFER);
-
-    let mut cur_size = size;
-    let mut cur_idx = 0;
-
-    for (suffix_index, bound) in BOUNDS.into_iter().enumerate() {
-        let aligned = cur_size - cur_size % bound;
-        let content = aligned / bound;
-        cur_size -= aligned;
-
-        // content == 0 没有必要写, 除非是传入的参数本就为 0, 即 0 B
-        if content != 0 || suffix_index == SUFFIXES.len() - 1 {
-            cur_idx = write_size(BUFFER, cur_idx, content, SUFFIXES[suffix_index]);
-
-            if cur_size == 0 {
-                break;
+impl Display for DebugSizeFormatter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let size = self.size;
+        if size < KB {
+            write!(f, "{}B", size)
+        } else if size < MB {
+            let kbs = size / KB;
+            let rest = size % KB;
+            if rest == 0 {
+                write!(f, "{}KiB", kbs)
+            } else {
+                write!(f, "{}KiB+{}", kbs, debug_size(rest))
             }
-
-            BUFFER[cur_idx] = b'+';
-            cur_idx += 1;
+        } else if size < GB {
+            let mbs = size / MB;
+            let rest = size % MB;
+            if rest == 0 {
+                write!(f, "{}MiB", mbs)
+            } else {
+                write!(f, "{}MiB+{}", mbs, debug_size(rest))
+            }
+        } else {
+            write!(f, "Too large size for {}", size)
         }
-    }
-
-    unsafe {
-        // 到下一个槽位
-        SLOT_IDX.fetch_add(1, Ordering::SeqCst); // 先自增
-        let new_slot_idx = SLOT_IDX.load(Ordering::SeqCst) % SLOT_COUNT;
-        SLOT_IDX.store(new_slot_idx, Ordering::SeqCst);
-        core::str::from_utf8_unchecked_mut(BUFFER)
     }
 }
 
-fn clear_buffer(buffer: &mut [u8; 32]) {
-    for byte in buffer {
-        *byte = 0;
+const DEFAULT_PRECISION: usize = 2;
+
+pub trait SuffixType {
+    const MOD_SIZE: usize;
+    fn suffixes() -> [&'static str; 4];
+}
+
+pub struct DecSuffix;
+
+impl SuffixType for DecSuffix {
+    const MOD_SIZE: usize = 1000;
+
+    fn suffixes() -> [&'static str; 4] {
+        ["B", "KB", "MB", "GB"]
     }
 }
 
-fn write_size(buffer: &mut [u8; 32], mut from: usize, content: usize, suffix: &str) -> usize {
-    let mut temp = [0u8; 10];
-    let mut idx = 0;
+/// Represents the prefixes used for display file sizes using powers of 1024.
+pub struct BinSuffix;
 
-    // 逐个将个位取出, 放入 temp 中
-    // 这里断言 content 内容不会太大, temp 足以容纳
-    if content == 0 {
-        temp[idx] = b'0';
-        idx += 1;
-    } else {
-        let mut cur_content = content;
-        while cur_content != 0 {
-            temp[idx] = (cur_content % 10) as u8 + b'0';
+impl SuffixType for BinSuffix {
+    const MOD_SIZE: usize = 1024;
 
-            cur_content /= 10;
-            idx += 1;
+    fn suffixes() -> [&'static str; 4] {
+        ["B", "KiB", "MiB", "GiB"]
+    }
+}
+
+fn int_log(mut num: usize, base: usize) -> usize {
+    let mut divisions = 0;
+
+    while num >= base {
+        num = num / base.clone();
+        divisions += 1;
+    }
+
+    divisions
+}
+
+struct FormatRatio {
+    size: Ratio<usize>,
+}
+
+impl FormatRatio {
+    /// Creates a new format ratio from the number.
+    fn new(size: Ratio<usize>) -> FormatRatio {
+        FormatRatio { size }
+    }
+}
+
+impl Display for FormatRatio {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.size.trunc())?;
+        let precision = f.precision().unwrap_or(DEFAULT_PRECISION);
+
+        if precision > 0 {
+            write!(f, ".")?;
+            let mut frac = self.size.fract();
+
+            for _ in 0..precision {
+                if frac.is_integer() {
+                    // If the fractional part is an integer, we're done and just need more zeroes.
+                    write!(f, "0")?;
+                } else {
+                    // Otherwise print every digit separately.
+                    frac = frac * Ratio::from_u64(10).unwrap();
+                    write!(f, "{}", frac.trunc())?;
+                    frac = frac.fract();
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub struct SizeFormatter<Suffix: SuffixType> {
+    size: usize,
+    _marker: PhantomData<Suffix>,
+}
+impl<Suffix: SuffixType> SizeFormatter<Suffix> {
+    fn new(size: usize) -> SizeFormatter<Suffix> {
+        Self {
+            size,
+            _marker: PhantomData,
         }
     }
+}
+impl<Suffix: SuffixType> Display for SizeFormatter<Suffix> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let max_prefix = Suffix::suffixes().len() - 1;
+        let precision = f.precision().unwrap_or(DEFAULT_PRECISION);
+        let mod_size = Suffix::MOD_SIZE;
 
-    for i in (0..idx).rev() {
-        buffer[from] = temp[i];
-        from += 1;
+        // Find the right prefix.
+        let divisions = cmp::min(int_log(self.size.clone(), mod_size.clone()), max_prefix);
+
+        // Cap the precision to what makes sense.
+        let precision = cmp::min(precision, divisions * 3);
+
+        let ratio = Ratio::<usize>::new(self.size.clone(), mod_size.pow(divisions as u32));
+
+        let format_number = FormatRatio::new(ratio);
+
+        write!(
+            f,
+            "{:.*}{}",
+            precision,
+            format_number,
+            Suffix::suffixes()[divisions]
+        )
     }
-
-    for c in suffix.bytes() {
-        buffer[from] = c;
-        from += 1;
-    }
-
-    from
 }

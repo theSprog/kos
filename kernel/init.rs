@@ -1,17 +1,18 @@
-use component::util::human_size_n;
+use component::util::human_size::*;
 use logger::{debug, info};
 
 use crate::memory::kernel_view::get_kernel_view;
+use crate::{clock, memory};
 use crate::{loader, process, task, trap};
-use crate::{memory, timer};
 
 pub fn kernel_start() -> bool {
     print_banner();
     clear_bss();
+
     memory::init();
 
     trap::init();
-    timer::init(); // 开启分时机制
+    clock::init(); // 开启分时机制
     loader::init();
     task::api::init(); // 加载 init 进程, 它是第一个进程
     process::processor::api::run_app();
@@ -30,7 +31,7 @@ fn clear_bss() {
         "bss_range: [{:#x}..{:#x}), BSS size: {}",
         bss.start,
         bss.end,
-        human_size_n(bss.len())
+        debug_size(bss.len())
     );
 
     // 将 bss 清零
@@ -55,7 +56,7 @@ fn print_banner() {
         "kernel_range: [{:#x}..{:#x}), kernel size: {}",
         kernel_range.start,
         kernel_range.end,
-        human_size_n(kernel_range.len())
+        debug_size(kernel_range.len())
     );
     info!("Now I am initalizing something neccessary");
 }

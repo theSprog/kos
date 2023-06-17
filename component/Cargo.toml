@@ -7,9 +7,10 @@ edition = "2021"
 
 [dependencies]
 # 内部依赖
-logger = {path = "../logger", features = ["kernel"]}
-sys_interface = {path = "../sys_interface"}
+logger = { path = "../logger", features = ["kernel"] }
+sys_interface = { path = "../sys_interface" }
 
 # 外部依赖
 spin = "0.9.6"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+num = { version = "0.4", default-features = false }

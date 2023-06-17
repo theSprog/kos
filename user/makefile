@@ -10,7 +10,7 @@ OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
 build: clean
-	python build.py
+	python3 build.py
 
 clean:
 	cargo clean

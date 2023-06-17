@@ -1,6 +1,6 @@
-use crate::{timer::get_time_ms, KernelHeapAllocator, KERNEL_HEAP_SIZE, PAGE_SIZE};
+use crate::{clock::get_time_ms, KernelHeapAllocator, KERNEL_HEAP_SIZE, PAGE_SIZE};
 
-use component::util::*;
+use component::util::human_size::*;
 use core::{assert_eq, mem::size_of, ops::Range};
 use logger::{debug, info};
 
@@ -49,7 +49,7 @@ pub fn init_allocator() {
         "Kernel heap range: [{:#x}..{:#x}), size: {}",
         heap_range.start,
         heap_range.end,
-        human_size(heap_range.len())
+        debug_size(heap_range.len())
     );
 
     info!("Now String, Vec and other internal data-structures are available");
@@ -111,7 +111,7 @@ fn test_vec(heap_range: &Range<usize>) {
     );
     debug!(
         "total size of (content of Vec<usize>) is {}",
-        human_size(core::mem::size_of_val(&v[0]) * v.len())
+        debug_size(core::mem::size_of_val(&v[0]) * v.len())
     );
     assert!(heap_range.contains(&(v.as_ptr() as usize)));
     debug!("dealloc Vec");

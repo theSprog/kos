@@ -7,8 +7,8 @@ edition = "2021"
 # this crate is specific for kernel, user mode should not use this logger
 
 [dependencies]
-qemu_config = { path = "../qemu_config"}
-sys_interface = { path = "../sys_interface"}
+qemu_config = { path = "../qemu_config" }
+sys_interface = { path = "../sys_interface" }
 
 riscv = { version = "0.10.1" }
 spin = "0.9.6"

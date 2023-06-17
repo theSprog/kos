@@ -1,3 +1,4 @@
+use crate::util::human_size::*;
 use crate::util::*;
 use crate::MB;
 use core::{
@@ -246,9 +247,9 @@ impl Heap {
             "Mem Display: kernel-allocator = 'bitmap': [{:#x}..{:#x}), user = {}, allocated = {}, total = {}",
             self.heap_start_ptr,
             self.heap_start_ptr + self.endpoint * BLOCK_UNIT,
-            human_size_n(self.user),
-            human_size_n(self.allocated),
-            human_size_n(self.total * BLOCK_UNIT)
+            debug_size(self.user),
+            debug_size(self.allocated),
+            debug_size(self.total * BLOCK_UNIT)
         );
     }
 }

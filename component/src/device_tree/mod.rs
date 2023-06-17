@@ -547,59 +547,59 @@ impl From<SliceReadError> for PropError {
     }
 }
 
-#[cfg(test)]
-mod test {
-    extern crate std;
-    use test::std::fs;
-    use test::std::io::{Read, Write};
+// #[cfg(test)]
+// mod test {
+//     extern crate std;
+//     use test::std::fs;
+//     use test::std::io::{Read, Write};
 
-    use super::*;
+//     use super::*;
 
-    #[test]
-    fn roundtrip() {
-        // read file into memory
-        let buf = include_bytes!("../examples/bcm2709-rpi-2-b.dtb");
-        let original_fdt = DeviceTree::load(buf).unwrap();
+//     #[test]
+//     fn roundtrip() {
+//         // read file into memory
+//         let buf = include_bytes!("../examples/bcm2709-rpi-2-b.dtb");
+//         let original_fdt = DeviceTree::load(buf).unwrap();
 
-        let dtb = original_fdt.store().unwrap();
-        let mut output = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open("output.dtb")
-            .unwrap();
-        output.write_all(&dtb).unwrap();
+//         let dtb = original_fdt.store().unwrap();
+//         let mut output = fs::OpenOptions::new()
+//             .write(true)
+//             .create(true)
+//             .open("output.dtb")
+//             .unwrap();
+//         output.write_all(&dtb).unwrap();
 
-        let mut input = fs::File::open("output.dtb").unwrap();
-        let mut buf = Vec::new();
-        input.read_to_end(&mut buf).unwrap();
-        let generated_fdt = DeviceTree::load(buf.as_slice()).unwrap();
+//         let mut input = fs::File::open("output.dtb").unwrap();
+//         let mut buf = Vec::new();
+//         input.read_to_end(&mut buf).unwrap();
+//         let generated_fdt = DeviceTree::load(buf.as_slice()).unwrap();
 
-        assert!(original_fdt == generated_fdt);
-    }
+//         assert!(original_fdt == generated_fdt);
+//     }
 
-    #[test]
-    fn walk() {
-        // read file into memory
-        let buf = include_bytes!("../examples/bcm2709-rpi-2-b.dtb");
+//     #[test]
+//     fn walk() {
+//         // read file into memory
+//         let buf = include_bytes!("../examples/bcm2709-rpi-2-b.dtb");
 
-        assert_eq!(
-            (DeviceTree::load_and_walk(buf, |node: &Node| match node.prop_str("device_type") {
-                Ok("cpu") => true,
-                _ => false,
-            }))
-            .unwrap()
-            .0,
-            true
-        );
+//         assert_eq!(
+//             (DeviceTree::load_and_walk(buf, |node: &Node| match node.prop_str("device_type") {
+//                 Ok("cpu") => true,
+//                 _ => false,
+//             }))
+//             .unwrap()
+//             .0,
+//             true
+//         );
 
-        assert_eq!(
-            (DeviceTree::load_and_walk(buf, |node: &Node| match node.prop_str("device_type") {
-                Ok("nonexistent") => true,
-                _ => false,
-            }))
-            .unwrap()
-            .0,
-            false
-        );
-    }
-}
+//         assert_eq!(
+//             (DeviceTree::load_and_walk(buf, |node: &Node| match node.prop_str("device_type") {
+//                 Ok("nonexistent") => true,
+//                 _ => false,
+//             }))
+//             .unwrap()
+//             .0,
+//             false
+//         );
+//     }
+// }

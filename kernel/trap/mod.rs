@@ -17,7 +17,7 @@ use crate::{
         api::{current_cmd_name, current_pid},
     },
     syscall::syscall,
-    timer::set_next_trigger,
+    clock::set_next_trigger,
      TRAMPOLINE, TRAP_CONTEXT,
 };
 

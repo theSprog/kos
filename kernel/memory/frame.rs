@@ -8,7 +8,7 @@ use super::address::*;
 use crate::{
     memory::kernel_view::get_kernel_view, sync::unicore::UPSafeCell, MEMORY_END, PAGE_SIZE,
 };
-use component::util::*;
+use component::util::human_size::*;
 lazy_static! {
     pub(crate) static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> = {
         info!("FRAME_ALLOCATOR Initializing...");
@@ -34,7 +34,7 @@ pub fn init_frame_allocator() {
         "Free memory range: [{:p}..{:p}), size: {}",
         free_start as *const u8,
         free_end as *const u8,
-        human_size(free_end - free_start)
+        debug_size(free_end - free_start)
     );
 
     // init 参数是 PhysPageNum

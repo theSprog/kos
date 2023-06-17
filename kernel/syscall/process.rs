@@ -7,7 +7,7 @@ use crate::{
         },
         scheduler,
     },
-    timer,
+    clock,
 };
 use alloc::{sync::Arc, vec::Vec};
 use logger::*;
@@ -31,7 +31,7 @@ pub fn sys_sched_yield() -> isize {
 
 // 以毫秒的形式返回
 pub fn sys_get_time_of_day() -> isize {
-    timer::get_time_ms() as isize
+    clock::get_time_ms() as isize
 }
 
 pub fn sys_sbrk(incrment: usize) -> isize {

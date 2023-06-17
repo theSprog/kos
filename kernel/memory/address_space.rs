@@ -22,7 +22,7 @@ use alloc::{
 };
 use component::{
     crt0::{Builder, Entry},
-    util::*,
+    util::human_size::*,
 };
 use logger::info;
 use sys_interface::config::USER_PROG_PATH;
@@ -251,32 +251,32 @@ impl AddressSpace {
             ".text    [{:#x}, {:#x}), size: {}",
             kernel_view.stext,
             kernel_view.etext,
-            human_size(kernel_view.text_range().len())
+            debug_size(kernel_view.text_range().len())
         );
         info!(
             ".rodata  [{:#x}, {:#x}), size: {}",
             kernel_view.srodata,
             kernel_view.erodata,
-            human_size(kernel_view.rodata_range().len())
+            debug_size(kernel_view.rodata_range().len())
         );
         info!(
             ".data    [{:#x}, {:#x}), size: {}",
             kernel_view.sdata,
             kernel_view.edata,
-            human_size(kernel_view.data_range().len())
+            debug_size(kernel_view.data_range().len())
         );
         info!(
             ".bss     [{:#x}, {:#x}), size: {}",
             kernel_view.sbss_with_stack,
             kernel_view.ebss,
-            human_size(kernel_view.bss_range().len())
+            debug_size(kernel_view.bss_range().len())
         );
 
         info!(
             "free mem [{:#x}, {:#x}), size: {}",
             kernel_view.kernel_end,
             MEMORY_END,
-            human_size(MEMORY_END - kernel_view.kernel_end)
+            debug_size(MEMORY_END - kernel_view.kernel_end)
         );
 
         // 所有逻辑段的 U 标志位均未被设置，
