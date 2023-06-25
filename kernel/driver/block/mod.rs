@@ -1,3 +1,8 @@
+mod virtio_blk;
+
+use alloc::sync::Arc;
+use component::fs::block_device::BlockDevice;
+
 type BlockDeviceImpl = virtio_blk::VirtIOBlock;
 
 lazy_static! {

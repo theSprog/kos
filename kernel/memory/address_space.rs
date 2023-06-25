@@ -1,4 +1,4 @@
-use core::{assert_eq, unreachable};
+use core::{assert_eq, ops::Range, unreachable};
 
 use super::{
     address::*,
@@ -25,6 +25,7 @@ use component::{
     util::human_size::*,
 };
 use logger::info;
+use qemu_config::MMIO;
 use sys_interface::config::USER_PROG_PATH;
 
 // 内核空间
@@ -279,6 +280,17 @@ impl AddressSpace {
             debug_size(MEMORY_END - kernel_view.kernel_end)
         );
 
+        // 各种驱动映射
+        for (start, len) in MMIO {
+            let range = *start..(start + len);
+            info!(
+                "driver   [{:#x}, {:#x}], size: {}",
+                range.start,
+                range.end,
+                debug_size(range.len())
+            );
+        }
+
         // 所有逻辑段的 U 标志位均未被设置，
         // 使得 CPU 只能在处于 S 特权级（或以上）时访问它们
         // text 可读可执行
@@ -340,6 +352,19 @@ impl AddressSpace {
             ),
             None,
         );
+
+        info!("mapping memory-mapped registers");
+        for pair in MMIO {
+            address_space.push(
+                Segment::new(
+                    (*pair).0.into(),
+                    ((*pair).0 + (*pair).1).into(),
+                    MapType::Identical,
+                    MapPermission::R | MapPermission::W,
+                ),
+                None,
+            );
+        }
 
         info!("Kernel mapping done");
         heap_alloc::api::display_heap_info();

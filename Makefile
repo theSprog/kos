@@ -1,10 +1,19 @@
 OS_DIR = target/riscv64gc-unknown-none-elf/release
 DEBUG_OS_DIR = target/riscv64gc-unknown-none-elf/debug
-QEMU_FLAGS = -machine virt -nographic -m 256M -smp 4
-QEMU_BIOS = -bios ./boot/rustsbi-qemu.bin -device loader,file=./kos,addr=0x80200000
 QEMU = qemu-system-riscv64
 TOOLS = ~/riscv64-elf-tools/bin
 KERNEL = kos
+FS_IMG = ./ext2.img
+
+QEMU_FLAGS = -machine virt -nographic -m 256M -smp 4
+
+# 以下配置, 顺序不可随意调换, 空格不可随意添加, 例如不要随便在 "," 后加上空格 " "
+BOOTLOADER = -bios ./boot/rustsbi-qemu.bin
+QEMU_DEVICE1 = -device loader,file=./$(KERNEL),addr=0x80200000
+QEMU_DRIVE = -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QEMU_DEVICE2 = -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+QEMU_BIOS = $(BOOTLOADER) $(QEMU_DEVICE1) $(QEMU_DRIVE) $(QEMU_DEVICE2)
+
 
 # 允许的指令
 .PHONY: run debugs debugc user_build clean

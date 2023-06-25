@@ -1,20 +1,21 @@
 use core::assert_eq;
 
-use alloc::vec::Vec;
-use logger::info;
-
 use super::address::*;
+use alloc::vec::Vec;
+use component::util::human_size::*;
+use logger::info;
 
 use crate::{
     memory::kernel_view::get_kernel_view, sync::unicore::UPSafeCell, MEMORY_END, PAGE_SIZE,
 };
-use component::util::human_size::*;
+
 lazy_static! {
     pub(crate) static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> = {
         info!("FRAME_ALLOCATOR Initializing...");
         unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) }
     };
 }
+
 type FrameAllocatorImpl = StackFrameAllocator;
 
 pub fn init_frame_allocator() {
@@ -46,9 +47,12 @@ pub fn init_frame_allocator() {
 }
 
 // 物理页分配器
-trait FrameAllocator {
+pub trait FrameAllocator {
     fn new() -> Self;
     fn alloc(&mut self) -> Option<PhysPageNum>;
+
+    // 一次性分配连续许多页
+    fn alloc_n(&mut self, n: usize) -> Option<Vec<PhysPageNum>>;
     fn dealloc(&mut self, ppn: PhysPageNum);
 }
 
@@ -88,6 +92,19 @@ impl FrameAllocator for StackFrameAllocator {
             None
         }
     }
+
+    fn alloc_n(&mut self, n: usize) -> Option<Vec<PhysPageNum>> {
+        if self.current + n >= self.end {
+            None
+        } else {
+            self.current += n;
+            let arr: Vec<usize> = (1..n + 1).collect();
+            // 以倒序的方式形成 vector, 例如 [3,2,1], last() 是 base 起始地址
+            let v = arr.iter().map(|x| (self.current - x).into()).collect();
+            Some(v)
+        }
+    }
+
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // 有效性检查
@@ -133,8 +150,15 @@ pub mod api {
             .map(PhysFrame::new) // 把 PhysPageNum 转为 PhysFrame
     }
 
+    pub fn frame_alloc_n(n: usize) -> Option<Vec<PhysFrame>> {
+        FRAME_ALLOCATOR
+            .exclusive_access()
+            .alloc_n(n)
+            .map(|x| x.iter().map(|&t| PhysFrame::new(t)).collect())
+    }
+
     /// drop 隐式调用, 所以不公开
-    pub(super) fn frame_dealloc(ppn: PhysPageNum) {
+    pub fn frame_dealloc(ppn: PhysPageNum) {
         FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
     }
 }

@@ -159,6 +159,7 @@ dependencies = [
  "oorandom",
  "qemu_config",
  "riscv",
+ "spin 0.9.8",
  "sys_interface",
  "tinybmp",
  "virtio-drivers",
