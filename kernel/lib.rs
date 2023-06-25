@@ -18,6 +18,7 @@ pub mod console;
 pub mod init;
 
 mod clock;
+mod driver;
 mod lang_items;
 mod loader;
 mod memory;

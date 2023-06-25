@@ -2,6 +2,9 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![feature(fmt_internals)]
+#![allow(unused_variables)]
+
+// #![feature(error_in_core)]
 
 use sys_interface::config::*;
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::INFO;

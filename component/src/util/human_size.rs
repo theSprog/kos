@@ -87,7 +87,7 @@ fn int_log(mut num: usize, base: usize) -> usize {
     let mut divisions = 0;
 
     while num >= base {
-        num = num / base.clone();
+        num = num / base;
         divisions += 1;
     }
 
