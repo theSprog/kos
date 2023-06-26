@@ -16,6 +16,7 @@ pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 pub mod console;
 
 use alloc::{format, string::String, vec::Vec};
+use bitflags::bitflags;
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
 pub mod constant;
@@ -30,7 +31,27 @@ mod syscall;
 use core::{ptr, todo};
 use syscall::*;
 
+bitflags! {
+    #[derive(Debug, Clone)]
+    pub struct OpenFlags: u32 {
+        const RDONLY = 0;
+        const WRONLY = 1 << 0;
+        const RDWR = 1 << 1;
+        const CREATE = 1 << 9;
+        const TRUNC = 1 << 10;
+    }
+}
+
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
+pub fn open(path: &str, flags: OpenFlags) -> isize {
+    // TODO 应该把相对路径转为绝对路径
+    let path = format!("{}\0", path);
+    sys_open(path.as_str(), flags.bits())
+}
+pub fn close(fd: usize) -> isize {
+    sys_close(fd)
+}
+
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }

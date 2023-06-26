@@ -258,9 +258,8 @@ impl VfsInode for Inode {
         Box::new(self.metadata())
     }
 
-    fn set_permissions(&mut self, permissions: &VfsPermissions) -> VfsResult<()> {
+    fn set_permissions(&mut self, permissions: &VfsPermissions) {
         self.modify_disk_inode(|disk_inode| disk_inode.set_permissions(permissions));
-        Ok(())
     }
 
     fn read_symlink(&self) -> VfsResult<String> {

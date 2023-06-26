@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-user_lib = { path = "../user_lib"}
+user_lib = { path = "../user_lib" }
 backtrace = { version = "0.3", default-features = false }
 
 [profile.release]
@@ -23,6 +23,10 @@ path = "src/init.rs"
 name = "user_shell"
 path = "src/user_shell.rs"
 
+[[bin]]
+name = "file"
+path = "src/file.rs"
+
 # [[bin]]
 # name = "hello"
 # path = "src/hello.rs"
@@ -35,9 +39,9 @@ path = "src/user_shell.rs"
 # name = "forkexec"
 # path = "src/forkexec.rs"
 
-[[bin]]
-name = "mem"
-path = "src/mem.rs"
+# [[bin]]
+# name = "mem"
+# path = "src/mem.rs"
 
 # [[bin]]
 # name = "text"
@@ -86,5 +90,3 @@ path = "src/mem.rs"
 # [[bin]]
 # name = "usertests"
 # path = "src/usertests.rs"
-
-

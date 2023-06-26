@@ -638,7 +638,7 @@ impl TypePerm {
         if self.contains(Self::O_EXEC) {
             others |= 0b001;
         }
-        VfsPermissions::new(user, group, others)
+        VfsPermissions::inner_new(user, group, others)
     }
 
     fn set_permissions(&mut self, permissions: &VfsPermissions) {

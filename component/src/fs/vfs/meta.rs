@@ -57,11 +57,20 @@ pub struct VfsPermissions {
 }
 
 impl VfsPermissions {
-    pub fn new<T: Into<VfsPermission>>(user: T, group: T, others: T) -> Self {
+    pub fn inner_new<T: Into<VfsPermission>>(user: T, group: T, others: T) -> Self {
         Self {
             user: user.into(),
             group: group.into(),
             others: others.into(),
+        }
+    }
+
+    pub fn new(ugo: u16) -> Self {
+        assert!(ugo <= 0o777, "invalid UGO permissions");
+        Self {
+            user: VfsPermission::from(((ugo >> 6) & 0o7) as u8),
+            group: VfsPermission::from(((ugo >> 3) & 0o7) as u8),
+            others: VfsPermission::from((ugo & 0o7) as u8),
         }
     }
 
@@ -109,6 +118,12 @@ impl VfsPermissions {
     }
     pub fn others(&self) -> VfsPermission {
         self.others
+    }
+}
+
+impl From<u16> for VfsPermissions {
+    fn from(ugo: u16) -> Self {
+        Self::new(ugo)
     }
 }
 

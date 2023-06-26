@@ -2,13 +2,13 @@ use component::process::IScheduler;
 use logger::info;
 
 use crate::process::PCB;
-use crate::{sync::unicore::UPSafeCell, Scheduler};
+use crate::{sync::unicore::UPSafeCell, KernelScheduler};
 use alloc::sync::Arc;
 
 lazy_static! {
-    pub(crate) static ref SCHEDULER: UPSafeCell<Scheduler> = unsafe {
+    pub(crate) static ref SCHEDULER: UPSafeCell<KernelScheduler> = unsafe {
         info!("SCHEDULER initializing...");
-        UPSafeCell::new(Scheduler::new())
+        UPSafeCell::new(KernelScheduler::new())
     };
 }
 

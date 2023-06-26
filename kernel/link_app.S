@@ -10,8 +10,8 @@ _num_app:
 
     .global _app_names
 _app_names:
+    .string "./user/prog/file"
     .string "./user/prog/init"
-    .string "./user/prog/mem"
     .string "./user/prog/user_shell"
 
     .section .data
@@ -19,7 +19,7 @@ _app_names:
     .global app_0_end
     .align 3
 app_0_start:
-    .incbin "./user/prog/init"
+    .incbin "./user/prog/file"
 app_0_end:
 
     .section .data
@@ -27,7 +27,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "./user/prog/mem"
+    .incbin "./user/prog/init"
 app_1_end:
 
     .section .data

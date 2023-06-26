@@ -14,6 +14,6 @@ build: clean
 
 clean:
 	cargo clean
-	rm -rf bin/*
-	rm -rf prog/*
+	rm -f bin/*
+	rm -f prog/*
 

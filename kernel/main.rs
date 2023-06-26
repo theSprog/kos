@@ -1,7 +1,6 @@
 #![no_main]
 #![no_std]
 #![allow(dead_code)]
-#![allow(unused_imports)]
 
 use core::arch::global_asm;
 use kos::init::*;

@@ -4,7 +4,7 @@ use crate::{PAGE_SIZE, PAGE_SIZE_BITS};
 use core::{fmt::Debug, ops::Add};
 
 /// 物理地址
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PhysAddr(pub usize);
 
 /// SV39 对应 56 位物理地址

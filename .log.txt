@@ -1,0 +1,33 @@
+/home/mrfan/.gdbinit:27: Error in sourced command file:
+Undefined command: "tui".  Try "help".
+Reading symbols from [32m./kos[m...
+The target architecture is assumed to be riscv:rv64
+Remote debugging using localhost:1234
+[34m0x0000000000001000[m in [33m??[m ()
+Breakpoint 1 at [34m0x80200000[m
+Continuing.
+[Switching to Thread 1.2]
+
+Thread 2 hit Breakpoint 1, [34m0x0000000080200000[m in [33mstext[m ()
+Continuing.
+
+Thread 2 received signal SIGINT, Interrupt.
+[34m0x0000000080241276[m in [33mvirtio_drivers::queue::VirtQueue<H,_>::add_notify_wait_pop[m ([36mself[m=0x80336080 <kos::memory::heap_alloc::HEAP_SPACE+12272>, [36minputs[m=..., [36moutputs[m=..., [36mtransport[m=0x803361f0 <kos::memory::heap_alloc::HEAP_SPACE+12640>) at [32m/home/mrfan/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-df7c3c540f42cdbd/virtio-drivers-0.5.0/src/queue.rs[m:202
+202	        while !self.can_pop() {
+Detaching from program: /home/mrfan/rust/kos/kos, process 1
+Ending remote debugging.
+[Inferior 1 (process 1) detached]
+/home/mrfan/.gdbinit:27: Error in sourced command file:
+Undefined command: "tui".  Try "help".
+Reading symbols from [32m./kos[m...
+The target architecture is assumed to be riscv:rv64
+Remote debugging using localhost:1234
+[34m0x0000000000001000[m in [33m??[m ()
+Breakpoint 1 at [34m0x80200000[m
+Continuing.
+
+Thread 1 hit Breakpoint 1, [34m0x0000000080200000[m in [33mstext[m ()
+Working directory /home/mrfan/rust/kos.
+Detaching from program: /home/mrfan/rust/kos/kos, process 1
+Ending remote debugging.
+[Inferior 1 (process 1) detached]

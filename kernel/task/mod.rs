@@ -1,6 +1,7 @@
 pub mod context;
 pub mod switch;
 
+use crate::fs::File;
 use crate::process::scheduler;
 
 use crate::{
@@ -18,6 +19,7 @@ use self::context::TaskContext;
 
 use alloc::format;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use logger::info;
 
 // INIT 进程名称
@@ -64,6 +66,8 @@ pub struct TCB {
 
     // base_size 统计了应用数据的大小，也就是在应用地址空间中从 0x0 开始到用户栈结束一共包含多少字节
     pub base_size: usize,
+
+    pub fd_table: Vec<Option<Arc<dyn File>>>,
 }
 
 impl TCB {
@@ -94,6 +98,7 @@ impl TCB {
             address_space,
             trap_cx_ppn,
             base_size: user_sp,
+            fd_table: Vec::new(),
         };
 
         // 为用户空间准备 TrapContext
@@ -111,6 +116,16 @@ impl TCB {
         tcb.address_space.init_crt0(trap_cx);
 
         tcb
+    }
+
+    pub fn alloc_fd(&mut self) -> usize {
+        if let Some(fd) = (0..self.fd_table.len()).find(|&fd| self.fd_table[fd].is_none()) {
+            fd
+        } else {
+            // 若没有的话新建一个
+            self.fd_table.push(None);
+            self.fd_table.len() - 1
+        }
     }
 }
 

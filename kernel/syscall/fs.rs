@@ -1,7 +1,10 @@
+use crate::vfs::meta::VfsPermissions;
+use alloc::sync::Arc;
 use logger::*;
 
-use crate::*;
+use crate::fs::inode::{OSInode, OpenFlags, VFS};
 use crate::{memory::page_table, process::processor, sbi::*};
+use crate::{print, println};
 
 const FD_STDIN: usize = 0;
 const FD_STDOUT: usize = 1;
@@ -49,4 +52,32 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
             panic!("Unsupported fd(={fd}) in sys_read!");
         }
     }
+}
+
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    let tcb = processor::api::current_tcb();
+    let token = processor::api::current_user_token();
+    let path = page_table::api::translated_user_cstr(token, path);
+
+    if let Ok(inode) = VFS.open_file(path.as_str()) {
+        let flags = OpenFlags::from_bits(flags).unwrap();
+        let fd = tcb.alloc_fd();
+        tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
+        fd as isize
+    } else {
+        -1
+    }
+}
+
+pub fn sys_close(fd: usize) -> isize {
+    let tcb = processor::api::current_tcb();
+    if fd >= tcb.fd_table.len() {
+        return -1;
+    }
+    if tcb.fd_table[fd].is_none() {
+        return -1;
+    }
+    // 所有权取出, 将 None 置入
+    tcb.fd_table[fd].take();
+    0
 }

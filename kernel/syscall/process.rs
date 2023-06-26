@@ -1,4 +1,5 @@
 use crate::{
+    clock,
     memory::page_table,
     process::{
         processor::{
@@ -7,7 +8,6 @@ use crate::{
         },
         scheduler,
     },
-    clock,
 };
 use alloc::{sync::Arc, vec::Vec};
 use logger::*;

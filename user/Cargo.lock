@@ -291,6 +291,7 @@ dependencies = [
 name = "user_lib"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "component",
  "lazy_static",
  "logger",

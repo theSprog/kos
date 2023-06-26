@@ -12,31 +12,29 @@ use core::fmt::Display;
 use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 pub use dir::VfsDirEntry;
+pub use error::*;
 pub use filesystem::FileSystem;
 pub use inode::VfsInode;
 pub use path::VfsPath;
 
 use crate::fs::block_device;
 
-use self::{
-    error::{VfsError, VfsErrorKind, VfsResult},
-    meta::VfsMetadata,
-};
+use self::meta::VfsMetadata;
 
 #[derive(Debug)]
-pub struct VFS {
+pub struct VirtualFileSystem {
     fs: Box<dyn FileSystem>,
 }
 
-impl Display for VFS {
+impl Display for VirtualFileSystem {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.fs)
     }
 }
 
-impl VFS {
-    pub fn new(fs: impl FileSystem) -> VFS {
-        VFS { fs: Box::new(fs) }
+impl VirtualFileSystem {
+    pub fn new(fs: impl FileSystem) -> Self {
+        Self { fs: Box::new(fs) }
     }
 
     fn parse_path(path: &str) -> VfsResult<VfsPath> {
@@ -110,7 +108,7 @@ impl VFS {
     }
 }
 
-impl Drop for VFS {
+impl Drop for VirtualFileSystem {
     fn drop(&mut self) {
         self.flush();
     }

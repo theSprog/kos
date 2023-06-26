@@ -40,11 +40,6 @@ fn clear_bss() {
         // 优化后的版本, 更快
         core::ptr::write_bytes(bss.start as *mut u8, 0, bss.len());
     }
-
-    // 不要用这个版本, 极慢
-    // for bit_addr in bss {
-    //     unsafe { (bit_addr as *mut u8).write_volatile(0u8) }
-    // }
 }
 
 fn print_banner() {

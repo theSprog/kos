@@ -19,6 +19,7 @@ pub mod init;
 
 mod clock;
 mod driver;
+mod fs;
 mod lang_items;
 mod loader;
 mod memory;
@@ -29,6 +30,7 @@ mod syscall;
 mod task;
 mod trap;
 
+use component::fs::ext2::Ext2FileSystem;
 use process::PCB;
 // 配置信息
 // ---------------------------------------------------------------------
@@ -61,4 +63,7 @@ type KernelHeapAllocator = LockedHeap;
 // type KernelHeapAllocator = LockedHeap;
 
 use component::process::FIFO;
-type Scheduler = FIFO<PCB>;
+type KernelScheduler = FIFO<PCB>;
+
+use component::fs::vfs;
+type KernelFileSystem = Ext2FileSystem;

@@ -38,6 +38,10 @@ lazy_static! {
     };
 }
 
+pub fn kernel_token() -> usize {
+    KERNEL_SPACE.exclusive_access().token()
+}
+
 /// 地址空间
 pub struct AddressSpace {
     // 页表自身也需要物理地址
