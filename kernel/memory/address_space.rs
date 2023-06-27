@@ -1,4 +1,4 @@
-use core::{assert_eq, ops::Range, unreachable};
+use core::{assert_eq, unreachable};
 
 use super::{
     address::*,

@@ -4,7 +4,7 @@ use component::crt0::{Entry, Reader};
 use crate::start::CRT0_SP;
 
 lazy_static! {
-    pub(crate) static ref ENV: Env = Env::init();
+    pub static ref ENV: Env = Env::init();
 }
 
 pub struct Env {
@@ -44,12 +44,12 @@ impl Env {
         }
     }
 
-    // 其他调用 new 函数
+    // 外部接口其他调用 new 函数
     pub fn new() -> &'static Env {
         &ENV
     }
 
-    pub fn args(&self) -> &Vec<String> {
+    pub fn args(&self) -> &[String] {
         &self.args
     }
 
@@ -65,7 +65,7 @@ impl Env {
         &mut self.envs
     }
 
-    pub fn auxs(&self) -> &Vec<Entry> {
+    pub fn auxs(&self) -> &[Entry] {
         &self.auxs
     }
 

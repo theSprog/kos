@@ -88,15 +88,6 @@ impl PCB {
             fd_table: parent_inner.tcb.fd_table.clone(),
         };
 
-        // let new_tcb = TCB {
-        //     task_status: TaskStatus::Ready,
-        //     task_cx: TaskContext::goto_trap_return(kernel_stack_top),
-        //     address_space,
-        //     trap_cx_ppn,
-        //     base_size: parent_inner.tcb.base_size,
-        //     fd_table: todo!(),
-        // };
-
         let pcb_inner = PCBInner {
             priority: parent_inner.priority, // 与父进程同优先级
             tcb: new_tcb,

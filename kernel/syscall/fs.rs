@@ -1,56 +1,64 @@
-use crate::vfs::meta::VfsPermissions;
 use alloc::sync::Arc;
-use logger::*;
 
-use crate::fs::inode::{OSInode, OpenFlags, VFS};
-use crate::{memory::page_table, process::processor, sbi::*};
-use crate::{print, println};
-
-const FD_STDIN: usize = 0;
-const FD_STDOUT: usize = 1;
+use crate::{
+    fs::{
+        inode::{OSInode, OpenFlags, VFS},
+        UserBuffer,
+    },
+    println,
+};
+use crate::{memory::page_table, process::processor};
 
 /// 由于内核和应用地址空间的隔离， sys_write 不再能够直接访问位于应用空间中的数据，
 /// 而需要手动查页表才能知道那些数据被放置在哪些物理页帧上并进行访问
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
-    match fd {
-        FD_STDOUT => {
-            let buffers = page_table::api::translated_byte_buffer(
-                processor::api::current_user_token(),
-                buf,
-                len,
-            );
-            for buffer in buffers {
-                print!("{}", core::str::from_utf8(buffer).unwrap());
-            }
-            len as isize
+    let token = processor::api::current_user_token();
+    let pcb = processor::api::current_pcb().unwrap();
+    let mut inner = pcb.ex_inner();
+    let tcb = inner.tcb();
+    if fd >= tcb.fd_table.len() {
+        return -1;
+    }
+
+    if let Some(file) = &tcb.fd_table[fd] {
+        if !file.writable() {
+            return -1;
         }
-        _ => {
-            panic!("Unsupported fd(={fd}) in sys_write!");
-        }
+
+        let file = file.clone();
+        // drop(inner);
+        file.write(UserBuffer::new(page_table::api::translated_byte_buffer(
+            token, buf, len,
+        )))
+        .unwrap() as isize
+    } else {
+        -1
     }
 }
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
-    match fd {
-        // stdin 每次读入一个字符
-        FD_STDIN => {
-            assert_eq!(len, 1, "Only support len = 1 in FD_STDIN!");
-            let c = console_getchar(); // 阻塞式 IO;
-            let ch = c as u8;
-            let mut buffers = page_table::api::translated_byte_buffer(
-                processor::api::current_user_token(),
-                buf,
-                len,
-            );
-            unsafe {
-                buffers[0].as_mut_ptr().write_volatile(ch);
-            }
+    let token = processor::api::current_user_token();
+    let pcb = processor::api::current_pcb().unwrap();
+    let mut inner = pcb.ex_inner();
+    let tcb = inner.tcb();
+    if fd >= tcb.fd_table.len() {
+        return -1;
+    }
 
-            len as isize
+    if let Some(file) = &tcb.fd_table[fd] {
+        let file = file.clone();
+        // 不可读
+        if !file.readable() {
+            return -1;
         }
-        _ => {
-            panic!("Unsupported fd(={fd}) in sys_read!");
-        }
+
+        // drop(inner);
+        file.read(UserBuffer::new(page_table::api::translated_byte_buffer(
+            token, buf, len,
+        )))
+        .unwrap() as isize
+    } else {
+        -1
     }
 }
 
@@ -58,9 +66,12 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let tcb = processor::api::current_tcb();
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
+    let flags = OpenFlags::from_bits(flags).unwrap();
+    let (create, trancate) = (flags.create(), flags.truncate());
+
+    //TODO: create & trancate
 
     if let Ok(inode) = VFS.open_file(path.as_str()) {
-        let flags = OpenFlags::from_bits(flags).unwrap();
         let fd = tcb.alloc_fd();
         tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
         fd as isize
@@ -79,5 +90,48 @@ pub fn sys_close(fd: usize) -> isize {
     }
     // 所有权取出, 将 None 置入
     tcb.fd_table[fd].take();
+    0
+}
+
+pub fn sys_listdir(path: *const u8) -> isize {
+    let token = processor::api::current_user_token();
+    let path = page_table::api::translated_user_cstr(token, path);
+    let dir = VFS.read_dir(path.as_str());
+    if dir.is_err() {
+        return -1;
+    }
+
+    use component::util::time::LocalTime;
+    let dir = dir.unwrap();
+    println!(
+        "{:>5} {:>11} {:>5} {:>8} {:>5} {:>5} {:>19} {}",
+        "Inode", "Permissions", "Links", "Size", "UID", "GID", "Modified Time", "Name"
+    );
+
+    for entry in dir {
+        let metadata = entry.inode().metadata();
+        let name = if metadata.filetype().is_symlink() {
+            alloc::format!(
+                "{} -> {}",
+                entry.name(),
+                entry.inode().read_symlink().unwrap()
+            )
+        } else {
+            alloc::format!("{}", entry.name())
+        };
+
+        println!(
+            "{:>5}  {}{} {:>5} {:>8} {:>5} {:>5} {:>19} {}",
+            entry.inode_id(),
+            metadata.filetype(),
+            metadata.permissions(),
+            metadata.hard_links(),
+            metadata.size(),
+            metadata.uid(),
+            metadata.gid(),
+            LocalTime::from_posix(metadata.timestamp().mtime()),
+            name
+        );
+    }
     0
 }

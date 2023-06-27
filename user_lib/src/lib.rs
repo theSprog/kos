@@ -24,6 +24,8 @@ pub mod constant;
 mod env;
 pub use env::Env;
 
+mod fs;
+mod io;
 mod lang_items;
 mod start;
 mod syscall;
@@ -54,6 +56,10 @@ pub fn close(fd: usize) -> isize {
 
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
+}
+pub fn list_dir(path: &str) -> isize {
+    let path = format!("{}\0", path);
+    sys_list_dir(path.as_str())
 }
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {
     sys_read(fd, buf)

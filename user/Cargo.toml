@@ -7,10 +7,9 @@ edition = "2021"
 
 [dependencies]
 user_lib = { path = "../user_lib" }
-backtrace = { version = "0.3", default-features = false }
 
 [profile.release]
-opt-level = 3
+opt-level = 2
 lto = "fat"
 
 
@@ -26,6 +25,10 @@ path = "src/user_shell.rs"
 [[bin]]
 name = "file"
 path = "src/file.rs"
+
+[[bin]]
+name = "ls"
+path = "src/ls.rs"
 
 # [[bin]]
 # name = "hello"

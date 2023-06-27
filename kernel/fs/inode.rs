@@ -2,7 +2,7 @@ use crate::driver::block::BlockDeviceImpl;
 use crate::vfs::VfsError;
 use crate::vfs::VfsInode;
 use crate::KernelFileSystem;
-use alloc::{boxed::Box, sync::Arc};
+use alloc::boxed::Box;
 use bitflags::bitflags;
 use component::fs::vfs::VirtualFileSystem;
 use spin::Mutex;
@@ -24,6 +24,7 @@ pub struct OSInodeInner {
 pub struct OSInode {
     readable: bool,
     writable: bool,
+    // 通过 mutex, OSInodeInner 变成可变的了, 可以向内读写数据
     inner: Mutex<OSInodeInner>,
 }
 

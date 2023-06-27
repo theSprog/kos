@@ -1,11 +1,5 @@
-use component::crt0::{Builder, Entry};
-use core::mem::size_of;
-
 use logger::info;
 use riscv::register::sstatus::{self, Sstatus, SPP};
-use sys_interface::config::PAGE_SIZE;
-
-use crate::{memory::page_table, task::TCB};
 
 #[repr(C)]
 pub struct TrapContext {

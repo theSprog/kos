@@ -4,28 +4,32 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{close, open, read, OpenFlags};
+use user_lib::{close, get_time_ms, open, write, OpenFlags};
 
 #[no_mangle]
 pub fn main() -> i32 {
+    // test write speed, write 5 MiB
     let fd = open("/new_file.c", OpenFlags::RDWR);
-    if fd == -1 {
-        panic!("Error occured when opening file");
+    const BUFFER_LEN: usize = 4096; // 4KiB
+    let mut buffer = [0u8; BUFFER_LEN];
+    for (i, ch) in buffer.iter_mut().enumerate() {
+        *ch = i as u8;
     }
-    println!("Got file descriptor fd: {}", fd as usize);
+
     let fd = fd as usize;
-    // let mut buf = [0u8; 256];
-    // loop {
-    //     let size = read(fd, &mut buf) as usize;
-    //     if size == 0 {
-    //         break;
-    //     }
-    //     println!("{}", core::str::from_utf8(&buf[..size]).unwrap());
-    // }
-    let res = close(fd);
-    if res == -1 {
-        panic!("Error occured when closing file");
+    let start = get_time_ms();
+    let size_mb = 5; // 5MiB
+    let count = (size_mb * 1024 * 1024) / BUFFER_LEN;
+    for _ in 0..count {
+        write(fd, &buffer);
     }
-    println!("close() returned {}", res);
+    close(fd);
+
+    let time_ms = (get_time_ms() - start) as usize;
+    let speed_kbs = size_mb * 1024 * 1000 / time_ms;
+    println!(
+        "{}MiB written, time cost = {}ms, write speed = {}KiB/s",
+        size_mb, time_ms, speed_kbs
+    );
     0
 }

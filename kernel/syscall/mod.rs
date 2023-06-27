@@ -29,6 +29,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_WAIT4 => sys_waitpid(args[0] as isize, args[1] as *mut i32),
 
         SYSCALL_SHUTDOWN => shutdown(),
+
+        // 自定义系统调用
+        SYSCALL_CUSTOM_LISTDIR => sys_listdir(args[0] as *const u8),
         // 严格来说这里不应该直接 panic,
         // 否则的话应用程序只需要一个非法系统调用就可以把 kernel 打挂
         _ => panic!(

@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-#[macro_use]
 extern crate user_lib;
 
 use user_lib::*;
@@ -16,7 +15,7 @@ pub fn main() -> i32 {
             "pid {}: forked child start execing hello app ... ",
             getpid()
         );
-        exec("hello");
+        exec("hello", None);
         100
     } else {
         // parent process

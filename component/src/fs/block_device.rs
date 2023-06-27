@@ -74,8 +74,6 @@ impl BlockCache {
                     &self.cache[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
                 );
             }
-
-            // self.block_device.write_block(self.block_id, &self.cache);
         }
     }
 

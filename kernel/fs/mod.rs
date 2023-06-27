@@ -2,6 +2,7 @@ use crate::vfs::VfsError;
 use alloc::vec::Vec;
 
 pub mod inode;
+pub mod stdio;
 
 pub struct UserBuffer {
     pub buffers: Vec<&'static mut [u8]>,

@@ -1,6 +1,4 @@
 use crate::sbi::set_timer;
-use alloc::sync::Arc;
-use component::device_tree::Node;
 use logger::info;
 use qemu_config::*;
 
@@ -9,13 +7,6 @@ const INTERRUPT_PER_SEC: usize = 100;
 
 // 时间片长度, 每秒 100 次中断, 每个时间片大概 10 ms
 const TIME_INTERVAL: usize = CLOCK_FREQ / INTERRUPT_PER_SEC;
-
-#[repr(C)]
-pub struct TimeVal {
-    pub sec: usize,
-    pub usec: usize,
-    pub msec: usize,
-}
 
 // 取得当前 mtime 计数器
 // mtime 是一个64位技术器, 用来统计处理器自上电以来经过了多少个内置时钟的时钟周期

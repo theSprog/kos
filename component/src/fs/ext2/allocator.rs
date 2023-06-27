@@ -98,9 +98,12 @@ impl Ext2Allocator {
         if needed > self.free_blocks() as usize {
             return Err(IOError::new(IOErrorKind::NoFreeBlocks).into());
         }
+        let mut ret = Vec::new();
+        if needed == 0 {
+            return Ok(ret);
+        }
 
         let mut unmet = needed;
-        let mut ret = Vec::new();
         // 需要分别更新 superblock 的 free_blocks 和 blockgroups 的 free_blocks_count
         for bg in self.blockgroups.iter() {
             let mut bg = bg.lock();

@@ -100,3 +100,12 @@ pub fn sys_open(path: &str, flags: u32) -> isize {
 pub fn sys_close(fd: usize) -> isize {
     syscall(SYSCALL_CLOSE, [fd, 0, 0])
 }
+
+// 通过 open 打开 dir, 将返回的 dir fd 传入得到 DirEntry
+// pub fn sys_getdents(fd: usize, entry: *mut DirEntry) -> isize {
+//     syscall(SYSCALL_GETDENTS64, [fd, entry as usize, 0])
+// }
+
+pub fn sys_list_dir(path: &str) -> isize {
+    syscall(SYSCALL_CUSTOM_LISTDIR, [path.as_ptr() as usize, 0, 0])
+}

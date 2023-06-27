@@ -300,6 +300,7 @@ pub const SYSCALL_LANDLOCK_CREATE_RULESET: usize = 0x1bc;
 pub const SYSCALL_LANDLOCK_ADD_RULE: usize = 0x1bd;
 pub const SYSCALL_LANDLOCK_RESTRICT_SELF: usize = 0x1be;
 
+pub const SYSCALL_CUSTOM_LISTDIR: usize = 0x200;
 /// Minimum valid system call number.
 pub const SYSCALL_CALL_BASE_INDEX: usize = 0x0;
 

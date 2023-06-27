@@ -1,6 +1,7 @@
 pub mod context;
 pub mod switch;
 
+use crate::fs::stdio::{Stderr, Stdin, Stdout};
 use crate::fs::File;
 use crate::process::scheduler;
 
@@ -17,9 +18,9 @@ use crate::{
 
 use self::context::TaskContext;
 
-use alloc::format;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use alloc::{format, vec};
 use logger::info;
 
 // INIT 进程名称
@@ -86,11 +87,6 @@ impl TCB {
 
         // 不需要在内核空间中申请内核栈, 外部的进程已经完成这件事了
         let (_, kernel_stack_top) = kernel_view.kernel_stack_range(pid);
-        // KERNEL_SPACE.exclusive_access().insert_framed_segment(
-        //     kernel_stack_bottom.into(),
-        //     kernel_stack_top.into(),
-        //     MapPermission::R | MapPermission::W,
-        // );
 
         let tcb = Self {
             task_status,
@@ -98,7 +94,14 @@ impl TCB {
             address_space,
             trap_cx_ppn,
             base_size: user_sp,
-            fd_table: Vec::new(),
+            fd_table: vec![
+                // 0 -> stdin
+                Some(Arc::new(Stdin)),
+                // 1 -> stdout
+                Some(Arc::new(Stdout)),
+                // 2 -> stderr
+                Some(Arc::new(Stderr)),
+            ],
         };
 
         // 为用户空间准备 TrapContext
