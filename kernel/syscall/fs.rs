@@ -46,11 +46,12 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 
     if let Some(file) = &tcb.fd_table[fd] {
-        let file = file.clone();
         // 不可读
         if !file.readable() {
             return -1;
         }
+
+        let file = file.clone();
 
         // drop(inner);
         file.read(UserBuffer::new(page_table::api::translated_byte_buffer(

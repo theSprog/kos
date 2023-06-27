@@ -7,7 +7,7 @@
 // #![feature(error_in_core)]
 
 use sys_interface::config::*;
-const LOG_LEVEL: logger::LogLevel = logger::LogLevel::INFO;
+const LOG_LEVEL: logger::LogLevel = logger::LogLevel::WARN;
 
 extern crate alloc;
 extern crate lazy_static;

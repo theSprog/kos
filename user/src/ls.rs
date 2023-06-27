@@ -20,7 +20,6 @@ pub fn main() -> i32 {
     if res < 0 {
         println!("Cannot list \"{}\": {}", path, res);
     }
-    println!("got res = {}", res);
 
-    0
+    res as i32
 }

@@ -23,12 +23,16 @@ name = "user_shell"
 path = "src/user_shell.rs"
 
 [[bin]]
-name = "file"
-path = "src/file.rs"
+name = "fwrite"
+path = "src/fwrite.rs"
 
 [[bin]]
 name = "ls"
 path = "src/ls.rs"
+
+[[bin]]
+name = "cat"
+path = "src/cat.rs"
 
 # [[bin]]
 # name = "hello"
