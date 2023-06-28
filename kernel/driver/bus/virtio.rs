@@ -8,7 +8,8 @@ use crate::sync::up::UPIntrFreeCell;
 
 use alloc::vec::Vec;
 use core::ptr::NonNull;
-use virtio_drivers::Hal;
+use logger::info;
+use virtio_drivers::{BufferDirection, Hal};
 
 lazy_static! {
     static ref QUEUE_FRAMES: UPIntrFreeCell<Vec<PhysFrame>> =
@@ -17,19 +18,21 @@ lazy_static! {
 
 pub struct VirtioHal;
 
-impl Hal for VirtioHal {
-    fn dma_alloc(pages: usize) -> usize {
+unsafe impl Hal for VirtioHal {
+    fn dma_alloc(pages: usize, direction: BufferDirection) -> (usize, NonNull<u8>) {
         let trakcers = frame_alloc_n(pages);
+        // last 即是分配的 dma 连续内存块的起始页号
         let ppn_base = trakcers.as_ref().unwrap().last().unwrap().ppn;
         QUEUE_FRAMES
             .exclusive_access()
             .append(&mut trakcers.unwrap());
-        let pa: PhysAddr = ppn_base.into();
-        pa.0
+        let paddr: PhysAddr = ppn_base.into();
+        let vaddr = NonNull::new(paddr.0 as _).unwrap();
+        (paddr.0, vaddr)
     }
 
-    fn dma_dealloc(pa: usize, pages: usize) -> i32 {
-        let pa = PhysAddr::from(pa);
+    unsafe fn dma_dealloc(paddr: usize, vaddr: NonNull<u8>, pages: usize) -> i32 {
+        let pa = PhysAddr::from(paddr);
         let mut ppn_base: PhysPageNum = pa.into();
         for _ in 0..pages {
             frame_dealloc(ppn_base);
@@ -38,14 +41,27 @@ impl Hal for VirtioHal {
         0
     }
 
-    fn phys_to_virt(addr: usize) -> usize {
-        addr
+    unsafe fn mmio_phys_to_virt(paddr: usize, size: usize) -> NonNull<u8> {
+        NonNull::new(paddr as _).unwrap()
     }
 
-    fn virt_to_phys(vaddr: usize) -> usize {
-        PageTable::from_token(kernel_token())
+    unsafe fn share(buffer: NonNull<[u8]>, direction: BufferDirection) -> usize {
+        let vaddr = buffer.as_ptr() as *mut u8 as usize;
+        let paddr = PageTable::from_token(kernel_token())
             .translate_vaddr(VirtAddr::from(vaddr))
             .unwrap()
-            .0
+            .0;
+        paddr
     }
+
+    unsafe fn unshare(paddr: usize, buffer: NonNull<[u8]>, direction: BufferDirection) {
+        // todo!()
+    }
+
+    // fn virt_to_phys(vaddr: usize) -> usize {
+    //     PageTable::from_token(kernel_token())
+    //         .translate_vaddr(VirtAddr::from(vaddr))
+    //         .unwrap()
+    //         .0
+    // }
 }

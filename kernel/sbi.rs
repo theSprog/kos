@@ -4,7 +4,7 @@ use core::arch::asm;
 
 use logger::*;
 
-use crate::{fs::inode::VFS, println};
+use crate::{println, fs::VFS};
 
 const SBI_SET_TIMER: usize = 0;
 const SBI_CONSOLE_PUTCHAR: usize = 1;
@@ -114,7 +114,8 @@ pub fn console_getchar_nio(base_addr: *const u8) -> usize {
 pub fn shutdown() -> ! {
     // Shutdown should flush filesystem
     {
-        VFS.flush()
+        // cleaning
+        VFS.flush();
     };
     println!("goodbye!");
     let ret = sbi_call(SYSTEM_RESET_EXTENSION, SBI_SHUTDOWN, 0, 0, 0);

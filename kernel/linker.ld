@@ -47,9 +47,14 @@ SECTIONS
     ebss = .;
 
     . = ALIGN(4K);
-    kernel_end = .;
-
-    /DISCARD/ : {
+    .eh_frame : {
         *(.eh_frame)
     }
+    . = ALIGN(4K);
+    /* /DISCARD/ : {
+        *(.eh_frame)
+    } */
+    kernel_end = .;
+
+
 }

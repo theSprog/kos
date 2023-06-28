@@ -1,10 +1,12 @@
 use core::fmt::{self, Display};
 
 use alloc::{boxed::Box, string::ToString, sync::Arc, vec::Vec};
+use logger::debug;
 use spin::Mutex;
 
 use super::block_device::{self, BlockDevice};
 
+use super::superblock::{FS_CLEAN, FS_UNKNOWN};
 use super::vfs::error::{IOError, IOErrorKind, VfsResult};
 use super::vfs::meta::*;
 use super::vfs::FileSystem;
@@ -44,7 +46,7 @@ impl Ext2FileSystem {
         Self { layout, allocator }
     }
 
-    pub fn flush(&self) {
+    fn flush(&self) {
         self.layout.flush();
     }
 

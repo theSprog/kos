@@ -1,5 +1,18 @@
+use crate::driver::block::BlockDeviceImpl;
 use crate::vfs::VfsError;
+use crate::vfs::VirtualFileSystem;
+use crate::KernelFileSystem;
 use alloc::vec::Vec;
+use component::fs::vfs::VfsErrorKind;
+use logger::info;
+
+lazy_static! {
+    pub static ref VFS: VirtualFileSystem = {
+        info!("VirtualFileSystem initializing...");
+        let kfs = KernelFileSystem::open(BlockDeviceImpl::new());
+        VirtualFileSystem::new(kfs)
+    };
+}
 
 pub mod inode;
 pub mod stdio;
@@ -31,4 +44,13 @@ pub trait File: Send + Sync {
     fn read(&self, buf: UserBuffer) -> Result<usize, VfsError>;
     /// Write `UserBuffer` to file
     fn write(&self, buf: UserBuffer) -> Result<usize, VfsError>;
+
+    /// default untrancable
+    fn truncate(&self, length: usize) -> Result<(), VfsError> {
+        Err(VfsErrorKind::NotSupported.into())
+    }
+}
+
+pub fn init() {
+    VFS.flush();
 }

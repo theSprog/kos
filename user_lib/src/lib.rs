@@ -57,6 +57,11 @@ pub fn close(fd: usize) -> isize {
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
+
+pub fn ftruncate(fd: usize, size: usize) -> isize {
+    sys_ftruncate(fd, size)
+}
+
 pub fn list_dir(path: &str) -> isize {
     let path = format!("{}\0", path);
     sys_list_dir(path.as_str())

@@ -238,11 +238,11 @@ impl Ext2Inode {
 
             // write and update write size
             let block_write_size = end_current_block - start;
+            let src = &buf[write_size..write_size + block_write_size];
             block_device::modify(
                 self.block_id_for(start_block as u32) as usize,
                 0,
                 |data_block: &mut DataBlock| {
-                    let src = &buf[write_size..write_size + block_write_size];
                     let dst =
                         &mut data_block[start % block_size..start % block_size + block_write_size];
                     dst.copy_from_slice(src);
@@ -387,6 +387,10 @@ impl Ext2Inode {
         self.set_size(new_size);
         let end_block = Self::data_blocks(new_size);
 
+        if new_blocks.is_empty() {
+            assert_eq!(start_block, end_block);
+            return;
+        }
         let mut blocks_iter = new_blocks.into_iter();
 
         if start_block < Self::DIRECT_COUNT {

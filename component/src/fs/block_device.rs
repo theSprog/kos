@@ -41,6 +41,22 @@ impl BlockCache {
         }
     }
 
+    pub fn sync(&mut self) {
+        if self.modified {
+            self.modified = false;
+
+            let lower_bid = self.block_id * block::SECTORS_PER_BLOCK;
+
+            // 底层是以 SECTOR_SIZE 为单位的
+            for i in 0..block::SECTORS_PER_BLOCK {
+                self.block_device.write_block(
+                    lower_bid + i,
+                    &self.cache[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
+                );
+            }
+        }
+    }
+
     fn addr_of_offset(&self, offset: usize) -> usize {
         &self.cache[offset] as *const _ as usize
     }
@@ -60,21 +76,6 @@ impl BlockCache {
         self.modified = true;
         let addr = self.addr_of_offset(offset);
         cast_mut!(addr, T)
-    }
-
-    pub fn sync(&mut self) {
-        if self.modified {
-            self.modified = false;
-
-            let lower_bid = self.block_id * block::SECTORS_PER_BLOCK;
-            // 底层是以 SECTOR_SIZE 为单位的
-            for i in 0..block::SECTORS_PER_BLOCK {
-                self.block_device.write_block(
-                    lower_bid + i,
-                    &self.cache[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
-                );
-            }
-        }
     }
 
     pub fn read<T, V>(&self, offset: usize, f: impl FnOnce(&T) -> V) -> V {
@@ -111,6 +112,7 @@ impl BlockCacheManager {
                 if let Some((&key, _)) = self
                     .map
                     .iter()
+                    .rev()
                     .find(|(_, cache)| Arc::strong_count(cache) == 1)
                 {
                     self.map.remove(&key);

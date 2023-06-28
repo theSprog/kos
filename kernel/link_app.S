@@ -2,20 +2,24 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 5
+    .quad 7
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
     .quad app_3_start
     .quad app_4_start
-    .quad app_4_end
+    .quad app_5_start
+    .quad app_6_start
+    .quad app_6_end
 
     .global _app_names
 _app_names:
     .string "./user/prog/cat"
-    .string "./user/prog/fwrite"
+    .string "./user/prog/fw"
     .string "./user/prog/init"
     .string "./user/prog/ls"
+    .string "./user/prog/rw"
+    .string "./user/prog/tc"
     .string "./user/prog/user_shell"
 
     .section .data
@@ -31,7 +35,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "./user/prog/fwrite"
+    .incbin "./user/prog/fw"
 app_1_end:
 
     .section .data
@@ -55,5 +59,21 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "./user/prog/user_shell"
+    .incbin "./user/prog/rw"
 app_4_end:
+
+    .section .data
+    .global app_5_start
+    .global app_5_end
+    .align 3
+app_5_start:
+    .incbin "./user/prog/tc"
+app_5_end:
+
+    .section .data
+    .global app_6_start
+    .global app_6_end
+    .align 3
+app_6_start:
+    .incbin "./user/prog/user_shell"
+app_6_end:

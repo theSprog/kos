@@ -15,6 +15,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
+        SYSCALL_FTRUNCATE => sys_ftruncate(args[0], args[1]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_SCHED_YIELD => sys_sched_yield(),
         SYSCALL_GETTIMEOFDAY => sys_get_time_of_day(),
@@ -28,10 +29,14 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         ),
         SYSCALL_WAIT4 => sys_waitpid(args[0] as isize, args[1] as *mut i32),
 
+        SYSCALL_IO_DESTROY => sys_io_destroy(args[0], args[1], args[2]),
+
         SYSCALL_SHUTDOWN => shutdown(),
 
         // 自定义系统调用
         SYSCALL_CUSTOM_LISTDIR => sys_listdir(args[0] as *const u8),
+
+        // SYSCALL_IO_DESTROY => sys_io_destroy(args[0] as *const u8),
         // 严格来说这里不应该直接 panic,
         // 否则的话应用程序只需要一个非法系统调用就可以把 kernel 打挂
         _ => panic!(

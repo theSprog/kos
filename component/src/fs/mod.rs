@@ -16,7 +16,6 @@ pub mod block {
     pub const SECTORS_PER_BLOCK: usize = 8;
 
     pub type DataBlock = [u8; SIZE];
-    pub type BitmapBlock = [u64; SIZE / 64];
 }
 
 use alloc::vec::Vec;

@@ -93,13 +93,14 @@ impl FrameAllocator for StackFrameAllocator {
         }
     }
 
+    // 申请连续若干页
     fn alloc_n(&mut self, n: usize) -> Option<Vec<PhysPageNum>> {
         if self.current + n >= self.end {
             None
         } else {
             self.current += n;
             let arr: Vec<usize> = (1..n + 1).collect();
-            // 以倒序的方式形成 vector, 例如 [3,2,1], last() 是 base 起始地址
+            // 以倒序的方式形成 vector, 例如 [3,2,1], last() 即是 base 起始页号
             let v = arr.iter().map(|x| (self.current - x).into()).collect();
             Some(v)
         }
@@ -151,13 +152,13 @@ pub mod api {
     }
 
     pub fn frame_alloc_n(n: usize) -> Option<Vec<PhysFrame>> {
+        // 使用 PhysFrame 管理 PhysPageNum
         FRAME_ALLOCATOR
             .exclusive_access()
             .alloc_n(n)
             .map(|x| x.iter().map(|&t| PhysFrame::new(t)).collect())
     }
 
-    /// drop 隐式调用, 所以不公开
     pub fn frame_dealloc(ppn: PhysPageNum) {
         FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
     }

@@ -15,6 +15,7 @@ pub use dir::VfsDirEntry;
 pub use error::*;
 pub use filesystem::FileSystem;
 pub use inode::VfsInode;
+use logger::info;
 pub use path::VfsPath;
 
 use crate::fs::block_device;
@@ -110,6 +111,7 @@ impl VirtualFileSystem {
 
 impl Drop for VirtualFileSystem {
     fn drop(&mut self) {
+        info!("VFS dropped");
         self.flush();
     }
 }

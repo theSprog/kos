@@ -32,7 +32,14 @@ pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
 }
 
 pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
-    syscall(SYSCALL_READ, [fd, buffer.as_ptr() as usize, buffer.len()])
+    syscall(
+        SYSCALL_READ,
+        [fd, buffer.as_mut_ptr() as usize, buffer.len()],
+    )
+}
+
+pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
+    syscall(SYSCALL_FTRUNCATE, [fd, length, 0])
 }
 
 /// 退出应用程序并将返回值告知系统

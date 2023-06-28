@@ -16,6 +16,8 @@ extern crate spin;
 use logger::info;
 use spin::Mutex;
 
+use crate::util::human_size::{debug_size, dec_size};
+
 mod linked_list;
 
 /// A heap that uses buddy system with configurable order.
@@ -56,6 +58,15 @@ impl<const ORDER: usize> Heap<ORDER> {
             allocated: 0,
             total: 0,
         }
+    }
+
+    pub fn display(&self) {
+        info!(
+            "user: {} allocated: {} total: {}",
+            debug_size(self.user),
+            debug_size(self.allocated),
+            debug_size(self.total)
+        );
     }
 
     /// Create an empty heap
@@ -240,6 +251,10 @@ impl LockedHeap {
     /// Creates an empty heap
     pub const fn empty() -> Self {
         LockedHeap(Mutex::new(Heap::<ORDER>::new()))
+    }
+
+    pub fn display(&self) {
+        self.0.lock().display();
     }
 }
 

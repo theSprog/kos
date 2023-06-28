@@ -68,7 +68,7 @@ impl SuffixType for DecSuffix {
     const MOD_SIZE: usize = 1000;
 
     fn suffixes() -> [&'static str; 4] {
-        ["B", "KB", "MB", "GB"]
+        ["", "K", "M", "G"]
     }
 }
 
@@ -79,7 +79,7 @@ impl SuffixType for BinSuffix {
     const MOD_SIZE: usize = 1024;
 
     fn suffixes() -> [&'static str; 4] {
-        ["B", "KiB", "MiB", "GiB"]
+        ["", "Ki", "Mi", "Gi"]
     }
 }
 

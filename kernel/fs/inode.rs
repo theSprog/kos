@@ -7,14 +7,8 @@ use bitflags::bitflags;
 use component::fs::vfs::VirtualFileSystem;
 use spin::Mutex;
 
+use super::VFS;
 use super::{File, UserBuffer};
-
-lazy_static! {
-    pub static ref VFS: VirtualFileSystem = {
-        let kfs = KernelFileSystem::open(BlockDeviceImpl::new());
-        VirtualFileSystem::new(kfs)
-    };
-}
 
 pub struct OSInodeInner {
     offset: usize,
@@ -52,7 +46,8 @@ impl File for OSInode {
         let mut total_read_size = 0usize;
 
         for slice in buf.buffers.iter_mut() {
-            let read_size = inner.inode.read_at(inner.offset, *slice)?;
+            let offset = inner.offset;
+            let read_size = inner.inode.read_at(offset, *slice)?;
             // 无数据可读
             if read_size == 0 {
                 break;
@@ -79,6 +74,11 @@ impl File for OSInode {
         }
 
         Ok(total_write_size)
+    }
+
+    fn truncate(&self, length: usize) -> Result<(), VfsError> {
+        let mut inner = self.inner.lock();
+        Ok(inner.inode.set_len(length)?)
     }
 }
 

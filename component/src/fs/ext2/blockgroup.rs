@@ -36,7 +36,7 @@ pub struct Ext2BlockGroupDesc {
 }
 
 const UNIT_WIDTH: usize = 64;
-type BitmapBlock = [u64; block::SIZE / UNIT_WIDTH];
+type BitmapBlock = [u64; block::BITS / UNIT_WIDTH];
 
 impl Ext2BlockGroupDesc {
     pub(crate) fn find(count: u32) -> Vec<Self> {
