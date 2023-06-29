@@ -114,6 +114,9 @@ impl FileSystem for Ext2FileSystem {
     fn open_file(&self, path: VfsPath) -> VfsResult<Box<dyn VfsInode>> {
         let root_inode = self.root_inode();
         let target = root_inode.walk(&path)?;
+        if !target.is_file() {
+            return Err(IOError::new(IOErrorKind::NotAFile).with_path(&path).into());
+        }
         Ok(Box::new(target))
     }
 

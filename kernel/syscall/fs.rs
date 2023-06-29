@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use component::fs::vfs::meta::VfsPermissions;
 use logger::info;
 
 use crate::fs::{
@@ -68,13 +69,28 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let flags = OpenFlags::from_bits(flags).unwrap();
     let (create, trancate) = (flags.create(), flags.truncate());
 
-    //TODO: create & trancate
-
-    if let Ok(inode) = VFS.open_file(path.as_str()) {
+    if let Ok(mut inode) = VFS.open_file(path.as_str()) {
+        if trancate {
+            let res = inode.set_len(0);
+            if res.is_err() {
+                return -1;
+            }
+        }
         let fd = tcb.alloc_fd();
         tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
         fd as isize
     } else {
+        // open 失败可能是因为不存在文件
+        if create {
+            let inode = VFS.create_file(path.as_str());
+            if inode.is_ok() {
+                let mut inode = inode.unwrap();
+                inode.set_permissions(&0o666.into());
+                let fd = tcb.alloc_fd();
+                tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
+                return fd as isize;
+            }
+        }
         -1
     }
 }

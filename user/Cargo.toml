@@ -42,6 +42,18 @@ path = "src/rw.rs"
 name = "tc"
 path = "src/tc.rs"
 
+[[bin]]
+name = "touch"
+path = "src/touch.rs"
+
+[[bin]]
+name = "echo"
+path = "src/echo.rs"
+
+# [[bin]]
+# name = "rm"
+# path = "src/rm.rs"
+
 # [[bin]]
 # name = "hello"
 # path = "src/hello.rs"

@@ -15,7 +15,7 @@ pub fn main() -> i32 {
 }
 
 fn random_str_test(len: usize) {
-    let fd = open("/new_file.c", OpenFlags::RDWR) as usize;
+    let fd = open("/new_file.c", OpenFlags::RDWR | OpenFlags::TRUNC) as usize;
     assert!(fd == 3);
     println!("test len: {}", len);
     let mut str = String::new();
