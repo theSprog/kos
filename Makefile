@@ -16,7 +16,7 @@ QEMU_BIOS = $(BOOTLOADER) $(QEMU_DEVICE1) $(QEMU_DRIVE) $(QEMU_DEVICE2)
 
 
 # 允许的指令
-.PHONY: run debugs debugc user_build clean
+.PHONY: run debugs debugc user_build clean build
 
 # 使用原始的进入退出 make
 # 因为 makefile 会调用 python, 在处理路径时不协调
@@ -31,7 +31,7 @@ build: clean user_build
 run: build
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_BIOS)
 
-debug_build: clean user_build 
+debug_build: user_build 
 	cargo b
 	ln -sf $(DEBUG_OS_DIR)/$(KERNEL) ./$(KERNEL)
 
@@ -44,6 +44,5 @@ debugc:
 	$(TOOLS)/riscv64-unknown-elf-gdb -ex 'file ./kos' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234' -ex 'b *0x80200000' -ex 'c'
 
 clean:
-	cd ./user && make clean && cd ..
 	rm -f kos
-	cargo clean
+# cargo clean

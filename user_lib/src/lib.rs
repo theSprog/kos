@@ -48,7 +48,7 @@ bitflags! {
 pub fn open(path: &str, flags: OpenFlags) -> isize {
     // TODO 应该把相对路径转为绝对路径
     let path = format!("{}\0", path);
-    sys_open(path.as_str(), flags.bits())
+    sys_open(path.as_str().as_ptr(), flags.bits())
 }
 pub fn close(fd: usize) -> isize {
     sys_close(fd)
@@ -64,10 +64,20 @@ pub fn ftruncate(fd: usize, size: usize) -> isize {
 
 pub fn list_dir(path: &str) -> isize {
     let path = format!("{}\0", path);
-    sys_list_dir(path.as_str())
+    sys_list_dir(path.as_str().as_ptr())
 }
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {
     sys_read(fd, buf)
+}
+
+pub fn mkdir(path: &str, mode: usize) -> isize {
+    let path = format!("{}\0", path);
+    sys_mkdir(path.as_str().as_ptr(), mode)
+}
+
+pub fn unlink(path: &str) -> isize {
+    let path = format!("{}\0", path);
+    sys_unlink(path.as_str().as_ptr())
 }
 
 pub fn exit(exit_code: i32) -> isize {

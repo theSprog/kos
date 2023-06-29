@@ -38,6 +38,18 @@ pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
     )
 }
 
+pub fn sys_mkdir(dirpath: *const u8, mode: usize) -> isize {
+    syscall(SYSCALL_MKDIRAT, [dirpath as usize, mode, 0])
+}
+
+pub fn sys_unlink(filepath: *const u8) -> isize {
+    syscall(SYSCALL_UNLINKAT, [filepath as usize, 0, 0])
+}
+
+// pub fn sys_rmdir(dirpath: *const u8) -> isize {
+//     syscall(SYSCALL_RMDIRAT, [dirpath as usize, 0])
+// }
+
 pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
     syscall(SYSCALL_FTRUNCATE, [fd, length, 0])
 }
@@ -100,8 +112,8 @@ pub fn sys_shutdown() -> ! {
     unreachable!();
 }
 
-pub fn sys_open(path: &str, flags: u32) -> isize {
-    syscall(SYSCALL_OPENAT, [path.as_ptr() as usize, flags as usize, 0])
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    syscall(SYSCALL_OPENAT, [path as usize, flags as usize, 0])
 }
 
 pub fn sys_close(fd: usize) -> isize {
@@ -113,6 +125,6 @@ pub fn sys_close(fd: usize) -> isize {
 //     syscall(SYSCALL_GETDENTS64, [fd, entry as usize, 0])
 // }
 
-pub fn sys_list_dir(path: &str) -> isize {
-    syscall(SYSCALL_CUSTOM_LISTDIR, [path.as_ptr() as usize, 0, 0])
+pub fn sys_list_dir(path: *const u8) -> isize {
+    syscall(SYSCALL_CUSTOM_LISTDIR, [path as usize, 0, 0])
 }

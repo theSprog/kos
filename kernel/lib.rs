@@ -49,8 +49,8 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 /// 可用内存空间的结尾, 从 USER_BASE_ADDRESS 到 MEMORY_END 会被页表管理
 pub const MEMORY_END: usize = 0x8f000000;
 
-/// 内核堆大小 32M
-pub const KERNEL_HEAP_SIZE: usize = 32 * MB;
+/// 内核堆大小 64M
+pub const KERNEL_HEAP_SIZE: usize = 64 * MB;
 
 // 外部组件
 // ----------------------------------------------------------------

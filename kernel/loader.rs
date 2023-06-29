@@ -20,7 +20,7 @@ lazy_static! {
         let start = _app_names as usize as *const u8;
         let apps = gen_app_names_vec(num_app, start);
 
-        debug!("avaliable apps: {:?}", apps);
+        debug!("avaliable apps: {:#?}", apps);
         apps
     };
 }

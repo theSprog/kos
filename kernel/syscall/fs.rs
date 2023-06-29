@@ -167,6 +167,36 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
     -1
 }
 
+pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
+    let token = processor::api::current_user_token();
+    let path = page_table::api::translated_user_cstr(token, path);
+    if mode > u16::MAX as usize {
+        return -1;
+    }
+    let permissions = VfsPermissions::new(mode as u16);
+    let res = VFS.create_dir(path.as_str());
+    if res.is_err() {
+        return -1;
+    }
+    let mut dir = res.unwrap();
+    dir.set_permissions(&permissions);
+    0
+}
+
+pub fn sys_unlinkat(path: *const u8) -> isize {
+    let token = processor::api::current_user_token();
+    let path = page_table::api::translated_user_cstr(token, path);
+    let res1 = VFS.remove_dir(path.as_str());
+    let res2 = VFS.remove_file(path.as_str());
+    if res1.is_ok() && res2.is_ok() {
+        panic!("Removed directory and file: '{}'", path);
+    }
+    if res1.is_err() && res2.is_err() {
+        return -1;
+    }
+    0
+}
+
 pub fn sys_close(fd: usize) -> isize {
     let tcb = processor::api::current_tcb();
     if fd >= tcb.fd_table.len() {

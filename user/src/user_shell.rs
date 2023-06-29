@@ -38,7 +38,7 @@ fn run_shell() -> i32 {
                     if pid == 0 {
                         // child process
                         if exec(&line, None) == -1 {
-                            println!("Error when executing!");
+                            println!("\x1B[31mError when executing!\x1B[0m");
                             return -4;
                         }
                         unreachable!();
@@ -46,7 +46,17 @@ fn run_shell() -> i32 {
                         let mut exit_code: i32 = 0;
                         let exit_pid = waitpid(pid as usize, &mut exit_code);
                         assert_eq!(pid, exit_pid);
-                        println!("Shell: Process {} exited with code {}", pid, exit_code);
+                        if exit_code != 0 {
+                            println!(
+                                "\x1B[31mShell: Process {} exited with code {}\x1B[0m",
+                                pid, exit_code
+                            );
+                        } else {
+                            println!(
+                                "\x1B[32mShell: Process {} exited with code {}\x1B[0m",
+                                pid, exit_code
+                            );
+                        }
                     }
                     line.clear();
                 }

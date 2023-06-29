@@ -132,6 +132,7 @@ impl FileSystem for Ext2FileSystem {
         dir_inode.insert_entry(&path, VfsFileType::Directory)
     }
 
+    // remove file 也包括 remove symlink
     fn remove_file(&self, path: VfsPath) -> VfsResult<()> {
         let root_inode = self.root_inode();
         let mut dir_inode = root_inode.walk(&path.parent())?;

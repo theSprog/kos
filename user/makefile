@@ -13,7 +13,7 @@ build: clean
 	python3 build.py
 
 clean:
-	cargo clean
+# cargo clean
 	rm -f bin/*
 	rm -f prog/*
 

@@ -41,7 +41,7 @@ impl Display for VfsFileType {
             VfsFileType::Directory => write!(f, "d"),
             VfsFileType::FIFO => write!(f, "f"),
             VfsFileType::SymbolicLink => write!(f, "l"),
-            _ => todo!(),
+            _ => panic!("why got {}", self),
             // VfsFileType::CharDev => write!(f, "CharDev"),
             // VfsFileType::BlockDev => write!(f, "BlockDev"),
             // VfsFileType::Socket => write!(f, "Socket"),

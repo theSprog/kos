@@ -438,25 +438,15 @@ impl AddressSpace {
                 // PT_LOAD类型的代码段是根据 p_vaddr 来排布的，这就使得 max_end_vpn 可以严格递增
                 max_end_vpn = segment.vpn_range.get_end();
 
-                if ph_flags.is_write() {
-                    // 如果是可写的则使用 lazy 方式, 只有当触发缺页时才分配物理页面
-                    address_space.push_lazy(segment);
-                } else {
-                    // 必定不可写
-                    assert!(!segment.map_perm.contains(MapPermission::W));
-                    // 只读页面则立即加载
-                    address_space.push(
-                        segment,
-                        Some(
-                            &elf.input
-                                [ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
-                        ),
-                    );
-                }
+                address_space.push(
+                    segment,
+                    Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
+                );
             }
         }
 
-        // 用户栈
+        // 用户堆栈都用 push_lazy 方式
+        // 先处理用户栈
         // 此前的修改使得 max_end_vpn 已经在最后一个 section 的结尾地址处了
         let max_end_va: VirtAddr = max_end_vpn.into();
         // 用户栈栈底
