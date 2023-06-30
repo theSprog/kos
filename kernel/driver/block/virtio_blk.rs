@@ -1,6 +1,5 @@
 use core::ptr::NonNull;
 
-use logger::info;
 use virtio_drivers::device::blk::VirtIOBlk;
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 

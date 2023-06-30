@@ -9,7 +9,6 @@ use super::{
 
 use crate::{
     memory::{heap_alloc, page_table},
-    process::processor::api::current_cmd_name,
     sync::unicore::UPSafeCell,
     trap::context::TrapContext,
     MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
@@ -168,64 +167,6 @@ impl AddressSpace {
     /// 以 lazy 的方式添加一个逻辑段, 只有访问该页的时候才会实现物理页分配与映射
     fn push_lazy(&mut self, segment: Segment) {
         self.segments.push(segment);
-    }
-
-    /// 填充虚拟内存, 可能会用到 elf 文件的对应内容。也可能不会, 例如填充栈段就不用 elf 指定
-    pub fn fill_one_page_from_elf(&mut self, vpn: VirtPageNum) {
-        // vpn 转为虚拟地址, 它必然是页对齐的
-        let vaddr = VirtAddr::from(vpn).0;
-        assert_eq!(0, vaddr % PAGE_SIZE);
-        // 防御性检验, 该 vaddr 一定是在某一个 segment 中
-        let seg = self.select_seg_by_vaddr(vaddr);
-        assert!(seg.is_some(), "vadder is not in any segment");
-
-        // vpn 转为虚拟地址, 它必然是页对齐的
-        let vaddr = VirtAddr::from(vpn).0;
-        assert_eq!(0, vaddr % PAGE_SIZE);
-
-        // 防御性检验, 该 vaddr 一定是在某一个 segment 中
-        let seg = self.select_seg_by_vaddr(vaddr);
-        assert!(seg.is_some());
-
-        {
-            // 将 elf 中的某个程序段加载一页到虚拟内存(对应的物理内存)中
-            let elf_data = crate::loader::load_app(&current_cmd_name()).unwrap();
-            let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
-
-            let ph: Vec<_> = elf
-                .program_iter()
-                .filter(|phdr| {
-                    (phdr.virtual_addr() <= vaddr as u64)
-                        && ((vaddr as u64) < (phdr.virtual_addr() + phdr.mem_size()))
-                })
-                .collect();
-            //该 vaddr 有可能来自 elf, 也有可能是其他非 elf 的段(例如用户栈就是 kernel 所设定的)
-            assert!(ph.len() <= 1);
-
-            if ph.len() == 1 {
-                let ph = ph[0];
-
-                let vaddr = VirtAddr::from(vpn).0;
-                assert_eq!(0, ph.virtual_addr() as usize % PAGE_SIZE);
-
-                //先把需要加载的数据框定
-                let data =
-                    &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
-                // 需要加载的内容的起点
-                let start = vaddr - ph.virtual_addr() as usize;
-                // 需要加载的内容的大小, 最大一个页面
-                let size = PAGE_SIZE.min(ph.file_size() as usize - start);
-                assert_ne!(size, 0);
-                // 划定源数据
-                let src = &data[start..start + size];
-                let pte = self.translate_vpn(vpn).unwrap();
-                assert!(pte.valid());
-                let dst = &mut pte.ppn().get_bytes_array()[..src.len()];
-                dst.copy_from_slice(src);
-            }
-
-            // 如果是来自其他段(例如用户栈), 由于之前已经申请过页面了, 所以直接用就行了
-        }
     }
 
     /// 假设 seg 之间没有两个段占用同一页面
@@ -473,9 +414,10 @@ impl AddressSpace {
         // 用户堆内存, 堆向高地址生长, 最初时无内存
         // 加上 PAGE_SIZE 是为了 guard page
         let heap_start_va = (user_stack_top + PAGE_SIZE).into();
+        let heap_end_va = heap_start_va;
         address_space.push_lazy(Segment::new(
             heap_start_va,
-            heap_start_va,
+            heap_end_va,
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
         ));
@@ -520,29 +462,15 @@ impl AddressSpace {
         trap.unwrap().ppn()
     }
 
+    // page fault 有两种: 写 cow 和懒加载
     pub fn is_page_fault(&self, vaddr: usize, perm: MapPermission) -> bool {
         for segment in &self.segments {
-            // 段内地址包含且权限正确
+            // 段内地址包含 且 权限正确
             if segment.contains(vaddr) && segment.map_perm.contains(perm | MapPermission::U) {
                 return true;
             }
         }
         false
-    }
-
-    pub fn select_seg_by_vaddr(&self, vaddr: usize) -> Option<&Segment> {
-        let segs = self
-            .segments
-            .iter()
-            .filter(|seg| seg.contains(vaddr))
-            .collect::<Vec<_>>();
-        assert!(segs.len() <= 1);
-
-        if segs.len() == 1 {
-            Some(segs[0])
-        } else {
-            None
-        }
     }
 
     // segment 自身包含着权限，直接取出用, 所以不需要再在参数中传递权限
@@ -562,18 +490,13 @@ impl AddressSpace {
     }
 
     // 修复缺页异常
-    pub fn fix_page_fault_from_elf(&mut self, vaddr: usize) {
-        // 分配物理页
-        let _ppn = self.map_phys_page(vaddr);
-        // 找到虚拟页页号
-        let vpn = VirtAddr(vaddr).floor();
-
-        // 有可能需要将 ELF 文件对应虚拟地址中的数据搬迁到此处
-        self.fill_one_page_from_elf(vpn);
+    pub fn fix_page_missing(&mut self, vaddr: usize) {
+        // 只有可能是堆栈缺页, 分配物理页即可
+        self.map_phys_page(vaddr);
     }
 
     // 修复 cow 异常
-    pub fn fix_page_fault_from_cow(&mut self, vaddr: usize) {
+    pub fn fix_cow(&mut self, vaddr: usize) {
         let vpn: VirtPageNum = VirtAddr(vaddr).floor();
         let pte = self.page_table.find_pte(vpn).unwrap();
         assert!(pte.valid());

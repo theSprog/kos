@@ -66,6 +66,16 @@ pub fn list_dir(path: &str) -> isize {
     let path = format!("{}\0", path);
     sys_list_dir(path.as_str().as_ptr())
 }
+
+pub fn chdir(path: &str) -> isize {
+    let path = format!("{}\0", path);
+    sys_chdir(path.as_str().as_ptr())
+}
+
+pub fn getcwd(buffer: &mut [u8]) -> isize {
+    sys_getcwd(buffer.as_mut_ptr(), buffer.len())
+}
+
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {
     sys_read(fd, buf)
 }

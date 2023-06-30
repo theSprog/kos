@@ -1,6 +1,6 @@
 use crate::memory::address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr};
 use crate::memory::address_space::kernel_token;
-use crate::memory::frame::api::{frame_alloc, frame_alloc_n, frame_dealloc};
+use crate::memory::frame::api::{frame_alloc_n, frame_dealloc};
 use crate::memory::frame::PhysFrame;
 
 use crate::memory::page_table::PageTable;
@@ -8,7 +8,6 @@ use crate::sync::up::UPIntrFreeCell;
 
 use alloc::vec::Vec;
 use core::ptr::NonNull;
-use logger::info;
 use virtio_drivers::{BufferDirection, Hal};
 
 lazy_static! {

@@ -46,7 +46,7 @@ pub trait File: Send + Sync {
     fn write(&self, buf: UserBuffer) -> Result<usize, VfsError>;
 
     /// default untrancable
-    fn truncate(&self, length: usize) -> Result<(), VfsError> {
+    fn truncate(&self, _length: usize) -> Result<(), VfsError> {
         Err(VfsErrorKind::NotSupported.into())
     }
 }

@@ -91,7 +91,7 @@ impl FileSystem for Ext2FileSystem {
             if child.is_dir() {
                 // child 已存在且是 dir, 则在该 dir 下新建同名符号链接
                 let mut new_from = from.clone();
-                new_from.push(to.last().unwrap());
+                new_from.forward(to.last().unwrap());
                 child.insert_hardlink(&new_from, &to, &target)?;
             } else {
                 // child 已存在但不是 dir, 则是 AlreadyExists Error

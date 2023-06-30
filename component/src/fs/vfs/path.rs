@@ -1,4 +1,4 @@
-use core::fmt::Display;
+use core::{fmt::Display, ops::DerefMut};
 
 use alloc::{
     string::{String, ToString},
@@ -27,8 +27,19 @@ impl VfsPath {
         self.from_root
     }
 
-    pub fn push(&mut self, next: &str) {
+    pub fn forward(&mut self, next: &str) {
         self.inner.push(next.to_string());
+    }
+
+    pub fn backward(&mut self) {
+        if !self.is_empty() {
+            self.inner.pop();
+        }
+    }
+
+    pub fn replace(&mut self, new_path: &str) {
+        assert!(new_path.starts_with('/'));
+        *self = Self::from(new_path);
     }
 
     pub fn parent(&self) -> Self {

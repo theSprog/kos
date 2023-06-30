@@ -1,4 +1,7 @@
-use alloc::sync::Arc;
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+};
 use component::fs::vfs::meta::VfsPermissions;
 use logger::info;
 
@@ -62,10 +65,24 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let tcb = processor::api::current_tcb();
+fn build_abs_path(path: *const u8) -> String {
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
+    match path.starts_with('/') {
+        true => path,
+        false => {
+            let pcb = processor::api::current_pcb().unwrap();
+            let mut pwd = pcb.ex_inner().cwd().clone();
+            pwd.forward(&path);
+            pwd.to_string()
+        }
+    }
+}
+
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    let path = build_abs_path(path);
+
+    let tcb = processor::api::current_tcb();
     let flags = OpenFlags::from_bits(flags).unwrap();
     let (create, trancate) = (flags.create(), flags.truncate());
 
@@ -96,9 +113,9 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 }
 
 pub fn sys_listdir(path: *const u8) -> isize {
-    let token = processor::api::current_user_token();
-    let path = page_table::api::translated_user_cstr(token, path);
-    let dir = VFS.read_dir(path.as_str());
+    let abs_path = build_abs_path(path);
+
+    let dir = VFS.read_dir(&abs_path);
     if dir.is_err() {
         return -1;
     }
@@ -168,13 +185,13 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
 }
 
 pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
-    let token = processor::api::current_user_token();
-    let path = page_table::api::translated_user_cstr(token, path);
+    let abs_path = build_abs_path(path);
+
     if mode > u16::MAX as usize {
         return -1;
     }
     let permissions = VfsPermissions::new(mode as u16);
-    let res = VFS.create_dir(path.as_str());
+    let res = VFS.create_dir(abs_path.as_str());
     if res.is_err() {
         return -1;
     }
@@ -183,13 +200,66 @@ pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
     0
 }
 
-pub fn sys_unlinkat(path: *const u8) -> isize {
+pub fn sys_chdir(path: *const u8) -> isize {
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
-    let res1 = VFS.remove_dir(path.as_str());
-    let res2 = VFS.remove_file(path.as_str());
+    let pcb = processor::api::current_pcb().unwrap();
+    match &path[..] {
+        "." => 0,
+        ".." => {
+            let mut inner = pcb.ex_inner();
+            let cwd = inner.cwd_mut();
+            cwd.backward();
+            0
+        }
+        path => {
+            let mut inner = pcb.ex_inner();
+            let cwd = inner.cwd_mut();
+            if path.starts_with('/') {
+                let meta = VFS.metadata(path.to_string()).unwrap();
+                if !meta.filetype().is_dir() {
+                    return -1;
+                }
+                cwd.replace(path);
+            } else {
+                cwd.forward(path);
+                let meta = VFS.metadata(cwd.to_string()).unwrap();
+                if !meta.filetype().is_dir() {
+                    cwd.backward();
+                    return -1;
+                }
+            }
+
+            0
+        }
+    }
+}
+
+pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
+    let token = processor::api::current_user_token();
+    let user_buffer_ptr = page_table::api::translated_refmut(token, buffer);
+
+    let pcb = processor::api::current_pcb().unwrap();
+    let inner = pcb.ex_inner();
+    let cwd_string = inner.cwd().to_string();
+    if cwd_string.len() > max_len {
+        return -1;
+    }
+
+    let dst = unsafe { core::slice::from_raw_parts_mut(user_buffer_ptr, cwd_string.len()) };
+    let src = cwd_string.as_bytes();
+    dst.copy_from_slice(src);
+
+    0
+}
+
+pub fn sys_unlinkat(path: *const u8) -> isize {
+    let abs_path = build_abs_path(path);
+
+    let res1: Result<(), component::fs::vfs::VfsError> = VFS.remove_dir(abs_path.as_str());
+    let res2 = VFS.remove_file(abs_path.as_str());
     if res1.is_ok() && res2.is_ok() {
-        panic!("Removed directory and file: '{}'", path);
+        panic!("Removed directory and file: '{}'", abs_path);
     }
     if res1.is_err() && res2.is_err() {
         return -1;
@@ -210,6 +280,6 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 
-pub fn sys_io_destroy(args0: usize, args1: usize, args2: usize) -> isize {
+pub fn sys_io_destroy(_args0: usize, _args1: usize, _args2: usize) -> isize {
     0
 }

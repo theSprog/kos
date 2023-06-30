@@ -148,7 +148,7 @@ pub mod api {
         FRAME_ALLOCATOR
             .exclusive_access()
             .alloc()
-            .map(PhysFrame::new) // 把 PhysPageNum 转为 PhysFrame
+            .map(PhysFrame::new) // 把 PhysPageNum 转为 PhysFrame, 从而 RAII
     }
 
     pub fn frame_alloc_n(n: usize) -> Option<Vec<PhysFrame>> {

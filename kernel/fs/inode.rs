@@ -1,13 +1,9 @@
-use crate::driver::block::BlockDeviceImpl;
 use crate::vfs::VfsError;
 use crate::vfs::VfsInode;
-use crate::KernelFileSystem;
 use alloc::boxed::Box;
 use bitflags::bitflags;
-use component::fs::vfs::VirtualFileSystem;
 use spin::Mutex;
 
-use super::VFS;
 use super::{File, UserBuffer};
 
 pub struct OSInodeInner {

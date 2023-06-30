@@ -18,10 +18,6 @@ impl TrapContext {
         self.x[2] = sp;
     }
 
-    pub fn get_sp(&self) -> usize {
-        self.x[2]
-    }
-
     /// init app context
     /// entry: app 入口, 即第一条指令地址
     /// sp: 用户栈指针

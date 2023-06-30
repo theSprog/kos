@@ -17,6 +17,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_FTRUNCATE => sys_ftruncate(args[0], args[1]),
         SYSCALL_UNLINKAT => sys_unlinkat(args[0] as *const u8),
+        SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
+        SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         // SYSCALL_LSEEK => sys_lseek(args[0], args[1], args[2]),
         SYSCALL_MKDIRAT => sys_mkdirat(args[0] as *const u8, args[1]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),

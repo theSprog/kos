@@ -172,11 +172,11 @@ pub fn trap_handler() -> ! {
                 if pte.is_some() && pte.unwrap().valid() && !pte.unwrap().writable() {
                     // segment 可写, 但是 pte 表示不可写, 说明是 cow
                     trace!("Fixing COW for this StorePageFault");
-                    tcb.address_space.fix_page_fault_from_cow(stval);
+                    tcb.address_space.fix_cow(stval);
                 } else {
-                    // 物理页不存在, 从 elf 文件中加载
+                    // 物理页不存在, 缺页只有可能发生在堆栈段
                     assert!(pte.is_none() || !pte.unwrap().valid());
-                    tcb.address_space.fix_page_fault_from_elf(stval);
+                    tcb.address_space.fix_page_missing(stval);
                 }
             } else {
                 warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
@@ -197,7 +197,7 @@ pub fn trap_handler() -> ! {
                 .address_space
                 .is_page_fault(stval, segment::MapPermission::R)
             {
-                tcb.address_space.fix_page_fault_from_elf(stval);
+                tcb.address_space.fix_page_missing(stval);
             } else {
                 warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
                 processor::api::exit_and_run_next(-2);

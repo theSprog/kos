@@ -9,6 +9,7 @@ edition = "2021"
 sys_interface = { path = "../sys_interface" }
 # features 选择 user 模式
 logger = { path = "../logger", features = ["user"] }
+# 需要用到 crt0 和 heap
 component = { path = "../component" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 bitflags = "2.0.2"

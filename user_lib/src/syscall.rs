@@ -128,3 +128,11 @@ pub fn sys_close(fd: usize) -> isize {
 pub fn sys_list_dir(path: *const u8) -> isize {
     syscall(SYSCALL_CUSTOM_LISTDIR, [path as usize, 0, 0])
 }
+
+pub fn sys_chdir(path: *const u8) -> isize {
+    syscall(SYSCALL_CHDIR, [path as usize, 0, 0])
+}
+
+pub fn sys_getcwd(buf: *mut u8, size: usize) -> isize {
+    syscall(SYSCALL_GETCWD, [buf as usize, size, 0])
+}

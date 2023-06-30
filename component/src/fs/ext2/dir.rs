@@ -362,7 +362,7 @@ impl Inode {
         let mut current_inode = self.clone();
         let mut next_path = VfsPath::empty(path.is_from_root());
         for next in path.iter() {
-            next_path.push(next);
+            next_path.forward(next);
 
             if current_inode.is_symlink() {
                 let parent = current_inode.parent_inode();

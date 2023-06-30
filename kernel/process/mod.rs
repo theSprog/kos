@@ -11,6 +11,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use component::fs::vfs::VfsPath;
 
 use crate::{
     loader::load_app,
@@ -51,8 +52,6 @@ impl PCB {
     }
 
     pub fn new(elf_data: &[u8], cmd: &str) -> Self {
-        let kernel_view = get_kernel_view();
-
         // 分配 pid
         let pid = pid::api::pid_alloc();
         // 确定内核栈位置
@@ -71,7 +70,8 @@ impl PCB {
         // 访问父进程
         let mut parent_inner = self.ex_inner();
         // 拷贝用户空间
-        let address_space = AddressSpace::from_fork(&mut parent_inner.tcb.address_space);
+        let address_space: AddressSpace =
+            AddressSpace::from_fork(&mut parent_inner.tcb.address_space);
 
         // 分配 pid 和 内核栈
         let pid_handle = pid::api::pid_alloc();
@@ -97,6 +97,7 @@ impl PCB {
             children: Vec::new(),
             cmd: String::from(parent_inner.cmd()),
             exit_code: 0,
+            cwd: parent_inner.cwd().clone(),
         };
 
         let new_pcb = Arc::new(PCB {
@@ -174,6 +175,9 @@ pub struct PCBInner {
     // 有些调度算法不会关注优先级, 例如 FIFO
     priority: u8,
 
+    // 当前进程所在目录
+    cwd: VfsPath,
+
     // 进程运行的时间片, 每用一个 +1
     count: usize,
 
@@ -197,6 +201,7 @@ impl PCBInner {
             children: Vec::new(),
             cmd: String::from(cmd),
             exit_code: 0,
+            cwd: VfsPath::empty(true),
         }
     }
 
@@ -207,6 +212,18 @@ impl PCBInner {
 
     pub fn cmd(&self) -> &str {
         &self.cmd
+    }
+
+    pub fn cwd(&self) -> &VfsPath {
+        &self.cwd
+    }
+
+    pub fn cwd_mut(&mut self) -> &mut VfsPath {
+        &mut self.cwd
+    }
+
+    pub fn parent(&self) -> Option<Weak<PCB>> {
+        self.parent.clone()
     }
 
     pub fn priority(&self) -> u8 {
