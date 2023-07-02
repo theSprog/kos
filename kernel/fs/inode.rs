@@ -1,6 +1,7 @@
 use crate::vfs::VfsError;
 use crate::vfs::VfsInode;
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use bitflags::bitflags;
 use spin::Mutex;
 
@@ -25,6 +26,21 @@ impl OSInode {
             writable,
             inner: Mutex::new(OSInodeInner { offset: 0, inode }),
         }
+    }
+
+    pub fn read_all(&self) -> Vec<u8> {
+        let mut inner = self.inner.lock();
+        let mut buffer = [0u8; 4096];
+        let mut ret = Vec::new();
+        loop {
+            let len = inner.inode.read_at(inner.offset, &mut buffer).unwrap();
+            if len == 0 {
+                break;
+            }
+            inner.offset += len;
+            ret.extend_from_slice(&buffer[..len]);
+        }
+        ret
     }
 }
 

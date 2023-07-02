@@ -34,6 +34,20 @@ macro_rules! println {
     }
 }
 
+#[macro_export]
+macro_rules! red {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console::print(format_args!(concat!("\x1b[31m", $fmt, "\x1b[0m", "\n") $(, $($arg)+)?));
+    }
+}
+
+#[macro_export]
+macro_rules! green {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console::print(format_args!(concat!("\x1b[32m", $fmt, "\x1b[0m", "\n") $(, $($arg)+)?));
+    }
+}
+
 pub fn getchar() -> u8 {
     const STDIN: usize = 0;
     let mut c = [0u8; 1];

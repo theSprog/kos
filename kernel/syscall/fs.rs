@@ -2,7 +2,10 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use component::fs::vfs::meta::VfsPermissions;
+use component::fs::vfs::{
+    meta::{VfsFileType, VfsPermissions},
+    VfsError, VfsErrorKind,
+};
 use logger::info;
 
 use crate::fs::{
@@ -79,6 +82,32 @@ fn build_abs_path(path: *const u8) -> String {
     }
 }
 
+fn report_fs_err(err: VfsError) {
+    match err.kind() {
+        VfsErrorKind::IOError(io_err) => {
+            info!("IOError: {:?}", io_err);
+        }
+        VfsErrorKind::FileNotFound => {
+            info!("File not found");
+        }
+        VfsErrorKind::InvalidPath(path) => {
+            info!("Invalid path: {:?}", path);
+        }
+        VfsErrorKind::DirectoryExists => {
+            info!("Directory exists");
+        }
+        VfsErrorKind::FileExists => {
+            info!("File exists");
+        }
+        VfsErrorKind::NotSupported => {
+            info!("Not supported");
+        }
+        _ => {
+            info!("Unknown error");
+        }
+    }
+}
+
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let path = build_abs_path(path);
 
@@ -86,10 +115,13 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let flags = OpenFlags::from_bits(flags).unwrap();
     let (create, trancate) = (flags.create(), flags.truncate());
 
-    if let Ok(mut inode) = VFS.open_file(path.as_str()) {
+    let res = VFS.open_file(path.as_str());
+
+    if let Ok(mut inode) = res {
         if trancate {
             let res = inode.set_len(0);
             if res.is_err() {
+                report_fs_err(res.unwrap_err());
                 return -1;
             }
         }
@@ -107,7 +139,10 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
                 tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
                 return fd as isize;
             }
+            // 出错
+            report_fs_err(inode.unwrap_err());
         }
+        report_fs_err(res.unwrap_err());
         -1
     }
 }
@@ -117,6 +152,7 @@ pub fn sys_listdir(path: *const u8) -> isize {
 
     let dir = VFS.read_dir(&abs_path);
     if dir.is_err() {
+        report_fs_err(dir.unwrap_err());
         return -1;
     }
 
@@ -142,6 +178,24 @@ pub fn sys_listdir(path: *const u8) -> isize {
         };
 
         let size_str = alloc::format!("{}", bin_size(metadata.size() as usize));
+        let colored_name = match metadata.filetype() {
+            VfsFileType::RegularFile => {
+                if metadata.permissions().user().execute() {
+                    alloc::format!("\x1b[32m{}\x1b[0m", entry.name())
+                } else {
+                    entry.name().to_string()
+                }
+            }
+            VfsFileType::Directory => alloc::format!("\x1b[94m{}\x1b[0m", entry.name()),
+            VfsFileType::SymbolicLink => alloc::format!("\x1b[36m{}\x1b[0m", entry.name()),
+
+            VfsFileType::FIFO => todo!(),
+
+            VfsFileType::CharDev => todo!(),
+            VfsFileType::BlockDev => todo!(),
+            VfsFileType::Socket => todo!(),
+        };
+
         println!(
             "{:>5}  {}{} {:>5} {:>10} {:>5} {:>5} {:>19} {}",
             entry.inode_id(),
@@ -152,7 +206,7 @@ pub fn sys_listdir(path: *const u8) -> isize {
             metadata.uid(),
             metadata.gid(),
             LocalTime::from_posix(metadata.timestamp().mtime()),
-            name
+            colored_name
         );
     }
     0
@@ -193,6 +247,7 @@ pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
     let permissions = VfsPermissions::new(mode as u16);
     let res = VFS.create_dir(abs_path.as_str());
     if res.is_err() {
+        report_fs_err(res.unwrap_err());
         return -1;
     }
     let mut dir = res.unwrap();
@@ -237,8 +292,6 @@ pub fn sys_chdir(path: *const u8) -> isize {
 
 pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
     let token = processor::api::current_user_token();
-    let user_buffer_ptr = page_table::api::translated_refmut(token, buffer);
-
     let pcb = processor::api::current_pcb().unwrap();
     let inner = pcb.ex_inner();
     let cwd_string = inner.cwd().to_string();
@@ -246,9 +299,22 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
         return -1;
     }
 
-    let dst = unsafe { core::slice::from_raw_parts_mut(user_buffer_ptr, cwd_string.len()) };
-    let src = cwd_string.as_bytes();
-    dst.copy_from_slice(src);
+    let mut user_buffer = UserBuffer::new(page_table::api::translated_byte_buffer(
+        token, buffer, max_len,
+    ));
+
+    let mut cwd_begin = 0;
+    for slice in user_buffer.iter_mut() {
+        let slice_len = slice.len();
+        let rest_cwd_len = cwd_string.len() - cwd_begin;
+        // 1. 如果此 slice 足以容纳剩余 cwd_string
+        // 2. 如果剩余 cwd_string 大于 slice, 则还需要下一次填充
+        let this_len = rest_cwd_len.min(slice_len);
+        let src = &cwd_string.as_bytes()[cwd_begin..cwd_begin + this_len];
+        let dst = &mut slice[..this_len];
+        dst.copy_from_slice(src);
+        cwd_begin += src.len();
+    }
 
     0
 }
@@ -256,12 +322,27 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
 pub fn sys_unlinkat(path: *const u8) -> isize {
     let abs_path = build_abs_path(path);
 
-    let res1: Result<(), component::fs::vfs::VfsError> = VFS.remove_dir(abs_path.as_str());
+    let res1 = VFS.remove_dir(abs_path.as_str());
     let res2 = VFS.remove_file(abs_path.as_str());
-    if res1.is_ok() && res2.is_ok() {
-        panic!("Removed directory and file: '{}'", abs_path);
+    match (&res1, &res2) {
+        (Ok(_), Ok(_)) => panic!("Removed directory and file: '{}'", abs_path),
+        (Ok(_), Err(_)) => 0,
+        (Err(_), Ok(_)) => 0,
+        (Err(_), Err(_)) => {
+            // 两个都出错, 说明即不存在文件也不存在目录
+            report_fs_err(res1.unwrap_err());
+            report_fs_err(res2.unwrap_err());
+            return -1;
+        }
     }
-    if res1.is_err() && res2.is_err() {
+}
+
+pub fn sys_linkat(to: *const u8, from: *const u8) -> isize {
+    let abs_to = build_abs_path(to);
+    let abs_from = build_abs_path(from);
+    let res = VFS.link(abs_to.as_str(), abs_from.as_str());
+    if res.is_err() {
+        report_fs_err(res.unwrap_err());
         return -1;
     }
     0

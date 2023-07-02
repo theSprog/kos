@@ -3,10 +3,10 @@ pub mod switch;
 
 use crate::fs::stdio::{Stderr, Stdin, Stdout};
 use crate::fs::File;
+use crate::loader::load_app;
 use crate::process::scheduler;
 
 use crate::{
-    loader::load_app,
     memory::{
         address::*,
         address_space::{AddressSpace, KERNEL_SPACE},
@@ -31,15 +31,12 @@ lazy_static! {
     pub static ref INITPROC: Arc<PCB> =
     {
         info!("{INIT} proc initializing...");
-        let init_proc_path = &format!("{}/{}", USER_PROG_PATH, INIT);
-        if let Some(init_data) = load_app(init_proc_path) {
-            Arc::new(PCB::new(init_data, init_proc_path))
+        if let Some(init_data) = load_app(INIT) {
+            Arc::new(PCB::new(&init_data, INIT))
         }else {
             panic!("Failed to find '{INIT}' proc");
         }
     };
-
-    pub static ref TCB_ONCE: &'static bool = &false;
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

@@ -2,9 +2,9 @@ use std::fs::{read_dir, File};
 use std::io::{Result, Write};
 use std::println;
 
-static SRC_PATH: &str = "./user/src/";
-static TARGET_PATH: &str = "./user/prog/";
-static SCRIPT_PATH: &str = "./kernel/link_app.S";
+static SRC_PATH: &str = "user/src/";
+static TARGET_PATH: &str = "user/prog/";
+static SCRIPT_PATH: &str = "kernel/link_app.S";
 
 fn main() {
     println!("cargo:rerun-if-changed={}", SRC_PATH);

@@ -266,6 +266,7 @@ pub mod api {
         ret
     }
 
+    // 翻译一页, 以 ptr 为页起始地址
     pub fn translated_one_page(token: usize, ptr: *const u8) -> &'static mut [u8] {
         let page_table = PageTable::from_token(token); // 拿到页表
         let start = ptr as usize;

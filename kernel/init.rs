@@ -2,7 +2,7 @@ use component::util::human_size::*;
 use logger::{debug, info};
 
 use crate::memory::kernel_view::get_kernel_view;
-use crate::{clock, memory, fs};
+use crate::{clock, fs, memory};
 use crate::{loader, process, task, trap};
 
 pub fn kernel_start() -> bool {
@@ -13,8 +13,9 @@ pub fn kernel_start() -> bool {
 
     trap::init();
     clock::init(); // 开启分时机制
-    loader::init();
     fs::init();
+
+    loader::init();
     task::api::init(); // 加载 init 进程, 它是第一个进程
     process::processor::api::run_app();
     // 初始化成功

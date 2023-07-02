@@ -17,6 +17,7 @@ lazy_static! {
 
 pub struct VirtioHal;
 
+#[allow(unused_variables)]
 unsafe impl Hal for VirtioHal {
     fn dma_alloc(pages: usize, direction: BufferDirection) -> (usize, NonNull<u8>) {
         let trakcers = frame_alloc_n(pages);

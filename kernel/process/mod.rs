@@ -12,6 +12,7 @@ use alloc::{
     vec::Vec,
 };
 use component::fs::vfs::VfsPath;
+use logger::info;
 
 use crate::{
     loader::load_app,
@@ -122,14 +123,14 @@ impl PCB {
     pub fn exec(&self, app_name: &str, args: Vec<String>, envs: Vec<String>) -> isize {
         // self 即子进程自身
         let pid = processor::api::current_pid();
+
         let app = load_app(app_name);
         if app.is_none() {
             return -1;
         }
-
         let elf_data = app.unwrap();
 
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data, pid);
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf_data, pid);
         let trap_cx_ppn = address_space.trap_ppn();
 
         // **** access inner exclusively

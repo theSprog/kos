@@ -46,6 +46,10 @@ pub fn sys_unlink(filepath: *const u8) -> isize {
     syscall(SYSCALL_UNLINKAT, [filepath as usize, 0, 0])
 }
 
+pub fn sys_link(to: *const u8, from: *const u8) -> isize {
+    syscall(SYSCALL_LINKAT, [to as usize, from as usize, 0])
+}
+
 // pub fn sys_rmdir(dirpath: *const u8) -> isize {
 //     syscall(SYSCALL_RMDIRAT, [dirpath as usize, 0])
 // }

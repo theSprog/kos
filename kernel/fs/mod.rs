@@ -4,6 +4,8 @@ use crate::vfs::VirtualFileSystem;
 use crate::KernelFileSystem;
 use alloc::vec::Vec;
 use component::fs::vfs::VfsErrorKind;
+use core::ops::Deref;
+use core::ops::DerefMut;
 use logger::info;
 
 lazy_static! {
@@ -32,6 +34,20 @@ impl UserBuffer {
             total += b.len();
         }
         total
+    }
+}
+
+impl Deref for UserBuffer {
+    type Target = Vec<&'static mut [u8]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffers
+    }
+}
+
+impl DerefMut for UserBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffers
     }
 }
 

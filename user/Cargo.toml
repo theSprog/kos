@@ -19,20 +19,12 @@ name = "init"
 path = "src/init.rs"
 
 [[bin]]
-name = "user_shell"
-path = "src/user_shell.rs"
+name = "shell"
+path = "src/shell/mod.rs"
 
 [[bin]]
 name = "fw"
 path = "src/fw.rs"
-
-[[bin]]
-name = "ls"
-path = "src/ls.rs"
-
-[[bin]]
-name = "cat"
-path = "src/cat.rs"
 
 [[bin]]
 name = "rw"
@@ -41,6 +33,14 @@ path = "src/rw.rs"
 [[bin]]
 name = "tc"
 path = "src/tc.rs"
+
+[[bin]]
+name = "ls"
+path = "src/ls.rs"
+
+[[bin]]
+name = "cat"
+path = "src/cat.rs"
 
 [[bin]]
 name = "touch"
@@ -62,10 +62,13 @@ path = "src/rm.rs"
 name = "pwd"
 path = "src/pwd.rs"
 
+[[bin]]
+name = "mv"
+path = "src/mv.rs"
 
 # [[bin]]
-# name = "mv"
-# path = "src/mv.rs"
+# name = "hello"
+# path = "src/hello.rs"
 
 # [[bin]]
 # name = "cp"

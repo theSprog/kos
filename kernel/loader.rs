@@ -1,5 +1,10 @@
-use crate::{task::INIT, *};
-use alloc::vec::Vec;
+use crate::{
+    fs::{inode::OSInode, VFS},
+    process::processor,
+    task::INIT,
+    *,
+};
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 use logger::{debug, info, trace, warn};
 
 extern "C" {
@@ -27,18 +32,54 @@ lazy_static! {
 
 pub fn init() {
     assert!(APP_CONTAINER.len() > 0, "There must be at least one app!");
-    assert!(
-        APP_CONTAINER
-            .iter()
-            .map(|app| app.split('/').last().unwrap())
-            .any(|app_name| app_name == INIT),
-        "cannot find '{INIT}' app!"
-    );
 }
 
-/// 按照名称寻找 app, 会添加 search path
-pub fn load_app(app_name: &str) -> Option<&'static [u8]> {
-    get_app_data_by_path(app_name)
+pub fn load_app(app_name: &str) -> Option<Box<[u8]>> {
+    // 先从内部查找
+    let app = load_inner_app(app_name);
+    if app.is_some() {
+        return app.map(|slice| Box::from(slice));
+    }
+    info!("cannot find app from inner: {}", app_name);
+
+    // 否则从文件系统中查找
+    info!("start find app from filesystem: {}", app_name);
+    let app = match app_name.starts_with('/') {
+        true => load_fs_app(app_name), // 绝对路径
+        false => {
+            // 相对路径
+            let pcb = processor::api::current_pcb().unwrap();
+            let inner = pcb.ex_inner();
+            let cwd_string = inner.cwd().to_string();
+            load_fs_app(&alloc::format!("{}/{}", cwd_string, app_name))
+        }
+    };
+    if app.is_some() {
+        return app.map(|vec| Box::from(vec.as_slice()));
+    }
+
+    if app.is_none() {
+        warn!("failed to find app '{app_name}'");
+        return None;
+    }
+
+    None
+}
+
+// 从文件系统中寻找 app
+fn load_fs_app(app_path: &str) -> Option<Vec<u8>> {
+    if let Ok(inode) = VFS.open_file(app_path) {
+        let os_inode = OSInode::new(true, false, inode);
+        return Some(os_inode.read_all());
+    }
+
+    None
+}
+
+/// 按照名称寻找 app
+fn load_inner_app(app_name: &str) -> Option<&'static [u8]> {
+    let app_path = alloc::format!("{}/{}", USER_PROG_PATH, app_name);
+    get_app_data_by_path(&app_path)
 }
 
 /// 按照路径寻找 app
@@ -50,11 +91,6 @@ fn get_app_data_by_path(app_path: &str) -> Option<&'static [u8]> {
     let app_data = (0..num_app)
         .find(|&i| APP_CONTAINER[i] == app_path)
         .map(get_app_data_by_id);
-
-    if app_data.is_none() {
-        warn!("failed to find app '{app_path}'");
-        return None;
-    }
 
     app_data
 }

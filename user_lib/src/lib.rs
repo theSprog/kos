@@ -90,6 +90,12 @@ pub fn unlink(path: &str) -> isize {
     sys_unlink(path.as_str().as_ptr())
 }
 
+pub fn link(to: &str, from: &str) -> isize {
+    let to = format!("{}\0", to);
+    let from = format!("{}\0", from);
+    sys_link(to.as_str().as_ptr(), from.as_str().as_ptr())
+}
+
 pub fn exit(exit_code: i32) -> isize {
     sys_exit(exit_code)
 }
@@ -107,7 +113,11 @@ pub fn fork() -> isize {
     sys_fork()
 }
 pub fn exec(name: &str, new_env: Option<Env>) -> isize {
-    let args: Vec<String> = name.split(" ").map(|s| String::from(s)).collect();
+    let args: Vec<String> = name
+        .split(" ")
+        .filter(|&s| !s.is_empty())
+        .map(|s| String::from(s))
+        .collect();
 
     // 准备新的 env
     let new_env = match new_env {
@@ -150,9 +160,7 @@ pub fn exec(name: &str, new_env: Option<Env>) -> isize {
     let envs_ptr = envs_ptr_vec.as_ptr();
 
     // -----------可执行文件路径--------------------------------
-    let new_envs = new_env.envs();
-    assert!(new_envs.contains_key("HOME"));
-    let filename = format!("{}/{}\0", new_envs.get("HOME").unwrap(), new_env.args()[0]);
+    let filename = format!("{}\0", new_env.args()[0]);
     sys_execve(filename.as_ptr() as *const u8, args_ptr, envs_ptr)
 }
 
