@@ -18,7 +18,7 @@ pub fn main() -> i32 {
 
     let fd = fd as usize;
     let start = get_time_ms();
-    let size_mb = 5;
+    let size_mb = 1;
     let count = (size_mb * 1024 * 1024) / BUFFER_LEN;
     for _ in 0..count {
         let size = write(fd, &buffer);

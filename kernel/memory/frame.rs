@@ -126,7 +126,7 @@ pub struct PhysFrame {
 
 impl PhysFrame {
     pub fn new(ppn: PhysPageNum) -> Self {
-        let bytes_array = ppn.get_bytes_array();
+        let bytes_array = ppn.get_one_page();
         unsafe {
             // 清理页数据
             core::ptr::write_bytes(bytes_array.as_mut_ptr(), 0, bytes_array.len());

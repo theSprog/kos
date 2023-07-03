@@ -124,13 +124,20 @@ impl PCB {
         // self 即子进程自身
         let pid = processor::api::current_pid();
 
-        let app = load_app(app_name);
-        if app.is_none() {
-            return -1;
-        }
-        let elf_data = app.unwrap();
+        let elf_data = match load_app(app_name) {
+            Some(app) => app,
+            None => return -1,
+        };
 
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf_data, pid);
+        let elf = match xmas_elf::ElfFile::new(&elf_data) {
+            Ok(elf) => elf,
+            Err(err) => {
+                info!("Failed to parse elf: {}", err);
+                return -1;
+            }
+        };
+
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf, pid);
         let trap_cx_ppn = address_space.trap_ppn();
 
         // **** access inner exclusively

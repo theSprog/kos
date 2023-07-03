@@ -44,7 +44,7 @@ impl Ext2Layout {
             let bg_size = core::mem::size_of::<Ext2BlockGroupDesc>();
             for (idx, bg) in self.blockgroups.iter().enumerate() {
                 let dst = &mut data[idx * bg_size..];
-                let disk_bg = cast_mut!(dst.as_ptr(), Ext2BlockGroupDesc);
+                let disk_bg = cast_mut!(dst.as_mut_ptr(), Ext2BlockGroupDesc);
                 disk_bg.clone_from(&bg.lock())
             }
         });

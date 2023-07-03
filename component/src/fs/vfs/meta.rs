@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 use core::fmt::Display;
 
-pub trait VfsMetadata: Debug + Display + 'static {
+pub trait VfsMetadata: Debug + Display {
     fn filetype(&self) -> VfsFileType;
     fn permissions(&self) -> VfsPermissions;
     fn size(&self) -> u64;

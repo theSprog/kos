@@ -41,6 +41,10 @@ bitflags! {
         const RDWR = 1 << 1;
         const CREATE = 1 << 9;
         const TRUNC = 1 << 10;
+        const APPEND = 1 << 11;  // Append to the end of the file
+        const NONBLOCK = 1 << 12;  // Non-blocking mode
+        const SYNC = 1 << 13;  // Synchronous I/O
+        const EXCLUSIVE = 1 << 14;  // Exclusive file access
     }
 }
 

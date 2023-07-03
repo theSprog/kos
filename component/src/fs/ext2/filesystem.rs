@@ -1,7 +1,7 @@
 use core::fmt::{self, Display};
 
 use alloc::{boxed::Box, string::ToString, sync::Arc, vec::Vec};
-use logger::debug;
+use logger::{debug, info};
 use spin::Mutex;
 
 use super::block_device::{self, BlockDevice};

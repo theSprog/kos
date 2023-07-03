@@ -23,7 +23,10 @@ pub fn main() -> i32 {
         println!("{}", msg);
     } else {
         let path = args.get(3).unwrap();
-        let fd = open(path, OpenFlags::WRONLY | OpenFlags::CREATE);
+        let fd = open(
+            path,
+            OpenFlags::WRONLY | OpenFlags::CREATE | OpenFlags::APPEND,
+        );
         if fd < 0 {
             red!("Could not create \"{}\" file", path);
             return 1;

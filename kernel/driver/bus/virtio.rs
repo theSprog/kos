@@ -8,6 +8,7 @@ use crate::sync::up::UPIntrFreeCell;
 
 use alloc::vec::Vec;
 use core::ptr::NonNull;
+use logger::info;
 use virtio_drivers::{BufferDirection, Hal};
 
 lazy_static! {
@@ -57,11 +58,4 @@ unsafe impl Hal for VirtioHal {
     unsafe fn unshare(paddr: usize, buffer: NonNull<[u8]>, direction: BufferDirection) {
         // todo!()
     }
-
-    // fn virt_to_phys(vaddr: usize) -> usize {
-    //     PageTable::from_token(kernel_token())
-    //         .translate_vaddr(VirtAddr::from(vaddr))
-    //         .unwrap()
-    //         .0
-    // }
 }

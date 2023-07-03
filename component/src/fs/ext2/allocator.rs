@@ -1,5 +1,4 @@
 use alloc::{sync::Arc, vec::Vec};
-use logger::{debug, info};
 use spin::Mutex;
 
 use super::vfs::error::{IOError, IOErrorKind, VfsResult};

@@ -175,7 +175,7 @@ impl Inode {
 
     fn clear_from(&mut self, start: usize, len: usize) -> VfsResult<()> {
         assert!(start + len <= self.size());
-        let buf = [0u8; block::SIZE];
+        let buf = alloc::vec![0u8; block::SIZE];
 
         // 剩下要写入的字节数
         let mut rest = len;

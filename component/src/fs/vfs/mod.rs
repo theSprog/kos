@@ -104,7 +104,6 @@ impl VirtualFileSystem {
     }
 
     pub fn flush(&self) {
-        self.fs.flush();
         block_device::flush();
     }
 }

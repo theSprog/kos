@@ -66,9 +66,9 @@ path = "src/pwd.rs"
 name = "mv"
 path = "src/mv.rs"
 
-# [[bin]]
-# name = "hello"
-# path = "src/hello.rs"
+[[bin]]
+name = "hello"
+path = "src/hello.rs"
 
 # [[bin]]
 # name = "cp"

@@ -9,11 +9,12 @@ BINS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(APPS))
 OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
-build: clean
+build:
+	rm -f bin/*
+	rm -f prog/*
 	python3 build.py
 
 clean:
-# cargo clean
-	rm -f bin/*
-	rm -f prog/*
+	cargo clean
+
 

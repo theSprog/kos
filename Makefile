@@ -24,7 +24,7 @@ QEMU_BIOS = $(BOOTLOADER) $(QEMU_DEVICE1) $(QEMU_DRIVE) $(QEMU_DEVICE2)
 user_build:
 	@cd ./user && make build && cd ..
 
-build: clean user_build 
+build: user_build 
 	cargo b --release
 	ln -sf $(OS_DIR)/$(KERNEL) ./$(KERNEL)
 
@@ -45,4 +45,5 @@ debugc:
 
 clean:
 	rm -f kos
-# cargo clean
+	cargo clean
+	cd ./user && make clean && cd ..

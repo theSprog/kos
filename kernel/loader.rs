@@ -38,23 +38,24 @@ pub fn load_app(app_name: &str) -> Option<Box<[u8]>> {
     // 先从内部查找
     let app = load_inner_app(app_name);
     if app.is_some() {
+        info!("find app {:#?} in inner", app_name);
         return app.map(|slice| Box::from(slice));
     }
     info!("cannot find app from inner: {}", app_name);
 
     // 否则从文件系统中查找
-    info!("start find app from filesystem: {}", app_name);
     let app = match app_name.starts_with('/') {
         true => load_fs_app(app_name), // 绝对路径
         false => {
             // 相对路径
             let pcb = processor::api::current_pcb().unwrap();
-            let inner = pcb.ex_inner();
+            let inner: core::cell::RefMut<'_, process::PCBInner> = pcb.ex_inner();
             let cwd_string = inner.cwd().to_string();
             load_fs_app(&alloc::format!("{}/{}", cwd_string, app_name))
         }
     };
     if app.is_some() {
+        info!("find app {:#?} in filesystem", app_name);
         return app.map(|vec| Box::from(vec.as_slice()));
     }
 

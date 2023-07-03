@@ -27,7 +27,7 @@ fn random_str_test(len: usize) {
     println!("write size: {}", write);
     close(fd);
 
-    let fd = open("/new_file.c", OpenFlags::RDWR) as usize;
+    let fd = open("/home/new_file.c", OpenFlags::RDWR) as usize;
     assert!(fd == 3);
     let mut read_buffer = [0u8; 8192];
     let mut read_str = String::new();

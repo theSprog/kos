@@ -256,10 +256,10 @@ pub mod api {
 
             if end_va.page_offset() == 0 {
                 // 如果跨页
-                ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..]);
+                ret.push(&mut ppn.get_one_page()[start_va.page_offset()..]);
             } else {
                 // 没有跨页
-                ret.push(&mut ppn.get_bytes_array()[start_va.page_offset()..end_va.page_offset()]);
+                ret.push(&mut ppn.get_one_page()[start_va.page_offset()..end_va.page_offset()]);
             }
             start = end_va.into();
         }
@@ -279,7 +279,7 @@ pub mod api {
 
         let vpn = VirtPageNum::from(VirtAddr::from(start));
         let ppn = page_table.translate(vpn).unwrap().ppn();
-        ppn.get_bytes_array()
+        ppn.get_one_page()
     }
 
     // 将用户态传入的 C 风格 str 转成 rust 的 String

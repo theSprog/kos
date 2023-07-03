@@ -3,6 +3,7 @@ use crate::vfs::VfsInode;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use logger::info;
 use spin::Mutex;
 
 use super::{File, UserBuffer};
@@ -28,18 +29,18 @@ impl OSInode {
         }
     }
 
+    pub fn set_offset(&mut self, offset: usize) {
+        self.inner.lock().offset = offset;
+    }
+
     pub fn read_all(&self) -> Vec<u8> {
-        let mut inner = self.inner.lock();
-        let mut buffer = [0u8; 4096];
-        let mut ret = Vec::new();
-        loop {
-            let len = inner.inode.read_at(inner.offset, &mut buffer).unwrap();
-            if len == 0 {
-                break;
-            }
-            inner.offset += len;
-            ret.extend_from_slice(&buffer[..len]);
-        }
+        let inner = self.inner.lock();
+        let mut ret = alloc::vec![0; inner.inode.metadata().size() as usize];
+        let len = inner
+            .inode
+            .read_at(inner.offset, &mut ret[inner.offset..])
+            .unwrap();
+        assert_eq!(len, ret.len());
         ret
     }
 }
@@ -56,7 +57,6 @@ impl File for OSInode {
         // 两个进程无法同时访问同个文件
         let mut inner = self.inner.lock();
         let mut total_read_size = 0usize;
-
         for slice in buf.buffers.iter_mut() {
             let offset = inner.offset;
             let read_size = inner.inode.read_at(offset, *slice)?;
@@ -107,6 +107,11 @@ bitflags! {
         const CREATE = 1 << 9;
         // 清空
         const TRUNC = 1 << 10;
+
+        const APPEND = 1 << 11;  // Append to the end of the file
+        const NONBLOCK = 1 << 12;  // Non-blocking mode
+        const SYNC = 1 << 13;  // Synchronous I/O
+        const EXCLUSIVE = 1 << 14;  // Exclusive file access
     }
 }
 
@@ -124,5 +129,9 @@ impl OpenFlags {
     }
     pub fn truncate(&self) -> bool {
         self.contains(OpenFlags::TRUNC)
+    }
+
+    pub fn append(&self) -> bool {
+        self.contains(OpenFlags::APPEND)
     }
 }

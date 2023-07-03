@@ -113,20 +113,26 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 
     let tcb = processor::api::current_tcb();
     let flags = OpenFlags::from_bits(flags).unwrap();
-    let (create, trancate) = (flags.create(), flags.truncate());
+    let (create, trancate, append) = (flags.create(), flags.truncate(), flags.append());
 
     let res = VFS.open_file(path.as_str());
-
     if let Ok(mut inode) = res {
         if trancate {
-            let res = inode.set_len(0);
-            if res.is_err() {
-                report_fs_err(res.unwrap_err());
-                return -1;
-            }
+            match inode.set_len(0) {
+                Err(err) => {
+                    report_fs_err(err);
+                    return -1;
+                }
+                _ => (),
+            };
         }
         let fd = tcb.alloc_fd();
-        tcb.fd_table[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
+        let offset = inode.metadata().size() as usize;
+        let mut os_inode = OSInode::new(flags.read(), flags.write(), inode);
+        if append {
+            os_inode.set_offset(offset);
+        }
+        tcb.fd_table[fd] = Some(Arc::new(os_inode));
         fd as isize
     } else {
         // open 失败可能是因为不存在文件
@@ -150,16 +156,17 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 pub fn sys_listdir(path: *const u8) -> isize {
     let abs_path = build_abs_path(path);
 
-    let dir = VFS.read_dir(&abs_path);
-    if dir.is_err() {
-        report_fs_err(dir.unwrap_err());
-        return -1;
-    }
+    let dir = match VFS.read_dir(&abs_path) {
+        Ok(dir) => dir,
+        Err(err) => {
+            report_fs_err(err);
+            return -1;
+        }
+    };
 
     use crate::println;
     use component::util::human_size::bin_size;
     use component::util::time::LocalTime;
-    let dir = dir.unwrap();
     println!(
         "{:>5} {:>11} {:>5} {:>10} {:>5} {:>5} {:>19} {}",
         "Inode", "Permissions", "Links", "Size", "UID", "GID", "Modified Time", "Name"

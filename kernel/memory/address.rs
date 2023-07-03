@@ -91,7 +91,7 @@ impl PhysPageNum {
     }
 
     // 取出一个 page_size 的数据
-    pub fn get_bytes_array(&self) -> &'static mut [u8] {
+    pub fn get_one_page(&self) -> &'static mut [u8] {
         let pa: PhysAddr = (*self).into();
         unsafe {
             // 取出一页数据

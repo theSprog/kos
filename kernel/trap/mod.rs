@@ -141,7 +141,7 @@ pub fn trap_handler() -> ! {
         // 如果是来自非法指令, 例如用户态下 sret
         Trap::Exception(Exception::IllegalInstruction) => {
             warn!(
-                "IllegalInstruction in application-'{}'(pid={}), stval:{}, cx.sepc: {}. kernel killed it.",
+                "IllegalInstruction in application-'{}'(pid={}), stval:{}, cx.sepc: {:#X?}. kernel killed it.",
                 current_cmd_name(),current_pid(),
                 stval,
                 cx.sepc

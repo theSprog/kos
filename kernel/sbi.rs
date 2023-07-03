@@ -4,7 +4,7 @@ use core::arch::asm;
 
 use logger::*;
 
-use crate::{println, fs::VFS};
+use crate::{fs::VFS, println};
 
 const SBI_SET_TIMER: usize = 0;
 const SBI_CONSOLE_PUTCHAR: usize = 1;

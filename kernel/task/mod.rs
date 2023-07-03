@@ -34,7 +34,7 @@ lazy_static! {
         if let Some(init_data) = load_app(INIT) {
             Arc::new(PCB::new(&init_data, INIT))
         }else {
-            panic!("Failed to find '{INIT}' proc");
+            panic!("Failed to find '{INIT}' app");
         }
     };
 }
@@ -74,8 +74,9 @@ impl TCB {
     /// 注意该函数只应该调用一次, 剩下的全都是用 fork 创建出来
     pub fn new_once(elf_data: &[u8], pid: usize) -> TCB {
         let kernel_view = get_kernel_view();
+        let elf = xmas_elf::ElfFile::new(elf_data).expect("why not elf");
 
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(elf_data, pid);
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf, pid);
 
         // 查询 TrapContext 的物理页号
         let trap_cx_ppn = address_space.trap_ppn();
@@ -91,7 +92,7 @@ impl TCB {
             address_space,
             trap_cx_ppn,
             base_size: user_sp,
-            fd_table: vec![
+            fd_table: alloc::vec![
                 // 0 -> stdin
                 Some(Arc::new(Stdin)),
                 // 1 -> stdout

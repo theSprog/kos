@@ -26,6 +26,7 @@ use component::{
 use logger::info;
 use qemu_config::MMIO;
 use sys_interface::config::USER_PROG_PATH;
+use xmas_elf::ElfFile;
 
 // 内核空间
 lazy_static! {
@@ -68,7 +69,7 @@ impl AddressSpace {
         // 从 user_space 复制 trap_context,
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
         let trap_seg = Segment::from_trap(&parent_space.segments[0]);
-        let trap_content = parent_space.trap_ppn().get_bytes_array();
+        let trap_content = parent_space.trap_ppn().get_one_page();
 
         // 向新 address_space 添加一个段, 并且放置初始内容
         // 注意这不能够 COW 因为两个进程的 trap 必定不一样(至少返回值不一样)
@@ -319,7 +320,7 @@ impl AddressSpace {
 
     /// 映射 ELF 的 sections 以及 trampoline、TrapContext(用于地址空间切换) 和 user stack,
     /// 返回 user_sp 和 entry point.
-    pub fn from_elf(elf_data: &[u8], pid: usize) -> (Self, usize, usize) {
+    pub fn from_elf(elf: &ElfFile<'_>, pid: usize) -> (Self, usize, usize) {
         info!("Creating user ELF file mapping for pid={}", pid);
 
         // 为应用程序申请一个地址空间
@@ -338,8 +339,6 @@ impl AddressSpace {
             ),
             None,
         );
-
-        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
         let mut max_end_vpn: VirtPageNum = VirtPageNum::empty();
         for ph in elf.program_iter() {
@@ -513,7 +512,7 @@ impl AddressSpace {
                 if Arc::strong_count(pf) == 1 {
                     assert!(segment.map_perm.contains(MapPermission::W));
                     let pte_flags = PTEFlags::from_bits(segment.map_perm.bits()).unwrap();
-                    // 重新为其赋予可写权限
+                    // 重新为该页面赋予可写权限
                     self.page_table.relink(vpn, src_ppn, pte_flags);
                 } else {
                     // 有多个进程引用该页面, 重新分配一页
@@ -523,8 +522,8 @@ impl AddressSpace {
                     let dst_ppn = segment.realloc_one(&mut self.page_table, vpn);
                     // 从源物理页拷贝到目的物理页
                     dst_ppn
-                        .get_bytes_array()
-                        .copy_from_slice(src_ppn.get_bytes_array());
+                        .get_one_page()
+                        .copy_from_slice(src_ppn.get_one_page());
                 }
 
                 // 一旦修复立即返回
@@ -595,9 +594,7 @@ impl AddressSpace {
         builder_arg.push("init").unwrap();
         let mut builder_env = builder_arg.done().unwrap();
 
-        builder_env
-            .push(&format!("HOME={}", USER_PROG_PATH))
-            .unwrap();
+        builder_env.push(&String::from("HOME=/home")).unwrap();
         let mut builder_aux = builder_env.done().unwrap();
 
         let auxv = [

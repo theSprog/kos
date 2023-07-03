@@ -140,7 +140,7 @@ impl Segment {
                 .translate(current_vpn)
                 .unwrap()
                 .ppn()
-                .get_bytes_array()[..src.len()];
+                .get_one_page()[..src.len()];
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {
