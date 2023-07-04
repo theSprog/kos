@@ -70,9 +70,9 @@ path = "src/mv.rs"
 name = "hello"
 path = "src/hello.rs"
 
-# [[bin]]
-# name = "cp"
-# path = "src/cp.rs"
+[[bin]]
+name = "cp"
+path = "src/cp.rs"
 
 
 # [[bin]]

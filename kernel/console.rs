@@ -1,3 +1,5 @@
+use alloc::string::ToString;
+
 use crate::sbi::console_putchar;
 use core::fmt::{self, Write};
 
@@ -5,7 +7,9 @@ struct Console;
 
 impl Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        s.chars().for_each(|c| console_putchar(c as usize));
+        for c in s.chars() {
+            console_putchar(c as usize);
+        }
         Ok(())
     }
 }

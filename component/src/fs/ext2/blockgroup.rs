@@ -7,13 +7,13 @@ use spin::Mutex;
 use crate::fs::block_device;
 
 use super::{
+    address::Address,
+    allocator::Ext2Allocator,
     block::{self, DataBlock},
-    vfs::meta::VfsFileType,
-};
-
-use super::{
-    address::Address, allocator::Ext2Allocator, disk_inode::Ext2Inode, inode::Inode,
+    disk_inode::Ext2Inode,
+    inode::Inode,
     layout::Ext2Layout,
+    vfs::meta::VfsFileType,
 };
 
 #[repr(C)]

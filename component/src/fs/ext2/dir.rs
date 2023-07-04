@@ -266,8 +266,8 @@ impl Dir {
     }
 
     fn insert_entry(&mut self, entry_name: &str, inode_id: usize, filetype: VfsFileType) {
-        let mut buffer = alloc::vec![0u8; block::SIZE];
-        let new_entry = Ext2DirEntry::build_raw(&mut buffer, entry_name, inode_id, filetype);
+        let mut new_entry_buffer = alloc::vec![0u8; block::SIZE];
+        let new_entry = Ext2DirEntry::build_raw(&mut new_entry_buffer, entry_name, inode_id, filetype);
 
         if self.is_empty() {
             new_entry.rec_expand(block::SIZE);

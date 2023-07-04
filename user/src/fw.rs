@@ -9,7 +9,10 @@ use user_lib::{close, get_time_ms, open, write, OpenFlags};
 #[no_mangle]
 pub fn main() -> i32 {
     // test write speed
-    let fd = open("/home/new_file.c", OpenFlags::RDWR);
+    let fd = open(
+        "/home/new_file.c",
+        OpenFlags::RDWR | OpenFlags::CREATE | OpenFlags::TRUNC,
+    );
     const BUFFER_LEN: usize = 4096; // 4KiB
     let mut buffer = [0u8; BUFFER_LEN];
     for ch in buffer.iter_mut() {

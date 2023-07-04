@@ -225,7 +225,10 @@ impl PageTableEntry {
 }
 
 pub mod api {
+    use logger::{info, warn};
     use sys_interface::config::PAGE_SIZE;
+
+    use crate::println;
 
     use super::*;
 
@@ -282,29 +285,34 @@ pub mod api {
         ppn.get_one_page()
     }
 
-    // 将用户态传入的 C 风格 str 转成 rust 的 String
-    pub fn translated_user_cstr(token: usize, ptr: *const u8) -> String {
-        let page_table = PageTable::from_token(token);
-        let mut string: String = String::new();
-        let mut vaddr = ptr as usize;
+    fn xxx(page_table: &PageTable, start_vaddr: usize) -> Vec<u8> {
+        let mut vec = Vec::new();
+        let mut vaddr = start_vaddr;
         loop {
             let ch: u8 = *(page_table
                 .translate_vaddr(VirtAddr::from(vaddr))
                 .unwrap()
                 .get());
-            assert!(
-                ch < 0b1000_0000,
-                "only supports ascii characters but got {}",
-                ch
-            );
+            // if ch >= 0x80 {
+            //     warn!("only supports ascii characters but got {ch}");
+            //     return vec;
+            // }
             if ch == 0 {
                 break;
             } else {
-                string.push(ch as char);
+                vec.push(ch);
                 vaddr += 1;
             }
         }
-        string
+        
+        vec
+    }
+
+    // 将用户态传入的 C 风格 str 转成 rust 的 String
+    pub fn translated_user_cstr(token: usize, ptr: *const u8) -> String {
+        let page_table = PageTable::from_token(token);
+        let vaddr = ptr as usize;
+        String::from_utf8(xxx(&page_table, vaddr)).unwrap()
     }
 
     // 泛型函数, 将用户空间的指针 ptr 转为内核可访问的可变引用

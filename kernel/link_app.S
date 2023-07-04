@@ -2,7 +2,7 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 14
+    .quad 15
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
@@ -17,11 +17,13 @@ _num_app:
     .quad app_11_start
     .quad app_12_start
     .quad app_13_start
-    .quad app_13_end
+    .quad app_14_start
+    .quad app_14_end
 
     .global _app_names
 _app_names:
     .string "user/prog/cat"
+    .string "user/prog/cp"
     .string "user/prog/echo"
     .string "user/prog/fw"
     .string "user/prog/hello"
@@ -49,7 +51,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "user/prog/echo"
+    .incbin "user/prog/cp"
 app_1_end:
 
     .section .data
@@ -57,7 +59,7 @@ app_1_end:
     .global app_2_end
     .align 3
 app_2_start:
-    .incbin "user/prog/fw"
+    .incbin "user/prog/echo"
 app_2_end:
 
     .section .data
@@ -65,7 +67,7 @@ app_2_end:
     .global app_3_end
     .align 3
 app_3_start:
-    .incbin "user/prog/hello"
+    .incbin "user/prog/fw"
 app_3_end:
 
     .section .data
@@ -73,7 +75,7 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "user/prog/init"
+    .incbin "user/prog/hello"
 app_4_end:
 
     .section .data
@@ -81,7 +83,7 @@ app_4_end:
     .global app_5_end
     .align 3
 app_5_start:
-    .incbin "user/prog/ls"
+    .incbin "user/prog/init"
 app_5_end:
 
     .section .data
@@ -89,7 +91,7 @@ app_5_end:
     .global app_6_end
     .align 3
 app_6_start:
-    .incbin "user/prog/mkdir"
+    .incbin "user/prog/ls"
 app_6_end:
 
     .section .data
@@ -97,7 +99,7 @@ app_6_end:
     .global app_7_end
     .align 3
 app_7_start:
-    .incbin "user/prog/mv"
+    .incbin "user/prog/mkdir"
 app_7_end:
 
     .section .data
@@ -105,7 +107,7 @@ app_7_end:
     .global app_8_end
     .align 3
 app_8_start:
-    .incbin "user/prog/pwd"
+    .incbin "user/prog/mv"
 app_8_end:
 
     .section .data
@@ -113,7 +115,7 @@ app_8_end:
     .global app_9_end
     .align 3
 app_9_start:
-    .incbin "user/prog/rm"
+    .incbin "user/prog/pwd"
 app_9_end:
 
     .section .data
@@ -121,7 +123,7 @@ app_9_end:
     .global app_10_end
     .align 3
 app_10_start:
-    .incbin "user/prog/rw"
+    .incbin "user/prog/rm"
 app_10_end:
 
     .section .data
@@ -129,7 +131,7 @@ app_10_end:
     .global app_11_end
     .align 3
 app_11_start:
-    .incbin "user/prog/shell"
+    .incbin "user/prog/rw"
 app_11_end:
 
     .section .data
@@ -137,7 +139,7 @@ app_11_end:
     .global app_12_end
     .align 3
 app_12_start:
-    .incbin "user/prog/tc"
+    .incbin "user/prog/shell"
 app_12_end:
 
     .section .data
@@ -145,5 +147,13 @@ app_12_end:
     .global app_13_end
     .align 3
 app_13_start:
-    .incbin "user/prog/touch"
+    .incbin "user/prog/tc"
 app_13_end:
+
+    .section .data
+    .global app_14_start
+    .global app_14_end
+    .align 3
+app_14_start:
+    .incbin "user/prog/touch"
+app_14_end:

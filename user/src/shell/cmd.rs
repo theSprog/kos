@@ -110,13 +110,23 @@ impl Cmd {
         }
     }
 
+    // 换行
+    fn new_line(&self) {
+        println!("");
+    }
+
     // 如果形成一行则返回 Some, 否则返回 None
     pub fn process_char(&mut self, c: u8) -> Option<&str> {
         match c {
             LF | CR => {
+                self.new_line();
                 // 敲下回车
-                println!("");
                 return Some(&self.cmd);
+            }
+            // ctrl + d 关机
+            EOT => {
+                self.new_line();
+                shutdown();
             }
 
             // 退格

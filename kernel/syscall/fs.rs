@@ -71,6 +71,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 fn build_abs_path(path: *const u8) -> String {
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
+    info!("user path: {:?}", path);
     match path.starts_with('/') {
         true => path,
         false => {
@@ -200,7 +201,7 @@ pub fn sys_listdir(path: *const u8) -> isize {
 
             VfsFileType::CharDev => todo!(),
             VfsFileType::BlockDev => todo!(),
-            VfsFileType::Socket => todo!(),
+            VfsFileType::Socket => entry.name().to_string(),
         };
 
         println!(
@@ -252,13 +253,16 @@ pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
         return -1;
     }
     let permissions = VfsPermissions::new(mode as u16);
-    let res = VFS.create_dir(abs_path.as_str());
-    if res.is_err() {
-        report_fs_err(res.unwrap_err());
-        return -1;
-    }
-    let mut dir = res.unwrap();
-    dir.set_permissions(&permissions);
+    match VFS.create_dir(abs_path.as_str()) {
+        Err(err) => {
+            report_fs_err(err);
+            return -1;
+        }
+        Ok(mut dir) => {
+            dir.set_permissions(&permissions);
+        }
+    };
+
     0
 }
 
@@ -329,19 +333,23 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
 pub fn sys_unlinkat(path: *const u8) -> isize {
     let abs_path = build_abs_path(path);
 
-    let res1 = VFS.remove_dir(abs_path.as_str());
-    let res2 = VFS.remove_file(abs_path.as_str());
-    match (&res1, &res2) {
-        (Ok(_), Ok(_)) => panic!("Removed directory and file: '{}'", abs_path),
-        (Ok(_), Err(_)) => 0,
-        (Err(_), Ok(_)) => 0,
-        (Err(_), Err(_)) => {
-            // 两个都出错, 说明即不存在文件也不存在目录
-            report_fs_err(res1.unwrap_err());
-            report_fs_err(res2.unwrap_err());
+    let meta = VFS.metadata(abs_path.as_str());
+    match meta {
+        Err(err) => {
+            report_fs_err(err);
             return -1;
         }
+        Ok(meta) => {
+            let filetype = meta.filetype();
+            if filetype.is_dir() {
+                VFS.remove_dir(abs_path).unwrap();
+            } else {
+                VFS.remove_file(abs_path).unwrap();
+            }
+        }
     }
+
+    0
 }
 
 pub fn sys_linkat(to: *const u8, from: *const u8) -> isize {

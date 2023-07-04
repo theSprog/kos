@@ -7,7 +7,7 @@ use spin::Mutex;
 use super::{block, SECTOR_SIZE};
 use crate::{cast, cast_mut};
 
-pub trait BlockDevice: Send + Sync + Any {
+pub trait BlockDevice: Send + Sync + 'static {
     fn read_block(&self, block_id: usize, buf: &mut [u8]);
     fn write_block(&self, block_id: usize, buf: &[u8]);
 }
@@ -22,6 +22,7 @@ pub struct BlockCache {
 impl BlockCache {
     /// Load a new BlockCache from disk.
     pub fn new(block_id: usize, block_device: Arc<dyn BlockDevice>) -> Self {
+        // 必须要用 vec 而不是数组, 内核栈在进程退出后就会销毁
         let mut cache = alloc::vec![0u8; block::SIZE];
         let lower_bid = block_id * block::SECTORS_PER_BLOCK;
 
@@ -93,7 +94,8 @@ impl Drop for BlockCache {
     }
 }
 
-const BLOCK_CACHE_SIZE: usize = 64;
+// 256 个 cache 即 1M 文件缓存
+const BLOCK_CACHE_SIZE: usize = 256;
 
 #[derive(Default)]
 pub struct BlockCacheManager {
@@ -119,14 +121,15 @@ impl BlockCacheManager {
                 }
             }
 
-            let block_cache = Arc::new(Mutex::new(BlockCache::new(
+            let block_cache = BlockCache::new(
                 block_id,
                 Arc::clone(
                     self.block_device
                         .as_ref()
                         .expect("block_device haven't been registered yet"),
                 ),
-            )));
+            );
+            let block_cache = Arc::new(Mutex::new(block_cache));
             self.map.insert(block_id, block_cache.clone());
             block_cache
         }

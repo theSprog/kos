@@ -60,6 +60,7 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
     let pid = processor::api::current_pid();
     let token = processor::api::current_user_token();
     let app_name = page_table::api::translated_user_cstr(token, filename);
+
     let args = {
         let mut vec = Vec::new();
         let mut args_ptr = args;

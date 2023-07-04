@@ -20,11 +20,6 @@ pub fn main() -> i32 {
 fn run_shell() -> i32 {
     let mut cmd = Cmd::new();
 
-    // loop {
-    //     let c = getchar();
-    //     print!("{}?", c);
-    // }
-
     loop {
         cmd.fresh();
         let c = getchar();

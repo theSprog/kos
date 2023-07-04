@@ -21,5 +21,8 @@ pub fn main() -> i32 {
         return 1;
     }
 
+    println!("你好吗");
+    // mkdir("你好吗", 0o664);
+
     0
 }

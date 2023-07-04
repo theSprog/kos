@@ -115,9 +115,10 @@ pub fn shutdown() -> ! {
     // Shutdown should flush filesystem
     {
         // cleaning
+        info!("cleaning filesystem cache");
         VFS.flush();
     };
-    println!("goodbye!");
+    info!("goodbye!");
     let ret = sbi_call(SYSTEM_RESET_EXTENSION, SBI_SHUTDOWN, 0, 0, 0);
     error!("cannot be here");
     // 此时 assert 已经不管用了, 因为 assert 失败会 shutdown, 又回到这个函数

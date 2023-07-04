@@ -1,7 +1,6 @@
 mod dir;
 mod filesystem;
 mod inode;
-mod io;
 mod path;
 
 pub mod error;
@@ -104,7 +103,13 @@ impl VirtualFileSystem {
     }
 
     pub fn flush(&self) {
+        // fs flush 不可少, 因为 superblock 和 desc 都是存放在内存中而不是缓存中
+        self.fs.flush();
         block_device::flush();
+    }
+
+    pub fn init(&self) {
+        // do nothing
     }
 }
 

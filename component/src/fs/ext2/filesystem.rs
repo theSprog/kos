@@ -1,5 +1,6 @@
 use core::fmt::{self, Display};
 
+use alloc::string::String;
 use alloc::{boxed::Box, string::ToString, sync::Arc, vec::Vec};
 use logger::{debug, info};
 use spin::Mutex;
@@ -82,7 +83,8 @@ impl FileSystem for Ext2FileSystem {
         // to 必须要存在
         let target = root_inode.walk(&to)?;
         let mut dir_inode = root_inode.walk(&from.parent())?;
-        let child = dir_inode.select_child(from.last().unwrap());
+        info!("to: {:?}, from :{:?}", to, from);
+        let child = dir_inode.select_child(from.last().unwrap_or(&String::from(".")));
         if child.is_err() {
             // child 尚不存在, 需要在当前 dir 下新建
             dir_inode.insert_hardlink(&from, &to, &target)?;

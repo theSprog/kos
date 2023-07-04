@@ -68,5 +68,5 @@ pub trait File: Send + Sync {
 }
 
 pub fn init() {
-    VFS.flush();
+    VFS.init();
 }

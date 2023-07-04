@@ -1,11 +1,12 @@
 use alloc::vec::{IntoIter, Vec};
 use bitflags::bitflags;
+use logger::info;
 
 use super::block;
 use super::block::DataBlock;
 use super::block_device;
 use super::vfs::meta::*;
-use crate::ceil_index;
+use crate::{cast_mut, ceil_index};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -73,6 +74,11 @@ impl Ext2Inode {
     pub const DOUBLE_BOUND: usize = Self::INDIRECT_BOUND + Self::DOUBLE_COUNT;
 
     pub fn init(&mut self, filetype: VfsFileType) {
+        unsafe {
+            let ptr = self as *mut _ as *mut u8;
+            let size = core::mem::size_of::<Self>();
+            core::ptr::write_bytes(ptr, 0, size);
+        }
         self.set_filetype(&filetype);
         if filetype.is_symlink() {
             self.set_permissions(&VfsPermissions::all());
