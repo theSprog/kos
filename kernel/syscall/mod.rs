@@ -11,7 +11,7 @@ mod process;
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     // 分发给不同的系统调用
     match syscall_id {
-        SYSCALL_OPENAT => sys_open(args[0] as *const u8, args[1] as u32),
+        SYSCALL_OPENAT => sys_open(args[0] as *const u8, args[1] as u32, args[2] as u16),
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
@@ -20,7 +20,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_LINKAT => sys_linkat(args[0] as *const u8, args[1] as *const u8),
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
         SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
-        // SYSCALL_LSEEK => sys_lseek(args[0], args[1], args[2]),
+        SYSCALL_LSEEK => sys_lseek(args[0], args[1] as isize, args[2]),
         SYSCALL_MKDIRAT => sys_mkdirat(args[0] as *const u8, args[1]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_SCHED_YIELD => sys_sched_yield(),

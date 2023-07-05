@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{list_dir, Env};
+use user_lib::{err_msg, list_dir, syserr, Env};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -17,9 +17,9 @@ pub fn main() -> i32 {
 
     let path = if args.len() == 1 { "." } else { &args[1] };
     let res = list_dir(path);
-    if res < 0 {
-        println!("Cannot list \"{}\": {}", path, res);
+    if res != 0 {
+        println!("{:?}: {}", path, err_msg(res));
     }
 
-    res as i32
+    syserr::errno(res) as i32
 }

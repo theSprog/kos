@@ -3,9 +3,12 @@ use crate::vfs::VfsInode;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use component::fs::vfs::IOError;
+use component::fs::vfs::IOErrorKind;
 use logger::info;
 use spin::Mutex;
 
+use super::SeekFrom;
 use super::{File, UserBuffer};
 
 pub struct OSInodeInner {
@@ -29,7 +32,7 @@ impl OSInode {
         }
     }
 
-    pub fn set_offset(&mut self, offset: usize) {
+    pub fn set_offset(&self, offset: usize) {
         self.inner.lock().offset = offset;
     }
 
@@ -91,6 +94,34 @@ impl File for OSInode {
     fn truncate(&self, length: usize) -> Result<(), VfsError> {
         let mut inner = self.inner.lock();
         Ok(inner.inode.set_len(length)?)
+    }
+
+    fn seek(&self, offset: isize, whence: usize) -> Result<(), VfsError> {
+        let whence = SeekFrom::from(whence);
+        match whence {
+            SeekFrom::Start => {
+                if offset < 0 {
+                    return Err(IOError::new(IOErrorKind::BadSeek).into());
+                }
+                self.set_offset(offset as usize);
+            }
+            SeekFrom::Current => {
+                let cur_offset = self.inner.lock().offset as isize;
+                if cur_offset + offset < 0 {
+                    return Err(IOError::new(IOErrorKind::BadSeek).into());
+                }
+                self.set_offset((cur_offset + offset) as usize);
+            }
+            SeekFrom::End => {
+                let meta = self.inner.lock().inode.metadata();
+                let end_offset = meta.size() as isize;
+                if end_offset + offset < 0 {
+                    return Err(IOError::new(IOErrorKind::BadSeek).into());
+                }
+                self.set_offset((end_offset + offset) as usize);
+            }
+        }
+        Ok(())
     }
 }
 

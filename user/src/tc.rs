@@ -14,7 +14,7 @@ pub fn main() -> i32 {
     }
     let path = args.get(1).unwrap();
 
-    let fd = open(path, OpenFlags::RDWR);
+    let fd = open(path, OpenFlags::RDWR, 0);
     if fd < 0 {
         panic!("Could not open \"{}\" file", path);
     }

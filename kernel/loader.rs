@@ -49,7 +49,7 @@ pub fn load_app(app_name: &str) -> Option<Box<[u8]>> {
         false => {
             // 相对路径
             let pcb = processor::api::current_pcb().unwrap();
-            let inner: core::cell::RefMut<'_, process::PCBInner> = pcb.ex_inner();
+            let inner = pcb.ex_inner();
             let cwd_string = inner.cwd().to_string();
             load_fs_app(&alloc::format!("{}/{}", cwd_string, app_name))
         }
@@ -58,6 +58,7 @@ pub fn load_app(app_name: &str) -> Option<Box<[u8]>> {
         info!("find app {:#?} in filesystem", app_name);
         return app.map(|vec| Box::from(vec.as_slice()));
     }
+    info!("cannot find app from fs: {}", app_name);
 
     if app.is_none() {
         warn!("failed to find app '{app_name}'");

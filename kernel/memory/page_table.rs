@@ -285,7 +285,7 @@ pub mod api {
         ppn.get_one_page()
     }
 
-    fn xxx(page_table: &PageTable, start_vaddr: usize) -> Vec<u8> {
+    fn inner_translated_user_cstr(page_table: &PageTable, start_vaddr: usize) -> Vec<u8> {
         let mut vec = Vec::new();
         let mut vaddr = start_vaddr;
         loop {
@@ -304,7 +304,7 @@ pub mod api {
                 vaddr += 1;
             }
         }
-        
+
         vec
     }
 
@@ -312,7 +312,7 @@ pub mod api {
     pub fn translated_user_cstr(token: usize, ptr: *const u8) -> String {
         let page_table = PageTable::from_token(token);
         let vaddr = ptr as usize;
-        String::from_utf8(xxx(&page_table, vaddr)).unwrap()
+        String::from_utf8(inner_translated_user_cstr(&page_table, vaddr)).unwrap()
     }
 
     // 泛型函数, 将用户空间的指针 ptr 转为内核可访问的可变引用

@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{close, open, read, write, Env, OpenFlags};
+use user_lib::{close, err_msg, open, read, write, Env, OpenFlags};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -17,18 +17,20 @@ pub fn main() -> i32 {
 
     let src = args[1].as_str();
     let dst = args[2].as_str();
+
+    let src_fd = open(src, OpenFlags::RDONLY, 0);
+    if src_fd < 0 {
+        println!("mv: {:?} {}", src, err_msg(src_fd));
+        return src_fd as i32;
+    }
     let dst_fd = open(
         dst,
         OpenFlags::WRONLY | OpenFlags::TRUNC | OpenFlags::CREATE,
+        0o644,
     );
     if dst_fd < 0 {
-        println!("mv: dst \"{}\" open failed", dst);
-        return 1;
-    }
-    let src_fd = open(src, OpenFlags::RDONLY);
-    if src_fd < 0 {
-        println!("mv: src \"{}\" not exists", src);
-        return -1;
+        println!("mv: {:?} {}", dst, err_msg(dst_fd));
+        return dst_fd as i32;
     }
 
     let src_fd = src_fd as usize;
@@ -40,7 +42,7 @@ pub fn main() -> i32 {
         if read_count == 0 {
             break;
         }
-        let write_count = write(dst_fd, &buffer);
+        let write_count = write(dst_fd, &buffer[..read_count as usize]);
         assert_eq!(read_count, write_count);
     }
 

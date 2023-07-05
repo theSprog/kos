@@ -171,7 +171,6 @@ pub enum IOErrorKind {
     NotAFile,
     NotASymlink,
     TooLongTargetSymlink,
-    DirectoryNotEmpty,
     IsADirectory,
     TooLargeFile,
     TooLongFileName,
@@ -179,4 +178,5 @@ pub enum IOErrorKind {
     InvalidFilename,
     NoFreeBlocks,
     NoFreeInodes,
+    BadSeek,
 }

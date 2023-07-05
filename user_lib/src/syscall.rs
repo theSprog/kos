@@ -58,6 +58,10 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
     syscall(SYSCALL_FTRUNCATE, [fd, length, 0])
 }
 
+pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> isize {
+    syscall(SYSCALL_LSEEK, [fd, offset as usize, whence])
+}
+
 /// 退出应用程序并将返回值告知系统
 /// # Arguments
 ///
@@ -116,8 +120,11 @@ pub fn sys_shutdown() -> ! {
     unreachable!();
 }
 
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    syscall(SYSCALL_OPENAT, [path as usize, flags as usize, 0])
+pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
+    syscall(
+        SYSCALL_OPENAT,
+        [path as usize, flags as usize, mode as usize],
+    )
 }
 
 pub fn sys_close(fd: usize) -> isize {

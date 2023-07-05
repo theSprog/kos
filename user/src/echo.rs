@@ -26,6 +26,7 @@ pub fn main() -> i32 {
         let fd = open(
             path,
             OpenFlags::WRONLY | OpenFlags::CREATE | OpenFlags::APPEND,
+            0o644,
         );
         if fd < 0 {
             red!("Could not create \"{}\" file", path);

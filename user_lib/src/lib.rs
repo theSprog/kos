@@ -3,6 +3,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![allow(dead_code)]
+#![allow(unused_variables)]
 
 extern crate alloc;
 extern crate logger;
@@ -19,19 +20,21 @@ use alloc::{format, string::String, vec::Vec};
 use bitflags::bitflags;
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
+pub use sys_interface::syserr;
+use syscall::*;
+
 pub mod constant;
 
 mod env;
 pub use env::Env;
+pub mod io;
 
 mod fs;
-mod io;
 mod lang_items;
 mod start;
 mod syscall;
 
 use core::{ptr, todo};
-use syscall::*;
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -49,10 +52,10 @@ bitflags! {
 }
 
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
-pub fn open(path: &str, flags: OpenFlags) -> isize {
+pub fn open(path: &str, flags: OpenFlags, mode: u16) -> isize {
     // TODO 应该把相对路径转为绝对路径
     let path = format!("{}\0", path);
-    sys_open(path.as_str().as_ptr(), flags.bits())
+    sys_open(path.as_str().as_ptr(), flags.bits(), mode)
 }
 pub fn close(fd: usize) -> isize {
     sys_close(fd)
@@ -64,6 +67,10 @@ pub fn write(fd: usize, buf: &[u8]) -> isize {
 
 pub fn ftruncate(fd: usize, size: usize) -> isize {
     sys_ftruncate(fd, size)
+}
+
+pub fn lseek(fd: usize, offset: isize, whence: usize) -> isize {
+    sys_lseek(fd, offset, whence)
 }
 
 pub fn list_dir(path: &str) -> isize {
@@ -215,6 +222,14 @@ pub fn brk(_addr: usize) -> i32 {
 pub fn sbrk(incrment: usize) -> usize {
     // 调用 brk 进行实现
     sys_sbrk(incrment) as usize
+}
+
+pub fn err_msg(syscall_err: isize) -> String {
+    format!(
+        "{} (os errno {})",
+        syserr::msg(syscall_err),
+        syserr::errno(syscall_err)
+    )
 }
 
 pub fn shutdown() -> ! {

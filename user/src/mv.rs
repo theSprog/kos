@@ -17,12 +17,12 @@ pub fn main() -> i32 {
 
     let src = args[1].as_str();
     let dst = args[2].as_str();
-    let dst_fd = open(dst, OpenFlags::RDONLY);
+    let dst_fd = open(dst, OpenFlags::RDONLY, 0);
     if dst_fd >= 0 {
         println!("mv: dst \"{}\" already exists", dst);
         return 1;
     }
-    let src_fd = open(src, OpenFlags::RDONLY);
+    let src_fd = open(src, OpenFlags::RDONLY, 0);
     if src_fd < 0 {
         println!("mv: src \"{}\" not exists", src);
         return -1;

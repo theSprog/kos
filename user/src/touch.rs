@@ -14,7 +14,7 @@ pub fn main() -> i32 {
     }
     let path = args.get(1).unwrap();
 
-    let fd = open(path, OpenFlags::CREATE);
+    let fd = open(path, OpenFlags::CREATE, 0o644);
     if fd < 0 {
         panic!("Could not create \"{}\" file", path);
     }

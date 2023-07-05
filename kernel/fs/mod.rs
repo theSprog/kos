@@ -62,8 +62,29 @@ pub trait File: Send + Sync {
     fn write(&self, buf: UserBuffer) -> Result<usize, VfsError>;
 
     /// default untrancable
-    fn truncate(&self, _length: usize) -> Result<(), VfsError> {
+    fn truncate(&self, length: usize) -> Result<(), VfsError> {
         Err(VfsErrorKind::NotSupported.into())
+    }
+
+    fn seek(&self, offset: isize, whence: usize) -> Result<(), VfsError> {
+        Err(VfsErrorKind::NotSupported.into())
+    }
+}
+
+pub enum SeekFrom {
+    Start = 0,
+    Current = 1,
+    End = 2,
+}
+
+impl From<usize> for SeekFrom {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => SeekFrom::Start,
+            1 => SeekFrom::Current,
+            2 => SeekFrom::End,
+            _ => panic!("Why got {}", value),
+        }
     }
 }
 

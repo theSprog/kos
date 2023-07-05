@@ -12,6 +12,7 @@ pub fn main() -> i32 {
     let fd = open(
         "/home/new_file.c",
         OpenFlags::RDWR | OpenFlags::CREATE | OpenFlags::TRUNC,
+        0o644,
     );
     const BUFFER_LEN: usize = 4096; // 4KiB
     let mut buffer = [0u8; BUFFER_LEN];

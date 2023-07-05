@@ -58,9 +58,9 @@ fn shell_cmd(line: &str) -> i32 {
 fn cd(paths: &[&str]) -> i32 {
     if paths.len() <= 1 {
         let path = if paths.is_empty() { "." } else { paths[0] };
-        let res = chdir(path);
-        if res < 0 {
-            println!("Cannot change dir to \"{}\": {}", path, res);
+        let err = chdir(path);
+        if err != 0 {
+            println!("cd: {:?}: {}", path, err_msg(err));
         }
     }
 
@@ -72,10 +72,10 @@ fn normal_cmd(line: &str) -> i32 {
     let pid = fork();
     if pid == 0 {
         // 子进程部分
-        if exec(line, None) == -1 {
-            red!("Error when executing \"{}\"", line);
-            // 子进程返回 -4
-            return -4;
+        let res = exec(line, None);
+        if res != 0 {
+            println!("{}", err_msg(res));
+            return syserr::errno(res) as i32;
         }
         unreachable!();
     } else {

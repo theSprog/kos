@@ -13,6 +13,7 @@ use alloc::{
 };
 use component::fs::vfs::VfsPath;
 use logger::info;
+use sys_interface::syserr;
 
 use crate::{
     loader::load_app,
@@ -126,14 +127,14 @@ impl PCB {
 
         let elf_data = match load_app(app_name) {
             Some(app) => app,
-            None => return -1,
+            None => return syserr::ENOENT,
         };
 
         let elf = match xmas_elf::ElfFile::new(&elf_data) {
             Ok(elf) => elf,
             Err(err) => {
                 info!("Failed to parse elf: {}", err);
-                return -1;
+                return syserr::ENOEXEC;
             }
         };
 

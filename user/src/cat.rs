@@ -15,7 +15,7 @@ pub fn main() -> i32 {
         return 1;
     }
     let path = args.get(1).unwrap();
-    let fd = open(path, OpenFlags::RDONLY);
+    let fd = open(path, OpenFlags::RDONLY, 0);
     if fd < 0 {
         red!("Error occured when opening file \"{}\"", path);
         return 1;
