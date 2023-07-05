@@ -74,6 +74,13 @@ path = "src/hello.rs"
 name = "cp"
 path = "src/cp.rs"
 
+[[bin]]
+name = "pipetest"
+path = "src/pipetest.rs"
+
+[[bin]]
+name = "pipe_large"
+path = "src/pipe_large.rs"
 
 # [[bin]]
 # name = "exit"
@@ -119,9 +126,13 @@ path = "src/cp.rs"
 # name = "stack_overflow"
 # path = "src/stack_overflow.rs"
 
-# [[bin]]
-# name = "yield"
-# path = "src/yield.rs"
+[[bin]]
+name = "yield"
+path = "src/yield.rs"
+
+[[bin]]
+name = "read"
+path = "src/read.rs"
 
 # [[bin]]
 # name = "usertests-simple"

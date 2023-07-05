@@ -120,6 +120,7 @@ impl TCB {
     }
 
     pub fn alloc_fd(&mut self) -> usize {
+        // 寻找最小的可用 fd
         if let Some(fd) = (0..self.fd_table.len()).find(|&fd| self.fd_table[fd].is_none()) {
             fd
         } else {

@@ -11,7 +11,9 @@ use sys_interface::syserr;
 
 use crate::fs::{
     inode::{OSInode, OpenFlags},
-    UserBuffer, VFS,
+    pipe,
+    userbuf::UserBuffer,
+    VFS,
 };
 use crate::{memory::page_table, process::processor};
 
@@ -23,12 +25,12 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let mut inner = pcb.ex_inner();
     let tcb = inner.tcb();
     if fd >= tcb.fd_table.len() {
-        return -1;
+        return syserr::EBADF;
     }
 
     if let Some(file) = &tcb.fd_table[fd] {
         if !file.writable() {
-            return -1;
+            return syserr::EBADF;
         }
 
         let file = file.clone();
@@ -38,7 +40,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         )))
         .unwrap() as isize
     } else {
-        -1
+        syserr::EBADF
     }
 }
 
@@ -48,13 +50,13 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let mut inner = pcb.ex_inner();
     let tcb = inner.tcb();
     if fd >= tcb.fd_table.len() {
-        return -1;
+        return syserr::EBADF;
     }
 
     if let Some(file) = &tcb.fd_table[fd] {
         // 不可读
         if !file.readable() {
-            return -1;
+            return syserr::EBADF;
         }
 
         let file = file.clone();
@@ -65,7 +67,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         )))
         .unwrap() as isize
     } else {
-        -1
+        syserr::EBADF
     }
 }
 
@@ -291,6 +293,64 @@ pub fn sys_mkdirat(path: *const u8, mode: usize) -> isize {
     0
 }
 
+pub fn sys_fstat(fd: usize, stat_buf: *mut u8) -> isize {
+    let token = processor::api::current_user_token();
+    let mut stat_buf = UserBuffer::new(page_table::api::translated_byte_buffer(token, stat_buf, 0));
+
+    let pcb = processor::api::current_pcb().unwrap();
+    let mut inner = pcb.ex_inner();
+    let tcb = inner.tcb();
+    // fd 越界
+    if fd >= tcb.fd_table.len() {
+        return syserr::EBADF;
+    }
+
+    if let Some(file) = &tcb.fd_table[fd] {
+        match file.metadata() {
+            Err(err) => return report_fs_err(err),
+            Ok(_) => {
+                // TODO
+                stat_buf.write(&[0]);
+                return 0;
+            }
+        }
+    }
+
+    -1
+}
+
+pub fn sys_pipe(pipe: *mut usize) -> isize {
+    let token = processor::api::current_user_token();
+    let tcb = processor::api::current_tcb();
+
+    let (pipe_read, pipe_write) = pipe::make_pipe();
+    let read_fd = tcb.alloc_fd();
+    tcb.fd_table[read_fd] = Some(pipe_read);
+    let write_fd = tcb.alloc_fd();
+    tcb.fd_table[write_fd] = Some(pipe_write);
+
+    *page_table::api::translated_refmut(token, pipe) = read_fd;
+    *page_table::api::translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
+
+    0
+}
+
+/// 功能：将一个文件描述符复制到当前可用的最低数值文件描述符，返回新复制的文件描述符。
+pub fn sys_dup(fd: usize) -> isize {
+    let tcb = processor::api::current_tcb();
+    if fd >= tcb.fd_table.len() {
+        return syserr::EBADF;
+    }
+    if tcb.fd_table[fd].is_none() {
+        return syserr::EBADF;
+    }
+    let new_fd = tcb.alloc_fd();
+    // clone 一份打开的 fd
+    tcb.fd_table[new_fd] = Some(Arc::clone(tcb.fd_table[fd].as_ref().unwrap()));
+
+    new_fd as isize
+}
+
 pub fn sys_chdir(path: *const u8) -> isize {
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
@@ -339,6 +399,7 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
     let pcb = processor::api::current_pcb().unwrap();
     let inner = pcb.ex_inner();
     let cwd_string = inner.cwd().to_string();
+    // 如果当前路径已经超过了最大容量
     if cwd_string.len() > max_len {
         return syserr::EINVAL;
     }
@@ -346,25 +407,12 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
     let mut user_buffer = UserBuffer::new(page_table::api::translated_byte_buffer(
         token, buffer, max_len,
     ));
-
-    let mut cwd_begin = 0;
-    for slice in user_buffer.iter_mut() {
-        let slice_len = slice.len();
-        let rest_cwd_len = cwd_string.len() - cwd_begin;
-        // 1. 如果此 slice 足以容纳剩余 cwd_string
-        // 2. 如果剩余 cwd_string 大于 slice, 则还需要下一次填充
-        let this_len = rest_cwd_len.min(slice_len);
-        let src = &cwd_string.as_bytes()[cwd_begin..cwd_begin + this_len];
-        let dst = &mut slice[..this_len];
-        dst.copy_from_slice(src);
-        cwd_begin += src.len();
-    }
+    user_buffer.write(cwd_string.as_bytes());
 
     0
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> isize {
-    info!("fd: {}, offset {}, whence {}", fd, offset, whence);
     let pcb = processor::api::current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
     let tcb = inner.tcb();

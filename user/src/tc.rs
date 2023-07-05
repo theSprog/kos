@@ -16,7 +16,7 @@ pub fn main() -> i32 {
 
     let fd = open(path, OpenFlags::RDWR, 0);
     if fd < 0 {
-        panic!("Could not open \"{}\" file", path);
+        panic!("Could not open {:?} file", path);
     }
     let fd = fd as usize;
     ftruncate(fd, 0);

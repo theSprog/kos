@@ -1,54 +1,27 @@
+pub mod inode;
+pub mod pipe;
+pub mod stdio;
+pub mod userbuf;
+
+pub use userbuf::UserBuffer;
+
 use crate::driver::block::BlockDeviceImpl;
+use crate::vfs::meta::VfsMetadata;
 use crate::vfs::VfsError;
+use crate::vfs::VfsErrorKind;
 use crate::vfs::VirtualFileSystem;
 use crate::KernelFileSystem;
-use alloc::vec::Vec;
-use component::fs::vfs::VfsErrorKind;
-use core::ops::Deref;
-use core::ops::DerefMut;
+use alloc::boxed::Box;
+use component::fs::block_device;
 use logger::info;
 
 lazy_static! {
     pub static ref VFS: VirtualFileSystem = {
         info!("VirtualFileSystem initializing...");
-        let kfs = KernelFileSystem::open(BlockDeviceImpl::new());
+        block_device::register_block_device(BlockDeviceImpl::new());
+        let kfs = KernelFileSystem::new();
         VirtualFileSystem::new(kfs)
     };
-}
-
-pub mod inode;
-pub mod stdio;
-
-pub struct UserBuffer {
-    pub buffers: Vec<&'static mut [u8]>,
-}
-
-impl UserBuffer {
-    pub fn new(buffers: Vec<&'static mut [u8]>) -> Self {
-        Self { buffers }
-    }
-
-    pub fn len(&self) -> usize {
-        let mut total: usize = 0;
-        for b in self.buffers.iter() {
-            total += b.len();
-        }
-        total
-    }
-}
-
-impl Deref for UserBuffer {
-    type Target = Vec<&'static mut [u8]>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.buffers
-    }
-}
-
-impl DerefMut for UserBuffer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buffers
-    }
 }
 
 pub trait File: Send + Sync {
@@ -67,6 +40,10 @@ pub trait File: Send + Sync {
     }
 
     fn seek(&self, offset: isize, whence: usize) -> Result<(), VfsError> {
+        Err(VfsErrorKind::NotSupported.into())
+    }
+
+    fn metadata(&self) -> Result<Box<dyn VfsMetadata>, VfsError> {
         Err(VfsErrorKind::NotSupported.into())
     }
 }

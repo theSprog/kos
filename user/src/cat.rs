@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{close, open, read, Env, OpenFlags};
+use user_lib::{fs::OpenOptions, io::Read, Env};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -15,25 +15,18 @@ pub fn main() -> i32 {
         return 1;
     }
     let path = args.get(1).unwrap();
-    let fd = open(path, OpenFlags::RDONLY, 0);
-    if fd < 0 {
-        red!("Error occured when opening file \"{}\"", path);
-        return 1;
-    }
+    let mut file = OpenOptions::new().read(true).open(path).unwrap();
 
     const BUFFER_LEN: usize = 4096; // 4KiB
     let mut buffer = [0u8; BUFFER_LEN];
-    let fd = fd as usize;
     loop {
-        let read_size = read(fd, &mut buffer);
-        if read_size <= 0 {
+        let read_size = file.read(&mut buffer).unwrap();
+        if read_size == 0 {
             break;
         }
-        let read_size = read_size as usize;
         print!("{}", core::str::from_utf8(&buffer[..read_size]).unwrap());
     }
     println!("");
 
-    close(fd);
     0
 }

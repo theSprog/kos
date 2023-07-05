@@ -4,6 +4,7 @@
 #![feature(alloc_error_handler)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_mut)]
 
 extern crate alloc;
 extern crate logger;
@@ -27,9 +28,9 @@ pub mod constant;
 
 mod env;
 pub use env::Env;
+pub mod fs;
 pub mod io;
 
-mod fs;
 mod lang_items;
 mod start;
 mod syscall;
@@ -123,6 +124,15 @@ pub fn getpid() -> isize {
 pub fn fork() -> isize {
     sys_fork()
 }
+
+pub fn pipe(pipe_fd: &mut [usize]) -> isize {
+    sys_pipe(pipe_fd)
+}
+
+pub fn dup(fd: usize) -> isize {
+    sys_dup(fd)
+}
+
 pub fn exec(name: &str, new_env: Option<Env>) -> isize {
     let args: Vec<String> = name
         .split(" ")

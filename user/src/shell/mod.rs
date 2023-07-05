@@ -6,9 +6,11 @@ extern crate alloc;
 
 use crate::cmd::Cmd;
 use alloc::vec::Vec;
+use parser::parse_line;
 use user_lib::{console::getchar, *};
 
 mod cmd;
+mod parser;
 mod utils;
 
 #[no_mangle]
@@ -28,9 +30,9 @@ fn run_shell() -> i32 {
             None => continue,
             Some(line) => {
                 let ret = shell_cmd(line);
-                if ret < 0 {
+                if ret != 0 {
                     // shell 永远返回 0, 负值只能是 app 的返回值
-                    return ret;
+                    panic!("failed to execute command {:?}", line);
                 }
                 cmd.clear();
             }
@@ -51,7 +53,7 @@ fn shell_cmd(line: &str) -> i32 {
         ["exit"] => exit(0) as i32,
         // cd 命令针对当前 shell
         ["cd", paths @ ..] => cd(paths),
-        _ => normal_cmd(line),
+        _ => parse_line(line),
     }
 }
 
@@ -66,28 +68,4 @@ fn cd(paths: &[&str]) -> i32 {
 
     // 始终要返回 0, shell 不能退出
     0
-}
-
-fn normal_cmd(line: &str) -> i32 {
-    let pid = fork();
-    if pid == 0 {
-        // 子进程部分
-        let res = exec(line, None);
-        if res != 0 {
-            println!("{}", err_msg(res));
-            return syserr::errno(res) as i32;
-        }
-        unreachable!();
-    } else {
-        let mut exit_code: i32 = 0;
-        let exit_pid = waitpid(pid as usize, &mut exit_code);
-        assert_eq!(pid, exit_pid);
-
-        let msg = alloc::format!("Shell: Process {} exited with code {}", pid, exit_code);
-        match exit_code == 0 {
-            true => green!("{}", msg),
-            false => red!("{}", msg),
-        };
-        0
-    }
 }

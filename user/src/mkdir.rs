@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{mkdir, Env};
+use user_lib::{err_msg, mkdir, Env};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -17,12 +17,9 @@ pub fn main() -> i32 {
     let path = args.get(1).unwrap();
     let res = mkdir(path, 0o664);
     if res != 0 {
-        println!("mkdir failed: {}", res);
+        println!("mkdir: {:?} {}", path, err_msg(res));
         return 1;
     }
-
-    println!("你好吗");
-    // mkdir("你好吗", 0o664);
 
     0
 }

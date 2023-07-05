@@ -218,7 +218,7 @@ impl Superblock {
             self.magic, EXT2_MAGIC,
             "magic number error, this maybe not ext2"
         );
-        assert_ne!(self.state, FS_ERR);
+        assert_eq!(self.state, FS_CLEAN);
         assert_eq!(self.block_size(), block::SIZE);
         assert_eq!(self.inode_size(), core::mem::size_of::<Ext2Inode>());
     }

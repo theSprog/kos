@@ -1,10 +1,11 @@
+use crate::vfs::meta::VfsMetadata;
+use crate::vfs::IOError;
+use crate::vfs::IOErrorKind;
 use crate::vfs::VfsError;
 use crate::vfs::VfsInode;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bitflags::bitflags;
-use component::fs::vfs::IOError;
-use component::fs::vfs::IOErrorKind;
 use logger::info;
 use spin::Mutex;
 
@@ -122,6 +123,10 @@ impl File for OSInode {
             }
         }
         Ok(())
+    }
+
+    fn metadata(&self) -> Result<Box<dyn VfsMetadata>, VfsError> {
+        Ok(self.inner.lock().inode.metadata())
     }
 }
 

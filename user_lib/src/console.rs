@@ -2,9 +2,8 @@ use core::fmt::{self, Write};
 
 use crate::{read, write};
 
-struct Console;
-
-impl Write for Console {
+struct Stdout;
+impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         // 标识符
         const STDOUT: usize = 1;
@@ -13,11 +12,26 @@ impl Write for Console {
     }
 }
 
+struct Stderr;
+impl Write for Stderr {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // 标识符
+        const STDERR: usize = 2;
+        write(STDERR, s.as_bytes());
+        Ok(())
+    }
+}
+
 use spin::Mutex;
 static LOGGER_LOCK: Mutex<()> = Mutex::new(());
 pub fn print(args: fmt::Arguments) {
     let _guard = LOGGER_LOCK.lock();
-    Console.write_fmt(args).unwrap();
+    Stdout.write_fmt(args).unwrap();
+}
+
+pub fn eprint(args: fmt::Arguments) {
+    let _guard = LOGGER_LOCK.lock();
+    Stderr.write_fmt(args).unwrap();
 }
 
 #[macro_export]
@@ -31,6 +45,13 @@ macro_rules! print {
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
         $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+    }
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console::eprint(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }
 

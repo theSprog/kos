@@ -100,6 +100,14 @@ pub fn sys_fork() -> isize {
     syscall(SYSCALL_CLONE, [0, 0, 0])
 }
 
+pub fn sys_pipe(pipe_fd: &mut [usize]) -> isize {
+    syscall(SYSCALL_PIPE2, [pipe_fd.as_mut_ptr() as usize, 0, 0])
+}
+
+pub fn sys_dup(fd: usize) -> isize {
+    syscall(SYSCALL_DUP, [fd, 0, 0])
+}
+
 /// 只将字符串起始地址传入, 因此需要用户调用该系统调用时先将 \0 准备好
 pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *const u8) -> isize {
     syscall(

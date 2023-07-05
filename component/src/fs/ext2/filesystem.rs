@@ -31,8 +31,7 @@ impl Display for Ext2FileSystem {
 }
 
 impl Ext2FileSystem {
-    pub fn open(block_dev: impl BlockDevice) -> Self {
-        block_device::register_block_device(block_dev);
+    pub fn new() -> Self {
         let superblock = block_device::read(0, 1024, |sb: &Superblock| {
             sb.check_valid();
             sb.clone()

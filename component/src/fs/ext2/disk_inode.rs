@@ -6,7 +6,7 @@ use super::block;
 use super::block::DataBlock;
 use super::block_device;
 use super::vfs::meta::*;
-use crate::{cast_mut, ceil_index};
+use crate::{cast_mut, ceil_index, zero};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -74,11 +74,7 @@ impl Ext2Inode {
     pub const DOUBLE_BOUND: usize = Self::INDIRECT_BOUND + Self::DOUBLE_COUNT;
 
     pub fn init(&mut self, filetype: VfsFileType) {
-        unsafe {
-            let ptr = self as *mut _ as *mut u8;
-            let size = core::mem::size_of::<Self>();
-            core::ptr::write_bytes(ptr, 0, size);
-        }
+        zero!(self, Ext2Inode);
         self.set_filetype(&filetype);
         if filetype.is_symlink() {
             self.set_permissions(&VfsPermissions::all());
@@ -94,7 +90,7 @@ impl Ext2Inode {
         self.dtime = 0;
         self.gid = 100;
         self.hard_links = 1;
-        self.sectors_count = 0;
+        self.sectors_count = 1;
         self.flags = Flags::empty();
         self._os_specific_1 = [0; 4];
         self.direct_pointer = [0; Self::DIRECT_COUNT];
@@ -135,6 +131,7 @@ impl Ext2Inode {
         if self.filetype().is_file() {
             assert_eq!(self.size_high, 0);
         }
+        self.sectors_count = (Self::total_blocks(size) * block::SECTORS_PER_BLOCK) as u32;
         self.size_low = size as u32;
     }
 
