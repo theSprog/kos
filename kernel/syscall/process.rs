@@ -11,6 +11,7 @@ use crate::{
 };
 use alloc::{sync::Arc, vec::Vec};
 use logger::*;
+use sys_interface::syserr;
 
 /// processor exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -19,8 +20,7 @@ pub fn sys_exit(exit_code: i32) -> ! {
         processor::api::current_pid(),
         exit_code
     );
-    processor::api::exit_and_run_next(exit_code);
-    panic!("Unreachable in sys_exit!");
+    processor::api::exit_and_run_next(exit_code)
 }
 
 pub fn sys_sched_yield() -> isize {
@@ -109,8 +109,8 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         .iter()
         .any(|p| pid == -1 || pid as usize == p.getpid())
     {
-        // 孩子中不存在所指定 pid 的进程
-        return -1;
+        // 孩子中不存在所指定 pid 的进程, No such process
+        return syserr::ESRCH;
     }
 
     // 确实存在要等待的进程(也有可能参数 pid == -1 从而等待任意一个进程)
@@ -138,6 +138,6 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         found_pid as isize
     } else {
         // 不是僵尸进程(进程未结束), 或者指定 pid 的进程不存在
-        -2
+        syserr::EAGAIN
     }
 }

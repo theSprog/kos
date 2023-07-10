@@ -31,7 +31,7 @@
 
 #![deny(missing_docs)]
 #![deny(clippy::all)]
-#![deny(clippy::integer_arithmetic)]
+#![deny(clippy::arithmetic_side_effects)]
 
 mod builder;
 mod entry;

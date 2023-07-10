@@ -6,6 +6,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+// #![deny(clippy::pedantic)]
+#![deny(clippy::unnecessary_cast)]
 
 const LOG_LEVEL: logger::LogLevel = logger::LogLevel::DEBUG;
 

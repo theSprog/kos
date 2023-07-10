@@ -84,11 +84,7 @@ impl FileSystem for Ext2FileSystem {
         let mut dir_inode = root_inode.walk(&from.parent())?;
         info!("to: {:?}, from :{:?}", to, from);
         let child = dir_inode.select_child(from.last().unwrap_or(&String::from(".")));
-        if child.is_err() {
-            // child 尚不存在, 需要在当前 dir 下新建
-            dir_inode.insert_hardlink(&from, &to, &target)?;
-        } else {
-            let mut child = child.unwrap();
+        if let Ok(mut child) = child {
             if child.is_dir() {
                 // child 已存在且是 dir, 则在该 dir 下新建同名链接
                 let mut new_from = from.clone();
@@ -100,6 +96,9 @@ impl FileSystem for Ext2FileSystem {
                     .with_path(&from)
                     .into());
             }
+        } else {
+            // child 尚不存在, 需要在当前 dir 下新建
+            dir_inode.insert_hardlink(&from, &to, &target)?;
         }
 
         Ok(())

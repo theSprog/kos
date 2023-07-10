@@ -144,7 +144,7 @@ pub mod api {
         schedule(task_cx_ptr);
     }
 
-    pub fn exit_and_run_next(exit_code: i32) {
+    pub fn exit_and_run_next(exit_code: i32) -> ! {
         // 已经把 pcb 取出, current 为 None
         let pcb = take_current_pcb().unwrap();
         let pid = pcb.getpid();
@@ -173,6 +173,8 @@ pub mod api {
         pcb_inner.children.clear();
         // 释放地址空间, 同时释放页表
         pcb_inner.tcb.address_space.release_space();
+        // 释放文件描述符
+        pcb_inner.tcb.fd_table.clear();
         drop(pcb_inner);
         drop(pcb); // 手动原地释放, 因为 schedule 不会回到此作用域了
 

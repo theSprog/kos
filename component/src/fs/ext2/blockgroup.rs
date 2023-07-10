@@ -110,7 +110,7 @@ impl Ext2BlockGroupDesc {
             use core::ops::Not;
             for (pos, bits) in bitmap.iter_mut().enumerate() {
                 let neg_bits = bits.not();
-                while neg_bits != 0 {
+                if neg_bits != 0 {
                     let inner_pos = neg_bits.trailing_zeros() as usize;
                     *bits |= 1 << inner_pos;
 

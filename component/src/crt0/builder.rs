@@ -294,13 +294,13 @@ impl<'a> Builder<'a, Aux> {
             // align down the destination pointer
             let dst_idx = self.data.checked_sub(self.items).ok_or(OutOfSpace)?;
 
-            #[allow(clippy::integer_arithmetic)]
+            #[allow(clippy::arithmetic_side_effects)]
             let align_offset = (&self.stack[dst_idx] as *const _ as usize) % align_of::<Stack>();
 
             let dst_idx = dst_idx.checked_sub(align_offset).ok_or(OutOfSpace)?;
 
             // Align the source start index
-            #[allow(clippy::integer_arithmetic)]
+            #[allow(clippy::arithmetic_side_effects)]
             let src_start_idx = self.items % size_of::<usize>();
 
             self.stack.copy_within(src_start_idx..self.items, dst_idx);

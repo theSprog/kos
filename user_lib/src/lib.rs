@@ -11,13 +11,16 @@ extern crate logger;
 #[macro_use]
 extern crate lazy_static;
 
+#[allow(unused_imports)]
+use logger::*;
+
 // 定义 logger 层级
 pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 
 #[macro_use]
 pub mod console;
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::String};
 use bitflags::bitflags;
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
@@ -35,7 +38,7 @@ mod lang_items;
 mod start;
 mod syscall;
 
-use core::{ptr, todo};
+use core::todo;
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -133,56 +136,18 @@ pub fn dup(fd: usize) -> isize {
     sys_dup(fd)
 }
 
-pub fn exec(name: &str, new_env: Option<Env>) -> isize {
-    let args: Vec<String> = name
-        .split(" ")
-        .filter(|&s| !s.is_empty())
-        .map(|s| String::from(s))
-        .collect();
-
+pub fn exec(line: &str, new_env: Option<Env>) -> isize {
+    // 由于要和内核交互需要极其小心生命周期管理
     // 准备新的 env
-    let new_env = match new_env {
-        // args 参数替换
-        Some(mut new_env) => {
-            new_env.args_mut().clear();
-            new_env.args_mut().extend(args);
-            new_env
-        }
-        None => {
-            // 否则新建一个
-            let mut new_env = Env::from(Env::new());
-            new_env.args_mut().clear();
-            new_env.args_mut().extend(args);
-            new_env
-        }
-    };
+    let new_env = Env::build_env(line, new_env);
+    // argv
+    let (args_vec, args_ptrs) = new_env.build_c_args();
+    // envs
+    let (envs_vec, envs_ptr) = new_env.build_c_envs();
 
-    //  --------------------argv---------------------------------------
-    // 之所以需要一个新 vec 是因为要保存这些 C 字符串变量的生命周期
-    let args_vec: Vec<String> = new_env
-        .args()
-        .iter()
-        .map(|arg| format!("{}\0", arg))
-        .collect();
-    // 收集各个字符串的指针
-    let mut args_ptr_vec: Vec<_> = args_vec.iter().map(|arg| (*arg).as_ptr()).collect();
-    // 最后一个指针设为 null 表示数组结束
-    args_ptr_vec.push(ptr::null());
-    let args_ptr = args_ptr_vec.as_ptr();
-
-    // -------------------envs-------------------------------------
-    let envs_vec: Vec<String> = new_env
-        .envs()
-        .iter()
-        .map(|(k, v)| format!("{}={}\0", k, v))
-        .collect();
-    let mut envs_ptr_vec: Vec<_> = envs_vec.iter().map(|arg| (*arg).as_ptr()).collect();
-    envs_ptr_vec.push(ptr::null());
-    let envs_ptr = envs_ptr_vec.as_ptr();
-
-    // -----------可执行文件路径--------------------------------
-    let filename = format!("{}\0", new_env.args()[0]);
-    sys_execve(filename.as_ptr() as *const u8, args_ptr, envs_ptr)
+    // 可执行文件路径
+    let exec_app = format!("{}\0", args_vec[0]);
+    sys_execve(exec_app.as_ptr(), args_ptrs.as_ptr(), envs_ptr.as_ptr())
 }
 
 /// wait 任意子进程结束
@@ -191,27 +156,35 @@ pub fn wait(exit_code: &mut i32) -> isize {
     loop {
         // 参数 -1 表示等待任何一个子进程
         match sys_waitpid(-1, exit_code as *mut _) {
-            // 返回值 -2 表示进程未结束
-            -2 => {
-                // -2 不应该返回给用户
+            syserr::EAGAIN => {
+                // 等待一段时间再重试
                 yield_cpu();
             }
             // 返回值为 -1 表示不存在
-            exit_pid => return exit_pid,
+            syserr::ECHILD => return -1,
+
+            exit_pid => {
+                assert!(exit_pid > 0, "exit_pid must be positive: {}", exit_pid);
+                return exit_pid;
+            }
         }
     }
 }
 
 /// waitpid 等待特定子进程结束
 /// 用户可观察到的要么是 -1, 要么是一个正数 pid
-pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
+pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
     loop {
-        match sys_waitpid(pid as isize, exit_code as *mut _) {
-            -2 => {
+        match sys_waitpid(pid, exit_code as *mut i32) {
+            syserr::EAGAIN => {
+                // 等待一段时间再重试
                 yield_cpu();
             }
-            // 返回值为 -1 表示不存在该进程
-            exit_pid => return exit_pid,
+            syserr::ECHILD => return syserr::ECHILD,
+            exit_pid => {
+                assert!(exit_pid > 0, "exit_pid must be positive: {}", exit_pid);
+                return exit_pid;
+            }
         }
     }
 }

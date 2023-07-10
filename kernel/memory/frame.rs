@@ -124,6 +124,12 @@ pub struct PhysFrame {
     pub ppn: PhysPageNum,
 }
 
+impl Drop for PhysFrame {
+    fn drop(&mut self) {
+        api::frame_dealloc(self.ppn);
+    }
+}
+
 impl PhysFrame {
     pub fn new(ppn: PhysPageNum) -> Self {
         let bytes_array = ppn.get_one_page();
@@ -132,12 +138,6 @@ impl PhysFrame {
             core::ptr::write_bytes(bytes_array.as_mut_ptr(), 0, bytes_array.len());
         }
         Self { ppn }
-    }
-}
-
-impl Drop for PhysFrame {
-    fn drop(&mut self) {
-        api::frame_dealloc(self.ppn);
     }
 }
 

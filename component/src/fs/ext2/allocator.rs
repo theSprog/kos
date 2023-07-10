@@ -140,7 +140,7 @@ impl Ext2Allocator {
             let mut bg = bg.lock();
             let bg_blocks = &freed[offset..offset + slots[idx]]
                 .iter()
-                .map(|&block_id| (block_id % self.blocks_per_group) as u32)
+                .map(|&block_id| block_id % self.blocks_per_group)
                 .collect::<Vec<_>>();
 
             bg.dealloc_blocks(bg_blocks);

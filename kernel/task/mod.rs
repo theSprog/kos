@@ -52,6 +52,7 @@ pub enum TaskStatus {
 
 // Task Control Block, 任务控制块
 // 不是 thread control block
+#[allow(clippy::upper_case_acronyms)]
 pub struct TCB {
     pub task_status: TaskStatus,
     pub task_cx: TaskContext,

@@ -26,7 +26,6 @@ pub fn main() -> i32 {
         }
         print!("{}", core::str::from_utf8(&buffer[..read_size]).unwrap());
     }
-    println!("");
 
     0
 }

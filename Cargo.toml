@@ -11,7 +11,7 @@ exclude = ['user', 'user_lib']
 
 [dependencies]
 # 内部依赖
-component = { path = "./component" }
+component = { path = "./component", features = ["kernel_log"] }
 logger = { path = "./logger", features = ["kernel"] }
 qemu_config = { path = "./qemu_config" }
 sys_interface = { path = "./sys_interface" }

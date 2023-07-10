@@ -87,7 +87,7 @@ fn int_log(mut num: usize, base: usize) -> usize {
     let mut divisions = 0;
 
     while num >= base {
-        num = num / base;
+        num /= base;
         divisions += 1;
     }
 
@@ -120,7 +120,7 @@ impl Display for FormatRatio {
                     write!(f, "0")?;
                 } else {
                     // Otherwise print every digit separately.
-                    frac = frac * Ratio::from_u64(10).unwrap();
+                    frac *= Ratio::from_u64(10).unwrap();
                     write!(f, "{}", frac.trunc())?;
                     frac = frac.fract();
                 }
@@ -150,12 +150,12 @@ impl<Suffix: SuffixType> Display for SizeFormatter<Suffix> {
         let mod_size = Suffix::MOD_SIZE;
 
         // Find the right prefix.
-        let divisions = cmp::min(int_log(self.size.clone(), mod_size.clone()), max_prefix);
+        let divisions = cmp::min(int_log(self.size, mod_size), max_prefix);
 
         // Cap the precision to what makes sense.
         let precision = cmp::min(precision, divisions * 3);
 
-        let ratio = Ratio::<usize>::new(self.size.clone(), mod_size.pow(divisions as u32));
+        let ratio = Ratio::<usize>::new(self.size, mod_size.pow(divisions as u32));
 
         let format_number = FormatRatio::new(ratio);
 

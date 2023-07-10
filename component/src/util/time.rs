@@ -71,7 +71,7 @@ impl PosixTime {
             let days_in_month = days_in_month(year, month);
 
             if days < days_in_month {
-                day += days as u32;
+                day += days;
                 break;
             }
 
@@ -80,10 +80,10 @@ impl PosixTime {
         }
 
         // 计算时、分、秒
-        let hour = (seconds / TimeUnit::SECONDS_PER_HOUR) as u32;
+        let hour = seconds / TimeUnit::SECONDS_PER_HOUR;
         seconds %= TimeUnit::SECONDS_PER_HOUR;
 
-        let minute = (seconds / TimeUnit::SECONDS_PER_MINUTE) as u32;
+        let minute = seconds / TimeUnit::SECONDS_PER_MINUTE;
         seconds %= TimeUnit::SECONDS_PER_MINUTE;
 
         (year, month, day, hour, minute, seconds)

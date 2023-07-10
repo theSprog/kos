@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 
 /// Convert a usize (pointer) to a string.
 /// # Safety
-#[allow(clippy::integer_arithmetic)]
+#[allow(clippy::arithmetic_side_effects)]
 pub unsafe fn u2s(ptr: usize) -> core::result::Result<String, FromUtf8Error> {
     let ptr = ptr as *const u8;
 
@@ -97,7 +97,7 @@ impl<'a> Iterator for Reader<'a, Arg> {
 impl<'a> Reader<'a, Arg> {
     /// Rewind to the start of this section
     #[inline]
-    #[allow(clippy::integer_arithmetic)]
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn rewind(&mut self) {
         // Go to the end of this section.
         while unsafe { *self.stack } != 0 {

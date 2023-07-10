@@ -94,7 +94,8 @@ impl File for OSInode {
 
     fn truncate(&self, length: usize) -> Result<(), VfsError> {
         let mut inner = self.inner.lock();
-        Ok(inner.inode.set_len(length)?)
+        inner.inode.set_len(length)?;
+        Ok(())
     }
 
     fn seek(&self, offset: isize, whence: usize) -> Result<(), VfsError> {

@@ -28,6 +28,7 @@ use crate::{
 
 use self::{pid::Pid, stack::KernelStack};
 
+#[allow(clippy::upper_case_acronyms)]
 pub struct PCB {
     // 在初始化之后就不再变化的元数据
     // pid 进程唯一标识符

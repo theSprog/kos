@@ -147,12 +147,9 @@ pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
     let res = VFS.open_file(path.as_str());
     if let Ok(mut inode) = res {
         if trancate {
-            match inode.set_len(0) {
-                Err(err) => {
-                    return report_fs_err(err);
-                }
-                _ => (),
-            };
+            if let Err(err) = inode.set_len(0) {
+                return report_fs_err(err);
+            }
         }
         let fd = tcb.alloc_fd();
         let offset = inode.metadata().size() as usize;
@@ -266,7 +263,7 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
         let res = file.truncate(length);
 
         return match res {
-            Ok(_) => 0 as isize,
+            Ok(_) => 0,
             Err(err) => report_fs_err(err),
         };
     }
@@ -329,8 +326,11 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     let write_fd = tcb.alloc_fd();
     tcb.fd_table[write_fd] = Some(pipe_write);
 
-    *page_table::api::translated_refmut(token, pipe) = read_fd;
-    *page_table::api::translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
+    let read_slot = page_table::api::translated_refmut(token, unsafe { pipe.add(0) });
+    let write_slot = page_table::api::translated_refmut(token, unsafe { pipe.add(1) });
+
+    *read_slot = read_fd;
+    *write_slot = write_fd;
 
     0
 }
@@ -338,15 +338,14 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
 /// 功能：将一个文件描述符复制到当前可用的最低数值文件描述符，返回新复制的文件描述符。
 pub fn sys_dup(fd: usize) -> isize {
     let tcb = processor::api::current_tcb();
-    if fd >= tcb.fd_table.len() {
+
+    if fd >= tcb.fd_table.len() || tcb.fd_table[fd].is_none() {
         return syserr::EBADF;
     }
-    if tcb.fd_table[fd].is_none() {
-        return syserr::EBADF;
-    }
+
     let new_fd = tcb.alloc_fd();
     // clone 一份打开的 fd
-    tcb.fd_table[new_fd] = Some(Arc::clone(tcb.fd_table[fd].as_ref().unwrap()));
+    tcb.fd_table[new_fd] = tcb.fd_table[fd].clone();
 
     new_fd as isize
 }
@@ -367,7 +366,7 @@ pub fn sys_chdir(path: *const u8) -> isize {
             let mut inner = pcb.ex_inner();
             let cwd = inner.cwd_mut();
             if path.starts_with('/') {
-                let meta = VFS.metadata(path.to_string());
+                let meta = VFS.metadata(path);
                 match meta {
                     Err(err) => return report_fs_err(err),
                     Ok(meta) if !meta.filetype().is_dir() => return syserr::ENOTDIR,

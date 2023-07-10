@@ -131,10 +131,7 @@ impl AddressSpace {
     }
 
     // 回收所有空间, 同时回收页表
-    pub fn release_space(&mut self) {
-        self.segments.clear();
-        self.page_table.clear();
-    }
+    pub fn release_space(&self) {}
 
     // 开启内核内存空间
     pub fn enable_paging(&self) {
@@ -575,7 +572,7 @@ impl AddressSpace {
 
         let auxv = [
             Entry::Gid(1000),
-            Entry::Uid(1001),
+            Entry::Uid(100),
             Entry::Platform("RISCV".to_string()),
         ];
         auxv.iter().for_each(|e| builder_aux.push(e).unwrap());
@@ -599,7 +596,7 @@ impl AddressSpace {
 
         let auxv = [
             Entry::Gid(1000),
-            Entry::Uid(1001),
+            Entry::Uid(100),
             Entry::Platform("RISCV".to_string()),
         ];
         auxv.iter().for_each(|e| builder_aux.push(e).unwrap());

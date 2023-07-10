@@ -20,7 +20,7 @@ fn main() -> i32 {
             let pid = wait(&mut exit_code);
 
             // 尚不存在死亡的子进程
-            if pid == -1 {
+            if pid == syserr::EAGAIN {
                 yield_cpu();
                 continue;
             }

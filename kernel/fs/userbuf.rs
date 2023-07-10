@@ -21,7 +21,7 @@ impl UserBuffer {
     // 该函数假定不会溢出
     pub fn write(&mut self, content: &[u8]) {
         let mut begin = 0;
-        for slice in self.iter_mut() {
+        for slice in self.buffers.iter_mut() {
             let slice_len = slice.len();
             let rest_len = content.len() - begin;
             // 1. 如果此 slice 足以容纳剩余 content
@@ -33,20 +33,6 @@ impl UserBuffer {
             begin += src.len();
         }
         assert_eq!(begin, content.len());
-    }
-}
-
-impl Deref for UserBuffer {
-    type Target = Vec<&'static mut [u8]>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.buffers
-    }
-}
-
-impl DerefMut for UserBuffer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buffers
     }
 }
 

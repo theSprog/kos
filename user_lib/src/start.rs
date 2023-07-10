@@ -18,6 +18,9 @@ pub extern "C" fn _start() -> ! {
     sbrk(USER_HEAP_SIZE);
     HEAP.lock().init(heap_start, USER_HEAP_SIZE);
     let exit_code = main();
+
+    // 刷新一行
+    println!("");
     // 进程退出后调用 exit
     exit(exit_code);
 

@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 user_lib = { path = "../user_lib" }
+shell-words = { version = "1.0.0", default-features = false }
 
 [profile.release]
 opt-level = 1
@@ -82,6 +83,18 @@ path = "src/pipetest.rs"
 name = "pipe_large"
 path = "src/pipe_large.rs"
 
+[[bin]]
+name = "perc"
+path = "src/perc.rs"
+
+[[bin]]
+name = "yield"
+path = "src/yield.rs"
+
+[[bin]]
+name = "read"
+path = "src/read.rs"
+
 # [[bin]]
 # name = "exit"
 # path = "src/exit.rs"
@@ -93,10 +106,6 @@ path = "src/pipe_large.rs"
 # [[bin]]
 # name = "text"
 # path = "src/text.rs"
-
-# [[bin]]
-# name = "forktest_simple"
-# path = "src/forktest_simple.rs"
 
 # [[bin]]
 # name = "forktest2"
@@ -125,18 +134,6 @@ path = "src/pipe_large.rs"
 # [[bin]]
 # name = "stack_overflow"
 # path = "src/stack_overflow.rs"
-
-[[bin]]
-name = "yield"
-path = "src/yield.rs"
-
-[[bin]]
-name = "read"
-path = "src/read.rs"
-
-# [[bin]]
-# name = "usertests-simple"
-# path = "src/usertests-simple.rs"
 
 # [[bin]]
 # name = "usertests"

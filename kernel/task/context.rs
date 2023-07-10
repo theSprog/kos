@@ -27,7 +27,7 @@ impl TaskContext {
         let (_, top) = kernel_view::get_kernel_view().kernel_stack_range(IDLE_PID);
 
         Self {
-            ra: 0 as usize,
+            ra: 0usize,
             sp: top,
             s: [0; 12],
         }

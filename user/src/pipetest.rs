@@ -27,7 +27,7 @@ pub fn main() -> i32 {
         close(write_end);
         let mut offset = 0;
         loop {
-            let mut buffer = [0u8; 4096];
+            let mut buffer = [0u8; 4101];
             let len_read = read(read_end, &mut buffer) as usize;
             if len_read == 0 {
                 break;

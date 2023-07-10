@@ -107,9 +107,7 @@ impl Ext2DirEntry {
     }
 
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe {
-            core::slice::from_raw_parts(self as *const _ as *const u8, self.regular_len() as usize)
-        }
+        unsafe { core::slice::from_raw_parts(self as *const _ as *const u8, self.regular_len()) }
     }
 
     pub fn name_bytes(&self) -> &[u8] {
@@ -267,7 +265,8 @@ impl Dir {
 
     fn insert_entry(&mut self, entry_name: &str, inode_id: usize, filetype: VfsFileType) {
         let mut new_entry_buffer = alloc::vec![0u8; block::SIZE];
-        let new_entry = Ext2DirEntry::build_raw(&mut new_entry_buffer, entry_name, inode_id, filetype);
+        let new_entry =
+            Ext2DirEntry::build_raw(&mut new_entry_buffer, entry_name, inode_id, filetype);
 
         if self.is_empty() {
             new_entry.rec_expand(block::SIZE);
@@ -665,7 +664,7 @@ impl Inode {
 
     fn remove_symlink_entry(&mut self, filename: &str, target_inode: &mut Inode) -> VfsResult<()> {
         // symlink 只需要删除目录项 和 inode 即可
-        let should_remove = self.unlink(filename, &target_inode);
+        let should_remove = self.unlink(filename, target_inode);
         if should_remove {
             self.free_inode(target_inode.inode_id(), false)?;
         }

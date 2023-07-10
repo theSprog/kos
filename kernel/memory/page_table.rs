@@ -5,6 +5,7 @@ use super::{
 use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::*;
+use core::ops::Deref;
 
 /// 页表
 pub struct PageTable {
@@ -13,6 +14,15 @@ pub struct PageTable {
 
     // 已经被分配的中途物理页(非叶子的页目录项)
     frames: Vec<PhysFrame>,
+}
+
+impl Drop for PageTable {
+    fn drop(&mut self) {
+        // 置空
+        self.root_ppn.0 = 0;
+        // 其实不用 clear 也是可以的, RAII 会保证 Vec<PhysFrame> 都被释放
+        self.frames.clear();
+    }
 }
 
 impl PageTable {
@@ -24,11 +34,11 @@ impl PageTable {
         }
     }
 
-    pub fn clear(&mut self) {
-        // 置空
-        self.root_ppn.0 = 0;
-        self.frames.clear();
-    }
+    // pub fn clear(&mut self) {
+    //     // 置空
+    //     self.root_ppn.0 = 0;
+    //     self.frames.clear();
+    // }
 
     // 给定虚拟页号，找到页表项，找不到就建立
     pub fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
@@ -183,10 +193,18 @@ bitflags! {
 /// 一级页表的每个页表项中的物理页号可描述一个二级页表；
 /// 二级页表的每个页表项中的物理页号可描述一个三级页表；
 /// 三级页表中的页表项内容则是正常页表项，其内容包含物理页号，即描述一个要映射到的物理页
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct PageTableEntry {
     pub bits: usize,
+}
+
+impl Deref for PageTableEntry {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.bits
+    }
 }
 
 impl PageTableEntry {

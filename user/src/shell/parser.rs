@@ -4,9 +4,8 @@ use user_lib::*;
 pub fn parse_line(line: &str) -> i32 {
     let args = line.split_whitespace().collect::<Vec<_>>();
     match args {
-        _ if line.contains("|") => pipe_cmd(line),
-        // 先判断 ">>" 再判断 ">"
-        _ if line.contains(">>") => redirect_append_cmd(line),
+        _ if args.contains(&"|") => pipe_cmd(line),
+        _ if args.contains(&">>") => redirect_append_cmd(line),
         _ if args.contains(&">") => redirect_cmd(line),
         _ => normal_cmd(line),
     }
@@ -62,6 +61,7 @@ fn pipe_cmd(line: &str) -> i32 {
 
     close(read_end);
     close(write_end);
+
     windup(pid1);
     windup(pid2);
 
@@ -154,10 +154,10 @@ fn normal_cmd(cmd: &str) -> i32 {
 
 fn windup(pid: isize) -> i32 {
     let mut exit_code: i32 = 0;
-    let exit_pid = waitpid(pid as usize, &mut exit_code);
+    let exit_pid = waitpid(pid, &mut exit_code);
     assert_eq!(pid, exit_pid);
 
-    let msg = alloc::format!("Shell: Process {} exited with code {}", pid, exit_code);
+    let msg = alloc::format!("[Shell] Process {} exited with code {}", pid, exit_code);
     match exit_code == 0 {
         true => green!("{}", msg),
         false => red!("{}", msg),

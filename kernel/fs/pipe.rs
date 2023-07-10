@@ -3,6 +3,7 @@ use alloc::{
     vec::Vec,
 };
 use component::fs::vfs::VfsError;
+use logger::info;
 use spin::Mutex;
 
 use crate::process::processor::api::suspend_and_run_next;
@@ -18,6 +19,7 @@ pub struct Pipe {
 }
 
 impl Pipe {
+    // 设置 buffer 读端
     pub fn read_end(buffer: Arc<Mutex<PipeRingBuffer>>) -> Self {
         Self {
             readable: true,
@@ -25,6 +27,7 @@ impl Pipe {
             buffer,
         }
     }
+    // 设置 buffer 写端
     pub fn write_end(buffer: Arc<Mutex<PipeRingBuffer>>) -> Self {
         Self {
             readable: false,
@@ -66,6 +69,7 @@ impl PipeRingBuffer {
         }
     }
 
+    // 关联读写端, 但是 weak ref
     pub fn set_write_end(&mut self, write_end: &Arc<Pipe>) {
         self.write_end = Some(Arc::downgrade(write_end));
     }
@@ -77,6 +81,7 @@ impl PipeRingBuffer {
     // 有可能会使状态变 EMPTY
     pub fn read_byte(&mut self) -> u8 {
         assert_ne!(self.status, RingBufferStatus::Empty);
+
         self.status = RingBufferStatus::Normal;
         let byte = self.arr[self.head];
         self.head = (self.head + 1) % RING_BUFFER_SIZE;
@@ -88,6 +93,7 @@ impl PipeRingBuffer {
 
     pub fn write_byte(&mut self, byte: u8) {
         assert_ne!(self.status, RingBufferStatus::Full);
+
         self.status = RingBufferStatus::Normal;
         self.arr[self.tail] = byte;
         self.tail = (self.tail + 1) % RING_BUFFER_SIZE;
@@ -96,8 +102,8 @@ impl PipeRingBuffer {
         }
     }
 
-    // 返回可读字节数
-    pub fn available_read(&self) -> usize {
+    // 返回剩余可读字节数
+    pub fn rest_read(&self) -> usize {
         match self.status {
             RingBufferStatus::Empty => 0,
             RingBufferStatus::Full | RingBufferStatus::Normal => {
@@ -110,11 +116,12 @@ impl PipeRingBuffer {
         }
     }
 
-    pub fn available_write(&self) -> usize {
+    // 返回剩余可写字节数
+    pub fn rest_write(&self) -> usize {
         match self.status {
             RingBufferStatus::Full => 0,
             RingBufferStatus::Empty | RingBufferStatus::Normal => {
-                RING_BUFFER_SIZE - self.available_read()
+                RING_BUFFER_SIZE - self.rest_read()
             }
         }
     }
@@ -124,11 +131,13 @@ impl PipeRingBuffer {
     pub fn all_write_ends_closed(&self) -> bool {
         self.write_end.as_ref().unwrap().upgrade().is_none()
     }
+    // 如果读端都被关闭, 数据就再也不可能被读取, 需要销毁此管道
     pub fn all_read_ends_closed(&self) -> bool {
         self.read_end.as_ref().unwrap().upgrade().is_none()
     }
 }
 
+// Pipe 也是一个文件
 impl File for Pipe {
     fn readable(&self) -> bool {
         self.readable
@@ -137,22 +146,28 @@ impl File for Pipe {
         self.writable
     }
 
+    // 从 pipe 读若干个字节进入 user_buffer 中
     fn read(&self, buf: super::UserBuffer) -> Result<usize, VfsError> {
         assert!(self.readable());
         let want_to_read = buf.len();
         let mut buf_iter = buf.into_iter();
         let mut already_read = 0usize;
         loop {
+            // 消费数据时禁止写入
             let mut ring_buffer = self.buffer.lock();
-            match ring_buffer.available_read() {
+            match ring_buffer.rest_read() {
                 // 无数据可读
                 0 => {
+                    // 有可能是因为所有写端已经关闭
                     if ring_buffer.all_write_ends_closed() {
                         return Ok(already_read);
                     }
-                    // 其他进程有可能要使用 ring_buffer, 必须提前 drop
+
+                    // 否则放弃锁, 让其他进程生产数据
+                    // 其他进程有可能要使用 ring_buffer, 必须提前 drop 锁
                     drop(ring_buffer);
                     suspend_and_run_next();
+                    // 返回本进程后继续查看是否有数据可读
                     continue;
                 }
 
@@ -161,18 +176,21 @@ impl File for Pipe {
                     for _ in 0..n {
                         match buf_iter.next() {
                             Some(byte_ptr) => {
+                                // 从管道中读数据
                                 unsafe {
                                     *byte_ptr = ring_buffer.read_byte();
                                 }
                                 already_read += 1;
-
-                                if already_read == want_to_read {
-                                    return Ok(want_to_read);
-                                }
                             }
-                            None => return Ok(already_read),
+                            None => {
+                                // 到此处说明 userbuf 已满
+                                assert_eq!(already_read, want_to_read);
+                                return Ok(already_read);
+                            }
                         }
                     }
+
+                    // 到此处说明 ring_buffer 已空(n 字节全部消费), 但 user_buffer 未填满
                 }
             }
         }
@@ -185,8 +203,12 @@ impl File for Pipe {
         let mut already_write = 0usize;
         loop {
             let mut ring_buffer = self.buffer.lock();
-            match ring_buffer.available_write() {
+            match ring_buffer.rest_write() {
                 0 => {
+                    // 没有可写的位置是因为没有消费者
+                    if ring_buffer.all_read_ends_closed() {
+                        return Ok(already_write);
+                    }
                     drop(ring_buffer);
                     suspend_and_run_next();
                     continue;
@@ -198,13 +220,13 @@ impl File for Pipe {
                         if let Some(byte_ptr) = buf_iter.next() {
                             ring_buffer.write_byte(unsafe { *byte_ptr });
                             already_write += 1;
-                            if already_write == want_to_write {
-                                return Ok(want_to_write);
-                            }
                         } else {
+                            // userbuf 已满
+                            assert_eq!(already_write, want_to_write);
                             return Ok(already_write);
                         }
                     }
+                    // ringbuffer 中的数据全部被消费
                 }
             }
         }

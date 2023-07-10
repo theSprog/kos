@@ -227,6 +227,7 @@ impl DeviceTree {
 
     /// Load a device tree from a raw pointer. This should be used when the size of the device tree
     /// is unknown
+    /// # Safety
     pub unsafe fn load_from_raw_pointer(addr: *const u8) -> Result<DeviceTree, DeviceTreeError> {
         let mut buffer: &[u8] = slice::from_raw_parts_mut(addr as *mut u8, Self::MIN_HEADER_SIZE);
         let buffer_actual_size = buffer.read_be_u32(4)? as usize;

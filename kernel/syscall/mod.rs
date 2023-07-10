@@ -24,7 +24,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_MKDIRAT => sys_mkdirat(args[0] as *const u8, args[1]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut u8),
         SYSCALL_PIPE2 => sys_pipe(args[0] as *mut usize),
-        SYSCALL_DUP => sys_dup(args[0] as usize),
+        SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_SCHED_YIELD => sys_sched_yield(),
         SYSCALL_GETTIMEOFDAY => sys_get_time_of_day(),

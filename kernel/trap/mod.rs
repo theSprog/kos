@@ -169,7 +169,7 @@ pub fn trap_handler() -> ! {
                 let pte = user_page_table.translate(vpn);
 
                 // 页存在且有物理页映射, 但是不可写
-                if pte.is_some() && pte.unwrap().valid() && !pte.unwrap().writable() {
+                if pte.is_some() && pte.as_ref().unwrap().valid() && !pte.as_ref().unwrap().writable() {
                     // segment 可写, 但是 pte 表示不可写, 说明是 cow
                     trace!("Fixing COW for this StorePageFault");
                     tcb.address_space.fix_cow(stval);
