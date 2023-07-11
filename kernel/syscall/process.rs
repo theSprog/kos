@@ -39,12 +39,14 @@ pub fn sys_getpid() -> isize {
 pub fn sys_fork() -> isize {
     let pcb = processor::api::current_pcb().unwrap();
     let new_pcb = pcb.fork();
-    let new_pid = new_pcb.getpid();
-    let trap_cx = new_pcb.ex_inner().trap_cx();
+    let new_pid = new_pcb.get_pid();
+
+    let new_tcb = new_pcb.ex_inner().get_tcb(0);
+    let trap_ctx = new_tcb.trap_ctx();
 
     // 子进程的返回值为 0
-    trap_cx.x[10] = 0;
-    scheduler::add_ready(new_pcb);
+    trap_ctx.x[10] = 0;
+    scheduler::add_ready(new_tcb);
 
     // 父进程返回子进程的 pid
     new_pid as isize
@@ -100,7 +102,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     if !inner
         .children()
         .iter()
-        .any(|p| pid == -1 || pid as usize == p.getpid())
+        .any(|p| pid == -1 || pid as usize == p.get_pid())
     {
         // 孩子中不存在所指定 pid 的进程
         return syserr::ECHILD;
@@ -110,7 +112,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     // 注意一次只回收一个进程, enumerate 逐个枚举
     let pair = inner.children().iter().enumerate().find(|(_, p)| {
         // 僵尸进程，并且是指定 pid 的进程(pid == -1 表示任意一个进程)
-        p.ex_inner().is_zombie() && (pid == -1 || pid as usize == p.getpid())
+        p.ex_inner().is_zombie() && (pid == -1 || pid as usize == p.get_pid())
     });
 
     if let Some((idx, _)) = pair {
@@ -121,7 +123,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         // 确保它的引用计数只有 1, 这样在离开作用域时才会 RAII
         assert_eq!(Arc::strong_count(&child), 1);
 
-        let found_pid = child.getpid();
+        let found_pid = child.get_pid();
         let exit_code = child.ex_inner().exit_code();
 
         // 以可变引用的方式取得用户空间 exit_code_ptr 对应的的地址

@@ -108,9 +108,9 @@ impl Ext2Allocator {
         for bg in self.blockgroups.iter() {
             let mut bg = bg.lock();
             // 每一个 bg 都尽力分配 unmet 个块, 返回分配的块数
-            let allocated = bg.alloc_blocks(unmet);
+            let mut allocated = bg.alloc_blocks(unmet);
             unmet -= allocated.len();
-            ret.extend(allocated);
+            ret.append(&mut allocated);
             if unmet == 0 {
                 break;
             }

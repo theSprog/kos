@@ -1,5 +1,6 @@
 use core::cell::{RefCell, RefMut};
 
+#[derive(Debug)]
 pub struct UPSafeCell<T> {
     /// inner data
     inner: RefCell<T>,

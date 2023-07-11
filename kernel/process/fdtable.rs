@@ -21,7 +21,7 @@ impl FdTable {
 
     pub fn alloc_fd(&mut self) -> usize {
         // 寻找最小的可用 fd
-        if let Some(fd) = (0..self.0.len()).find(|&fd| self.0[fd].is_none()) {
+        if let Some(fd) = (0..self.len()).find(|&fd| self[fd].is_none()) {
             fd
         } else {
             // 若没有的话新建一个

@@ -93,7 +93,7 @@ pub fn sys_sigreturn() -> isize {
         let mut inner = pcb.ex_inner();
         inner.set_handling_sig(-1);
         // restore the trap context
-        let trap_ctx = inner.trap_cx();
+        let trap_ctx = processor::api::current_trap_ctx();
         *trap_ctx = inner.trap_ctx_backup().unwrap();
         trap_ctx.x[10] as isize
     } else {

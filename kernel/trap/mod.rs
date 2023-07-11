@@ -95,7 +95,7 @@ pub fn trap_handler() -> ! {
     // 调用 current_trap_cx 来获取当前应用的 Trap 上下文的可变引用而不是像之前那样作为参数传入 trap_handler
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
-    let cx = processor::api::current_trap_cx();
+    let cx = processor::api::current_trap_ctx();
     match scause.cause() {
         // 如果是来自用户态的 Syscall 调用(使用 ecall 指令)
         Trap::Exception(Exception::UserEnvCall) => {
@@ -111,7 +111,7 @@ pub fn trap_handler() -> ! {
 
                 let ret = syscall(old_cx.x[17], [old_cx.x[10], old_cx.x[11], old_cx.x[12]]);
     
-                let now_cx = processor::api::current_trap_cx();
+                let now_cx = processor::api::current_trap_ctx();
                 now_cx.x[10] = ret as usize;
             }else {
                 cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;

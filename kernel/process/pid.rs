@@ -4,17 +4,26 @@ use logger::info;
 use crate::{process::PCB, sync::unicore::UPSafeCell};
 
 lazy_static! {
-    static ref PID_ALLOCATOR: UPSafeCell<PidAllocator> = unsafe {
+    static ref PID_ALLOCATOR: UPSafeCell<RecycleAllocator> = unsafe {
         info!("PID_ALLOCATOR Initializing...");
-        UPSafeCell::new(PidAllocator::new())
+        UPSafeCell::new(RecycleAllocator::new())
     };
 
     // 保存 pid -> pcb 的映射关系
     pub static ref PID_MAP: UPSafeCell<BTreeMap<usize, Arc<PCB>>> =
-    unsafe { UPSafeCell::new(BTreeMap::new()) };
+    unsafe {  info!("PID_MAP Initializing...");
+    UPSafeCell::new(BTreeMap::new()) };
+
+
 }
 
 pub struct Pid(pub usize);
+impl Pid {
+    pub fn alloc() -> Pid {
+        Pid(PID_ALLOCATOR.exclusive_access().alloc())
+    }
+}
+
 impl From<usize> for Pid {
     fn from(value: usize) -> Self {
         Self(value)
@@ -40,42 +49,33 @@ impl Pid {
     }
 }
 
-struct PidAllocator {
+pub struct RecycleAllocator {
     current: usize,
     recycled: Vec<usize>,
 }
 
-impl PidAllocator {
-    fn new() -> Self {
-        PidAllocator {
-            current: 1,
+impl RecycleAllocator {
+    pub fn new() -> Self {
+        RecycleAllocator {
+            current: 0,
             recycled: Vec::new(),
         }
     }
-    fn alloc(&mut self) -> Pid {
-        if let Some(pid) = self.recycled.pop() {
-            Pid(pid)
+    pub fn alloc(&mut self) -> usize {
+        if let Some(id) = self.recycled.pop() {
+            id
         } else {
             self.current += 1;
-            Pid(self.current - 1)
+            self.current - 1
         }
     }
-    fn dealloc(&mut self, pid: usize) {
-        // current 是目前尚未分配的 pid 的下界
-        assert!(pid < self.current);
-        // 不可能在可重复利用的集合中
+    pub fn dealloc(&mut self, id: usize) {
+        assert!(id < self.current);
         assert!(
-            self.recycled.iter().all(|&ppid| ppid != pid),
-            "pid {} has been deallocated!",
-            pid
+            !self.recycled.iter().any(|i| *i == id),
+            "id {} has been deallocated!",
+            id
         );
-        self.recycled.push(pid);
-    }
-}
-
-pub mod api {
-    use super::*;
-    pub fn pid_alloc() -> Pid {
-        PID_ALLOCATOR.exclusive_access().alloc()
+        self.recycled.push(id);
     }
 }

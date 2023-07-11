@@ -39,8 +39,6 @@ mod start;
 mod syscall;
 use syscall::*;
 
-use core::todo;
-
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
 pub fn open(path: &str, flags: OpenFlags, mode: u16) -> isize {
     // TODO 应该把相对路径转为绝对路径

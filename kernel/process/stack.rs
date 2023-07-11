@@ -1,36 +1,38 @@
-use crate::memory::{address::*, address_space::KERNEL_SPACE, kernel_view, segment::MapPermission};
+use crate::{
+    memory::{address::*, address_space::KERNEL_SPACE, kernel_view, segment::MapPermission},
+    process::pid::RecycleAllocator,
+    sync::unicore::UPSafeCell,
+};
 
 use super::pid::Pid;
 
+lazy_static! {
+    static ref KSTACK_ID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
+        unsafe { UPSafeCell::new(RecycleAllocator::new()) };
+}
+
+#[derive(Debug)]
 pub struct KernelStack {
-    pid: usize,
+    kstack_id: usize,
 }
 
 impl KernelStack {
-    pub fn new(pid_handle: &Pid) -> Self {
+    pub fn alloc() -> KernelStack {
+        let kstack_id = KSTACK_ID_ALLOCATOR.exclusive_access().alloc();
+
         let kernel_view = kernel_view::get_kernel_view();
-        let pid = pid_handle.0;
-        let (bottom, top) = kernel_view.kernel_stack_range(pid);
+        let (bottom, top) = kernel_view.kernel_stack_range(kstack_id);
         KERNEL_SPACE.exclusive_access().insert_framed_segment(
             bottom.into(),
             top.into(),
             MapPermission::R | MapPermission::W,
         );
-        KernelStack { pid: pid_handle.0 }
+        KernelStack { kstack_id }
     }
 
-    // // psuh 一个 Sized 结构体到栈顶
-    // pub fn push_on_top<T: Sized>(&self, value: T) -> *mut T {
-    //     let kernel_stack_top = self.get_top();
-    //     let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
-    //     unsafe {
-    //         *ptr_mut = value;
-    //     }
-    //     ptr_mut
-    // }
-
     pub fn get_top(&self) -> usize {
-        let (_, kernel_stack_top) = kernel_view::get_kernel_view().kernel_stack_range(self.pid);
+        let (_, kernel_stack_top) =
+            kernel_view::get_kernel_view().kernel_stack_range(self.kstack_id);
         kernel_stack_top
     }
 }
@@ -40,7 +42,7 @@ impl Drop for KernelStack {
     fn drop(&mut self) {
         let kernel_view = kernel_view::get_kernel_view();
 
-        let (kernel_stack_bottom, _) = kernel_view.kernel_stack_range(self.pid);
+        let (kernel_stack_bottom, _) = kernel_view.kernel_stack_range(self.kstack_id);
         let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();
         KERNEL_SPACE
             .exclusive_access()

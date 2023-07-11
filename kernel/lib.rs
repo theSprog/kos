@@ -33,7 +33,8 @@ mod task;
 mod trap;
 
 use component::fs::ext2::Ext2FileSystem;
-use process::PCB;
+use task::TCB;
+
 // 配置信息
 // ---------------------------------------------------------------------
 use sys_interface::config::*;
@@ -65,7 +66,7 @@ type KernelHeapAllocator = LockedHeap;
 // type KernelHeapAllocator = LockedHeap;
 
 use component::process::FIFO;
-type KernelScheduler = FIFO<PCB>;
+type KernelScheduler = FIFO<TCB>;
 
 use component::fs::vfs;
 type KernelFileSystem = Ext2FileSystem;

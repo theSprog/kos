@@ -67,7 +67,7 @@ impl AddressSpace {
         // 从 user_space 复制 trap_context,
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
         let trap_seg = Segment::from_trap(&parent_space.segments[0]);
-        let trap_content = parent_space.trap_cx_ppn().get_one_page();
+        let trap_content = parent_space.trap_ctx_ppn().get_one_page();
 
         // 向新 address_space 添加一个段, 并且放置初始内容
         // 注意这不能够 COW 因为两个进程的 trap 必定不一样(至少返回值不一样)
@@ -444,7 +444,7 @@ impl AddressSpace {
     }
 
     // 找到该地址空间的 trap 的 ppn
-    pub fn trap_cx_ppn(&self) -> PhysPageNum {
+    pub fn trap_ctx_ppn(&self) -> PhysPageNum {
         let trap = self.translate_vpn(VirtAddr::from(TRAP_CONTEXT).into());
         assert!(
             trap.is_some(),

@@ -20,7 +20,7 @@ lazy_static! {
 }
 
 pub struct Processor {
-    current: Option<Arc<PCB>>,
+    current: Option<Arc<TCB>>,
     idle_task_cx: TaskContext, // idle 进程
 }
 
@@ -34,12 +34,12 @@ impl Processor {
 
     // 取出当前正在执行的任务而不是得到一份拷贝
     // 注意 take 之后 current 就为 None 了, 无法在使用 api 内的许多函数
-    pub fn take_current(&mut self) -> Option<Arc<PCB>> {
+    pub fn take_current(&mut self) -> Option<Arc<TCB>> {
         self.current.take()
     }
 
     // 返回当前执行的任务的一份拷贝, 会增加引用计数
-    pub fn current(&self) -> Option<Arc<PCB>> {
+    pub fn current(&self) -> Option<Arc<TCB>> {
         self.current.as_ref().map(|pcb| Arc::clone(pcb))
     }
 
@@ -63,19 +63,19 @@ pub mod api {
     }
 
     pub fn take_current_pcb() -> Option<Arc<PCB>> {
-        PROCESSOR.exclusive_access().take_current()
+        PROCESSOR.exclusive_access().take_current().unwrap().pcb()
     }
 
     pub fn current_pcb() -> Option<Arc<PCB>> {
+        PROCESSOR.exclusive_access().current().unwrap().pcb()
+    }
+
+    pub fn current_tcb() -> Option<Arc<TCB>> {
         PROCESSOR.exclusive_access().current()
     }
 
     pub fn current_cmd_name() -> String {
         String::from(current_pcb().unwrap().ex_inner().cmd())
-    }
-
-    pub fn current_tcb() -> &'static mut TCB {
-        current_pcb().unwrap().ex_inner().tcb()
     }
 
     pub fn current_address_space() -> &'static mut AddressSpace {
@@ -88,7 +88,7 @@ pub mod api {
 
     pub fn current_pid() -> usize {
         match current_pcb() {
-            Some(pcb) => pcb.getpid(),
+            Some(pcb) => pcb.get_pid(),
             None => 1,
         }
     }
@@ -97,8 +97,8 @@ pub mod api {
         current_pcb().unwrap().ex_inner().user_token()
     }
 
-    pub fn current_trap_cx() -> &'static mut TrapContext {
-        current_pcb().unwrap().ex_inner().trap_cx()
+    pub fn current_trap_ctx() -> &'static mut TrapContext {
+        current_tcb().unwrap().trap_ctx()
     }
 
     pub fn pid2pcb(pid: usize) -> Option<Arc<PCB>> {
@@ -114,6 +114,7 @@ pub mod api {
     }
 
     pub fn run_app() {
+        info!("start running app");
         let mut processor = PROCESSOR.exclusive_access();
         let idle_cx_ptr = processor.get_idle_cx_ptr();
         drop(processor);
@@ -126,21 +127,22 @@ pub mod api {
         let mut processor = PROCESSOR.exclusive_access();
 
         // 如果找得到下一个进程
-        if let Some(pcb_next) = scheduler::fetch() {
-            trace!("schedule next process: {}", pcb_next.getpid());
-            // 互斥访问下一个 PCB
-            let mut pcb_next_inner = pcb_next.ex_inner();
-            let pcb_next_cx_ptr = pcb_next_inner.task_cx() as *const TaskContext;
-            pcb_next_inner.set_status(TaskStatus::Running);
-            pcb_next_inner.inc_count();
-            // 停止互斥访问
-            drop(pcb_next_inner);
-            processor.current = Some(pcb_next);
+        if let Some(tcb_next) = scheduler::fetch() {
+            let mut tcb_next_inner = tcb_next.ex_inner();
+
+            // 互斥访问下一个 TCB
+            tcb_next_inner.set_status(TaskStatus::Running);
+            tcb_next_inner.inc_count();
+            let pcb_next_ctx_ptr: *const TaskContext =
+                tcb_next_inner.task_ctx() as *const TaskContext;
+
+            drop(tcb_next_inner);
+            processor.current = Some(tcb_next);
             drop(processor);
 
             // 切换任务
             unsafe {
-                __switch(current_task_cx_ptr, pcb_next_cx_ptr);
+                __switch(current_task_cx_ptr, pcb_next_ctx_ptr);
             }
         } else {
             info!("All applications completed!");
@@ -158,23 +160,21 @@ pub mod api {
     }
 
     pub fn suspend_and_run_next() {
-        let pcb = current_pcb().unwrap();
-        let pid = current_pid();
-        let mut pcb_inner = pcb.ex_inner();
-        pcb_inner.set_status(TaskStatus::Ready);
-        let task_cx_ptr = pcb_inner.task_cx() as *mut TaskContext;
-        drop(pcb_inner);
-
+        let tcb = current_tcb().unwrap();
+        let mut tcb_inner = tcb.ex_inner();
+        tcb_inner.set_status(TaskStatus::Ready);
+        let task_ctx_ptr = tcb_inner.task_ctx() as *mut TaskContext;
+        drop(tcb_inner);
         // suspend 只是换一个进程调度, 而当前进程仍然是 ready 的
-        scheduler::add_ready(pcb);
+        scheduler::add_ready(tcb);
 
-        schedule(task_cx_ptr);
+        schedule(task_ctx_ptr);
     }
 
     pub fn exit_and_run_next(exit_code: i32) -> ! {
         // 已经把 pcb 取出, current 为 None
         let pcb = take_current_pcb().unwrap();
-        let pid = pcb.getpid();
+        let pid = pcb.get_pid();
         assert_ne!(pid, 1, "init should not exit!"); // init 进程不能退出
         debug!(
             "'{}' (pid={}) exited with code {}",
@@ -185,7 +185,7 @@ pub mod api {
 
         let mut pcb_inner = pcb.ex_inner();
         // 设置为 zombie 孩子被 init 收养
-        pcb_inner.set_status(TaskStatus::Zombie);
+        pcb_inner.set_zombie();
         pcb_inner.exit_code = exit_code;
 
         {

@@ -285,7 +285,7 @@ impl Dir {
 
         // 到此处说明 dir 没有空间可用, 需要扩容
         let old_len = self.buffer.len();
-        self.buffer.extend(alloc::vec![0u8; block::SIZE]);
+        self.buffer.append(&mut alloc::vec![0u8; block::SIZE]);
         new_entry.rec_expand(block::SIZE);
         self.place_entry(old_len, new_entry);
     }

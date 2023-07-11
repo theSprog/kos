@@ -2,7 +2,7 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 32
+    .quad 34
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
@@ -35,11 +35,15 @@ _num_app:
     .quad app_29_start
     .quad app_30_start
     .quad app_31_start
-    .quad app_31_end
+    .quad app_32_start
+    .quad app_33_start
+    .quad app_33_end
 
     .global _app_names
 _app_names:
     .string "user/prog/cat"
+    .string "user/prog/cor"
+    .string "user/prog/coroutine"
     .string "user/prog/cp"
     .string "user/prog/echo"
     .string "user/prog/exit"
@@ -85,7 +89,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "user/prog/cp"
+    .incbin "user/prog/cor"
 app_1_end:
 
     .section .data
@@ -93,7 +97,7 @@ app_1_end:
     .global app_2_end
     .align 3
 app_2_start:
-    .incbin "user/prog/echo"
+    .incbin "user/prog/coroutine"
 app_2_end:
 
     .section .data
@@ -101,7 +105,7 @@ app_2_end:
     .global app_3_end
     .align 3
 app_3_start:
-    .incbin "user/prog/exit"
+    .incbin "user/prog/cp"
 app_3_end:
 
     .section .data
@@ -109,7 +113,7 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "user/prog/forkexec"
+    .incbin "user/prog/echo"
 app_4_end:
 
     .section .data
@@ -117,7 +121,7 @@ app_4_end:
     .global app_5_end
     .align 3
 app_5_start:
-    .incbin "user/prog/forktest"
+    .incbin "user/prog/exit"
 app_5_end:
 
     .section .data
@@ -125,7 +129,7 @@ app_5_end:
     .global app_6_end
     .align 3
 app_6_start:
-    .incbin "user/prog/forktest2"
+    .incbin "user/prog/forkexec"
 app_6_end:
 
     .section .data
@@ -133,7 +137,7 @@ app_6_end:
     .global app_7_end
     .align 3
 app_7_start:
-    .incbin "user/prog/forktree"
+    .incbin "user/prog/forktest"
 app_7_end:
 
     .section .data
@@ -141,7 +145,7 @@ app_7_end:
     .global app_8_end
     .align 3
 app_8_start:
-    .incbin "user/prog/fw"
+    .incbin "user/prog/forktest2"
 app_8_end:
 
     .section .data
@@ -149,7 +153,7 @@ app_8_end:
     .global app_9_end
     .align 3
 app_9_start:
-    .incbin "user/prog/hello"
+    .incbin "user/prog/forktree"
 app_9_end:
 
     .section .data
@@ -157,7 +161,7 @@ app_9_end:
     .global app_10_end
     .align 3
 app_10_start:
-    .incbin "user/prog/init"
+    .incbin "user/prog/fw"
 app_10_end:
 
     .section .data
@@ -165,7 +169,7 @@ app_10_end:
     .global app_11_end
     .align 3
 app_11_start:
-    .incbin "user/prog/ls"
+    .incbin "user/prog/hello"
 app_11_end:
 
     .section .data
@@ -173,7 +177,7 @@ app_11_end:
     .global app_12_end
     .align 3
 app_12_start:
-    .incbin "user/prog/matrix"
+    .incbin "user/prog/init"
 app_12_end:
 
     .section .data
@@ -181,7 +185,7 @@ app_12_end:
     .global app_13_end
     .align 3
 app_13_start:
-    .incbin "user/prog/mkdir"
+    .incbin "user/prog/ls"
 app_13_end:
 
     .section .data
@@ -189,7 +193,7 @@ app_13_end:
     .global app_14_end
     .align 3
 app_14_start:
-    .incbin "user/prog/mv"
+    .incbin "user/prog/matrix"
 app_14_end:
 
     .section .data
@@ -197,7 +201,7 @@ app_14_end:
     .global app_15_end
     .align 3
 app_15_start:
-    .incbin "user/prog/perc"
+    .incbin "user/prog/mkdir"
 app_15_end:
 
     .section .data
@@ -205,7 +209,7 @@ app_15_end:
     .global app_16_end
     .align 3
 app_16_start:
-    .incbin "user/prog/pipe_large"
+    .incbin "user/prog/mv"
 app_16_end:
 
     .section .data
@@ -213,7 +217,7 @@ app_16_end:
     .global app_17_end
     .align 3
 app_17_start:
-    .incbin "user/prog/pipetest"
+    .incbin "user/prog/perc"
 app_17_end:
 
     .section .data
@@ -221,7 +225,7 @@ app_17_end:
     .global app_18_end
     .align 3
 app_18_start:
-    .incbin "user/prog/pwd"
+    .incbin "user/prog/pipe_large"
 app_18_end:
 
     .section .data
@@ -229,7 +233,7 @@ app_18_end:
     .global app_19_end
     .align 3
 app_19_start:
-    .incbin "user/prog/read"
+    .incbin "user/prog/pipetest"
 app_19_end:
 
     .section .data
@@ -237,7 +241,7 @@ app_19_end:
     .global app_20_end
     .align 3
 app_20_start:
-    .incbin "user/prog/rm"
+    .incbin "user/prog/pwd"
 app_20_end:
 
     .section .data
@@ -245,7 +249,7 @@ app_20_end:
     .global app_21_end
     .align 3
 app_21_start:
-    .incbin "user/prog/rw"
+    .incbin "user/prog/read"
 app_21_end:
 
     .section .data
@@ -253,7 +257,7 @@ app_21_end:
     .global app_22_end
     .align 3
 app_22_start:
-    .incbin "user/prog/shell"
+    .incbin "user/prog/rm"
 app_22_end:
 
     .section .data
@@ -261,7 +265,7 @@ app_22_end:
     .global app_23_end
     .align 3
 app_23_start:
-    .incbin "user/prog/sig1"
+    .incbin "user/prog/rw"
 app_23_end:
 
     .section .data
@@ -269,7 +273,7 @@ app_23_end:
     .global app_24_end
     .align 3
 app_24_start:
-    .incbin "user/prog/sleep"
+    .incbin "user/prog/shell"
 app_24_end:
 
     .section .data
@@ -277,7 +281,7 @@ app_24_end:
     .global app_25_end
     .align 3
 app_25_start:
-    .incbin "user/prog/sleep_simple"
+    .incbin "user/prog/sig1"
 app_25_end:
 
     .section .data
@@ -285,7 +289,7 @@ app_25_end:
     .global app_26_end
     .align 3
 app_26_start:
-    .incbin "user/prog/stack_overflow"
+    .incbin "user/prog/sleep"
 app_26_end:
 
     .section .data
@@ -293,7 +297,7 @@ app_26_end:
     .global app_27_end
     .align 3
 app_27_start:
-    .incbin "user/prog/tc"
+    .incbin "user/prog/sleep_simple"
 app_27_end:
 
     .section .data
@@ -301,7 +305,7 @@ app_27_end:
     .global app_28_end
     .align 3
 app_28_start:
-    .incbin "user/prog/text"
+    .incbin "user/prog/stack_overflow"
 app_28_end:
 
     .section .data
@@ -309,7 +313,7 @@ app_28_end:
     .global app_29_end
     .align 3
 app_29_start:
-    .incbin "user/prog/touch"
+    .incbin "user/prog/tc"
 app_29_end:
 
     .section .data
@@ -317,7 +321,7 @@ app_29_end:
     .global app_30_end
     .align 3
 app_30_start:
-    .incbin "user/prog/usertests"
+    .incbin "user/prog/text"
 app_30_end:
 
     .section .data
@@ -325,5 +329,21 @@ app_30_end:
     .global app_31_end
     .align 3
 app_31_start:
-    .incbin "user/prog/yield"
+    .incbin "user/prog/touch"
 app_31_end:
+
+    .section .data
+    .global app_32_start
+    .global app_32_end
+    .align 3
+app_32_start:
+    .incbin "user/prog/usertests"
+app_32_end:
+
+    .section .data
+    .global app_33_start
+    .global app_33_end
+    .align 3
+app_33_start:
+    .incbin "user/prog/yield"
+app_33_end:

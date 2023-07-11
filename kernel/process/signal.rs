@@ -104,7 +104,7 @@ pub mod api {
             inner.pending_signals ^= signal;
 
             // 备份 trap
-            let trap_ctx = inner.trap_cx();
+            let trap_ctx = processor::api::current_trap_ctx();
             inner.trap_ctx_backup = Some(trap_ctx.clone());
 
             // 将返回地址设置为信号处理函数地址

@@ -1,7 +1,10 @@
+use core::borrow::BorrowMut;
+
 use component::process::IScheduler;
 use logger::info;
 
 use crate::process::PCB;
+use crate::task::TCB;
 use crate::{sync::unicore::UPSafeCell, KernelScheduler};
 use alloc::sync::Arc;
 
@@ -15,12 +18,13 @@ lazy_static! {
 }
 
 // scheduler 实际上是依赖外部实现
-pub fn add_ready(pcb: Arc<PCB>) {
-    let pid = pcb.getpid();
+pub fn add_ready(tcb: Arc<TCB>) {
+    let pcb = tcb.pcb().unwrap();
+    let pid = pcb.get_pid();
     PID_MAP.exclusive_access().insert(pid, pcb.clone());
-    SCHEDULER.exclusive_access().add_ready(pcb)
+    SCHEDULER.exclusive_access().add_ready(tcb)
 }
 
-pub fn fetch() -> Option<Arc<PCB>> {
+pub fn fetch() -> Option<Arc<TCB>> {
     SCHEDULER.exclusive_access().fetch()
 }
