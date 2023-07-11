@@ -24,6 +24,11 @@ fn main() -> i32 {
                 yield_cpu();
                 continue;
             }
+
+            if pid == 2 {
+                // shell 是 2 号进程
+                break;
+            }
             println!(
                 "[init] Released a zombie process, pid={}, exit_code={}",
                 pid, exit_code,

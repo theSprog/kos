@@ -311,10 +311,10 @@ pub mod api {
                 .translate_vaddr(VirtAddr::from(vaddr))
                 .unwrap()
                 .get());
-            // if ch >= 0x80 {
-            //     warn!("only supports ascii characters but got {ch}");
-            //     return vec;
-            // }
+            if ch >= 0x80 {
+                warn!("only supports ascii characters but got {ch}");
+                return vec;
+            }
             if ch == 0 {
                 break;
             } else {
@@ -334,6 +334,7 @@ pub mod api {
     }
 
     // 泛型函数, 将用户空间的指针 ptr 转为内核可访问的可变引用
+    // 注意使用 translated_refmut 的前提是类型 T 不会跨页, 否则会内存出错
     pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         let page_table = PageTable::from_token(token);
         let vaddr = ptr as usize;
@@ -343,6 +344,7 @@ pub mod api {
             .get_mut()
     }
 
+    // 注意使用 translated_ref(mut) 的前提是类型 T 不会跨页
     pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
         let page_table = PageTable::from_token(token);
         let vaddr = ptr as usize;

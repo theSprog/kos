@@ -1,24 +1,22 @@
-use core::{
-    arch::{asm, global_asm},
-};
+use core::arch::{asm, global_asm};
 
 use logger::*;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
-    utvec::TrapMode,
+    utvec::TrapMode, sepc,
 };
-use sys_interface::syscall::SYSCALL_EXECVE;
+use sys_interface::{syscall::SYSCALL_EXECVE, syssig::SignalFlags, syserr};
 
 use crate::{
     memory::{address::*,  segment},
-    process::processor::{
+    process::{processor::{
         self,
         api::{current_cmd_name, current_pid},
-    },
+    }, signal},
     syscall::syscall,
     clock::set_next_trigger,
-     TRAMPOLINE, TRAP_CONTEXT,
+    TRAMPOLINE, TRAP_CONTEXT,
 };
 
 pub mod context;
@@ -41,6 +39,7 @@ pub fn init() {
 #[no_mangle]
 #[repr(align(4096))]
 pub fn trap_from_kernel() -> ! {
+    error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
     panic!("A trap from kernel! How could be it ?");
 }
 
@@ -130,12 +129,14 @@ pub fn trap_handler() -> ! {
         // 内存访问错误，类似写入只读区域, 包括低特权级访问高特权级寄存器
         Trap::Exception(Exception::LoadFault) => {
             warn!("LoadFault in application-'{}'(pid={}), bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", current_cmd_name(),current_pid(), stval, cx.sepc);
-            processor::api::exit_and_run_next(-2);
+            // processor::api::exit_and_run_next(-2);
+            processor::api::current_add_signal(SignalFlags::SIGSEGV);
         }
 
         Trap::Exception(Exception::StoreFault) => {
             warn!("StoreFault in application-'{}'(pid={}), bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", current_cmd_name(), current_pid(), stval, cx.sepc);
-            processor::api::exit_and_run_next(-2);
+            // processor::api::exit_and_run_next(-2);
+            processor::api::current_add_signal(SignalFlags::SIGSEGV);
         }
 
         // 如果是来自非法指令, 例如用户态下 sret
@@ -146,7 +147,8 @@ pub fn trap_handler() -> ! {
                 stval,
                 cx.sepc
             );
-            processor::api::exit_and_run_next(-3);
+            // processor::api::exit_and_run_next(-3);
+            processor::api::current_add_signal(SignalFlags::SIGILL);
         }
 
         // 以下是三个缺页异常
@@ -180,7 +182,8 @@ pub fn trap_handler() -> ! {
                 }
             } else {
                 warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
-                processor::api::exit_and_run_next(-2);
+                // processor::api::exit_and_run_next(-2);
+                processor::api::current_add_signal(SignalFlags::SIGSEGV);
             }
         }
 
@@ -200,7 +203,8 @@ pub fn trap_handler() -> ! {
                 tcb.address_space.fix_page_missing(stval);
             } else {
                 warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
-                processor::api::exit_and_run_next(-2);
+                // processor::api::exit_and_run_next(-2);
+                processor::api::current_add_signal(SignalFlags::SIGSEGV);
             }
         }
 
@@ -216,7 +220,8 @@ pub fn trap_handler() -> ! {
             current_cmd_name(), 
             current_pid(),
             stval, cx.sepc);
-            processor::api::exit_and_run_next(-3);
+            // processor::api::exit_and_run_next(-3);
+            processor::api::current_add_signal(SignalFlags::SIGSEGV);
         }
 
         _ => {
@@ -226,6 +231,15 @@ pub fn trap_handler() -> ! {
                 stval
             );
         }
+    }
+
+    // 返回时处理信号
+    signal::api::handle_signals();
+
+    // 检查是否有错, 若有错(例如段错误)则退出
+    if let Some((exit_code, msg)) = signal::api::check_signals_error() {
+        info!("{}", msg);
+        processor::api::exit_and_run_next(syserr::EINTR as i32);
     }
 
     // 返回用户地址空间

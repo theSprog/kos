@@ -1,10 +1,9 @@
 pub mod pid;
 pub mod processor;
 pub mod scheduler;
+pub mod signal;
 
 mod stack;
-
-use core::cell::RefMut;
 
 use alloc::{
     string::String,
@@ -13,7 +12,7 @@ use alloc::{
 };
 use component::fs::vfs::VfsPath;
 use logger::info;
-use sys_interface::syserr;
+use sys_interface::{syserr, syssig::*};
 
 use crate::{
     loader::load_app,
@@ -26,7 +25,7 @@ use crate::{
     trap::{context::TrapContext, trap_handler},
 };
 
-use self::{pid::Pid, stack::KernelStack};
+use self::{pid::Pid, signal::SignalActions, stack::KernelStack};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct PCB {
@@ -41,7 +40,7 @@ pub struct PCB {
 }
 
 impl PCB {
-    pub fn ex_inner(&self) -> RefMut<'_, PCBInner> {
+    pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
         self.inner.exclusive_access()
     }
     pub fn getpid(&self) -> usize {
@@ -101,6 +100,15 @@ impl PCB {
             cmd: String::from(parent_inner.cmd()),
             exit_code: 0,
             cwd: parent_inner.cwd().clone(),
+
+            pending_signals: SignalFlags::empty(),
+            // inherit the signal_mask and signal_action
+            signal_mask: parent_inner.signal_mask,
+            handling_sig: -1,
+            signal_actions: parent_inner.signal_actions.clone(),
+            killed: false,
+            frozen: false,
+            trap_ctx_backup: None,
         };
 
         let new_pcb = Arc::new(PCB {
@@ -198,6 +206,20 @@ pub struct PCBInner {
 
     // 退出码
     exit_code: i32,
+
+    // 记录对应进程目前已经收到了哪些信号尚未处理
+    pending_signals: SignalFlags,
+
+    signal_mask: SignalFlags,
+    signal_actions: SignalActions,
+
+    handling_sig: isize,
+
+    // 是否被 kill
+    killed: bool,
+    // 是否被 frozen
+    frozen: bool,
+    trap_ctx_backup: Option<TrapContext>,
 }
 
 impl PCBInner {
@@ -212,6 +234,14 @@ impl PCBInner {
             cmd: String::from(cmd),
             exit_code: 0,
             cwd: VfsPath::empty(true),
+
+            pending_signals: SignalFlags::empty(),
+            signal_mask: SignalFlags::empty(),
+            handling_sig: -1,
+            signal_actions: SignalActions::default(),
+            killed: false,
+            frozen: false,
+            trap_ctx_backup: None,
         }
     }
 
@@ -280,5 +310,48 @@ impl PCBInner {
 
     pub fn children(&self) -> &Vec<Arc<PCB>> {
         &self.children
+    }
+
+    pub fn pending_signals(&self) -> &SignalFlags {
+        &self.pending_signals
+    }
+
+    pub fn pending_signals_mut(&mut self) -> &mut SignalFlags {
+        &mut self.pending_signals
+    }
+
+    pub fn signal_mask(&self) -> &SignalFlags {
+        &self.signal_mask
+    }
+
+    pub fn set_signal_mask(&mut self, flag: SignalFlags) {
+        self.signal_mask = flag;
+    }
+
+    pub fn signal_actions(&self) -> &SignalActions {
+        &self.signal_actions
+    }
+
+    pub fn signal_actions_mut(&mut self) -> &mut SignalActions {
+        &mut self.signal_actions
+    }
+
+    pub fn frozen(&self) -> bool {
+        self.frozen
+    }
+    pub fn killed(&self) -> bool {
+        self.killed
+    }
+
+    pub fn handling_sig(&self) -> isize {
+        self.handling_sig
+    }
+
+    pub fn set_handling_sig(&mut self, handling_sig: isize) {
+        self.handling_sig = handling_sig;
+    }
+
+    pub fn trap_ctx_backup(&self) -> Option<TrapContext> {
+        self.trap_ctx_backup.clone()
     }
 }

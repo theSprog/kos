@@ -21,11 +21,11 @@ pub const LOG_LEVEL: logger::LogLevel = logger::LogLevel::TRACE;
 pub mod console;
 
 use alloc::{format, string::String};
-use bitflags::bitflags;
 // 向外提供 kernel 配置，例如页大小
 pub use sys_interface::config::*;
 pub use sys_interface::syserr;
-use syscall::*;
+pub use sys_interface::sysfs::OpenFlags;
+pub use sys_interface::syssig::*;
 
 pub mod constant;
 
@@ -37,23 +37,9 @@ pub mod io;
 mod lang_items;
 mod start;
 mod syscall;
+use syscall::*;
 
 use core::todo;
-
-bitflags! {
-    #[derive(Debug, Clone)]
-    pub struct OpenFlags: u32 {
-        const RDONLY = 0;
-        const WRONLY = 1 << 0;
-        const RDWR = 1 << 1;
-        const CREATE = 1 << 9;
-        const TRUNC = 1 << 10;
-        const APPEND = 1 << 11;  // Append to the end of the file
-        const NONBLOCK = 1 << 12;  // Non-blocking mode
-        const SYNC = 1 << 13;  // Synchronous I/O
-        const EXCLUSIVE = 1 << 14;  // Exclusive file access
-    }
-}
 
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
 pub fn open(path: &str, flags: OpenFlags, mode: u16) -> isize {
@@ -177,7 +163,7 @@ pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
     loop {
         match sys_waitpid(pid, exit_code as *mut i32) {
             syserr::EAGAIN => {
-                // 等待一段时间再重试
+                // 子进程尚未退出, 等待一段时间再重试
                 yield_cpu();
             }
             syserr::ECHILD => return syserr::ECHILD,
@@ -207,14 +193,39 @@ pub fn sbrk(incrment: usize) -> usize {
     sys_sbrk(incrment) as usize
 }
 
+/// 当前进程向另一个进程（可以是自身）发送一个信号。
+pub fn kill(pid: usize, signal: i32) -> isize {
+    sys_kill(pid, signal)
+}
+
+/// 为 signal 注册某种处理函数
+pub fn sigaction(
+    signal: i32,
+    action: Option<&SignalAction>,
+    old_action: Option<&mut SignalAction>,
+) -> isize {
+    let action = action.map_or(core::ptr::null(), |a| a) as usize;
+    let old_action = old_action.map_or(core::ptr::null_mut(), |a| a) as usize;
+    sys_sigaction(signal, action, old_action)
+}
+
+// 设置进程的信号屏蔽掩码
+pub fn sigprocmask(mask: u32) -> isize {
+    sys_sigprocmask(mask)
+}
+
+pub fn sigreturn() -> isize {
+    sys_sigreturn()
+}
+
+pub fn shutdown() -> ! {
+    sys_shutdown();
+}
+
 pub fn err_msg(syscall_err: isize) -> String {
     format!(
         "{} (os errno {})",
         syserr::msg(syscall_err),
         syserr::errno(syscall_err)
     )
-}
-
-pub fn shutdown() -> ! {
-    sys_shutdown();
 }

@@ -142,9 +142,10 @@ fn normal_cmd(cmd: &str) -> i32 {
     if pid == 0 {
         // 子进程部分
         let res = exec(cmd, None);
+        // exec 成功则不会回到此处, 会到此处则说明 exec 时出错
         if res != 0 {
-            println!("{}", err_msg(res));
-            return syserr::errno(res) as i32;
+            eprintln!("{}", err_msg(res));
+            return 0;
         }
         unreachable!();
     } else {

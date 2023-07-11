@@ -1,7 +1,9 @@
+use sys_interface::sysfs::OpenFlags;
+
 use crate::{
     close, err_msg,
     io::{IOError, IOResult, Read, SeekFrom, Write, SEEK_CURRENT, SEEK_END, SEEK_SET},
-    lseek, open, read, write, OpenFlags,
+    lseek, open, read, write,
 };
 
 pub trait Seek {

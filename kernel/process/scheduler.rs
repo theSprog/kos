@@ -1,9 +1,12 @@
+use alloc::collections::BTreeMap;
 use component::process::IScheduler;
 use logger::info;
 
 use crate::process::PCB;
 use crate::{sync::unicore::UPSafeCell, KernelScheduler};
 use alloc::sync::Arc;
+
+use super::pid::{self, PID_MAP};
 
 lazy_static! {
     pub(crate) static ref SCHEDULER: UPSafeCell<KernelScheduler> = unsafe {
@@ -13,8 +16,10 @@ lazy_static! {
 }
 
 // scheduler 实际上是依赖外部实现
-pub fn add_ready(task: Arc<PCB>) {
-    SCHEDULER.exclusive_access().add_ready(task)
+pub fn add_ready(pcb: Arc<PCB>) {
+    let pid = pcb.getpid();
+    PID_MAP.exclusive_access().insert(pid, pcb.clone());
+    SCHEDULER.exclusive_access().add_ready(pcb)
 }
 
 pub fn fetch() -> Option<Arc<PCB>> {

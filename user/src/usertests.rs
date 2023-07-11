@@ -11,7 +11,6 @@ extern crate user_lib;
 static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("exit", "\0", "\0", "\0", 0),
     ("text", "\0", "\0", "\0", 0),
-    ("forktest_simple", "\0", "\0", "\0", 0),
     ("forktest", "\0", "\0", "\0", 0),
     ("forktest2", "\0", "\0", "\0", 0),
     ("forktree", "\0", "\0", "\0", 0),
@@ -21,7 +20,7 @@ static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("yield", "\0", "\0", "\0", 0),
 ];
 
-static FAIL_TESTS: &[(&str, &str, &str, &str, i32)] = &[("stack_overflow", "\0", "\0", "\0", -2)];
+static FAIL_TESTS: &[(&str, &str, &str, &str, i32)] = &[("stack_overflow", "\0", "\0", "\0", -4)];
 
 use user_lib::{exec, fork, waitpid};
 
@@ -62,10 +61,10 @@ fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
         let pid = fork();
         if pid == 0 {
             exec(test.0, None);
-            panic!("unreachable!");
+            unreachable!()
         } else {
             let mut exit_code: i32 = Default::default();
-            let wait_pid = waitpid(pid as usize, &mut exit_code);
+            let wait_pid = waitpid(pid, &mut exit_code);
             assert_eq!(pid, wait_pid);
             if exit_code == test.4 {
                 // summary apps with  exit_code

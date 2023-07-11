@@ -1,6 +1,6 @@
 use core::cell::{RefCell, RefMut};
 
-pub(crate) struct UPSafeCell<T> {
+pub struct UPSafeCell<T> {
     /// inner data
     inner: RefCell<T>,
 }

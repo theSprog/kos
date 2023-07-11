@@ -19,14 +19,6 @@ fn syscall(id: usize, args: [usize; 3]) -> isize {
     ret
 }
 
-/// 向 fd 文件描述符写入 buffer 内的内容, 返回成功写入 u8 个数
-/// # Arguments
-///
-/// * `fd` - 文件描述符
-/// * `buffer` - 内存中缓冲区的起始地址
-/// # Returns
-///
-/// 返回成功写入的 u8 长度
 pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
     syscall(SYSCALL_WRITE, [fd, buffer.as_ptr() as usize, buffer.len()])
 }
@@ -93,6 +85,10 @@ pub fn sys_sbrk(incrment: usize) -> isize {
     syscall(SYSCALL_BRK, [incrment, 0, 0])
 }
 
+pub fn sys_kill(pid: usize, signal: i32) -> isize {
+    syscall(SYSCALL_KILL, [pid, signal as usize, 0])
+}
+
 pub fn sys_getpid() -> isize {
     syscall(SYSCALL_GETPID, [0, 0, 0])
 }
@@ -154,4 +150,16 @@ pub fn sys_chdir(path: *const u8) -> isize {
 
 pub fn sys_getcwd(buf: *mut u8, size: usize) -> isize {
     syscall(SYSCALL_GETCWD, [buf as usize, size, 0])
+}
+
+pub fn sys_sigaction(signal: i32, action: usize, old_action: usize) -> isize {
+    syscall(SYSCALL_RT_SIGACTION, [signal as usize, action, old_action])
+}
+
+pub fn sys_sigprocmask(mask: u32) -> isize {
+    syscall(SYSCALL_RT_SIGPROCMASK, [mask as usize, 0, 0])
+}
+
+pub fn sys_sigreturn() -> isize {
+    syscall(SYSCALL_RT_SIGRETURN, [0, 0, 0])
 }

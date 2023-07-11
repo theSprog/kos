@@ -32,7 +32,8 @@ fn run_shell() -> i32 {
                 let ret = shell_cmd(line);
                 if ret != 0 {
                     // shell 永远返回 0, 负值只能是 app 的返回值
-                    panic!("failed to execute command {:?}", line);
+                    println!("failed to execute command {:?}", line);
+                    loop {}
                 }
                 cmd.clear();
             }
@@ -50,7 +51,7 @@ fn shell_cmd(line: &str) -> i32 {
     match words.as_slice() {
         ["shutdown"] => shutdown(),
         // exit 只退出当前 shell, 而不会关机
-        ["exit"] => exit(0) as i32,
+        // ["exit"] => exit(0) as i32,
         // cd 命令针对当前 shell
         ["cd", paths @ ..] => cd(paths),
         _ => parse_line(line),

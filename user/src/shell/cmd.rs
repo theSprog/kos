@@ -26,6 +26,7 @@ impl Cmd {
         self.tablen = tablen;
     }
 
+    // 更新内容到屏幕上
     pub fn fresh(&self) {
         print!("\x1B[2K\r"); // 删除当前行并将光标回到行首
         print!("{}{}", self.prompt, self.cmd);
@@ -123,6 +124,7 @@ impl Cmd {
                 // 敲下回车
                 return Some(&self.cmd);
             }
+
             // ctrl + d 关机
             EOT => {
                 self.new_line();

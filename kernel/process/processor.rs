@@ -4,6 +4,7 @@ use crate::task::switch::__switch;
 use crate::task::TaskStatus;
 use crate::{memory::address::*, task::TCB};
 use crate::{sync::unicore::UPSafeCell, task::context::TaskContext, trap::context::TrapContext};
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 use logger::*;
@@ -48,7 +49,9 @@ impl Processor {
 }
 
 pub mod api {
+    use crate::process::{pid::PID_MAP, processor};
     use logger::{debug, trace};
+    use sys_interface::syssig::SignalFlags;
 
     use super::*;
 
@@ -85,6 +88,18 @@ pub mod api {
 
     pub fn current_trap_cx() -> &'static mut TrapContext {
         current_pcb().unwrap().ex_inner().trap_cx()
+    }
+
+    pub fn pid2pcb(pid: usize) -> Option<Arc<PCB>> {
+        let map = PID_MAP.exclusive_access();
+        map.get(&pid).map(Arc::clone)
+    }
+
+    pub fn current_add_signal(signal: SignalFlags) {
+        let pcb = processor::api::current_pcb().unwrap();
+        let mut inner = pcb.ex_inner();
+        inner.pending_signals |= signal;
+        info!("current task sigflag {:?}", inner.pending_signals());
     }
 
     pub fn run_app() {
@@ -133,13 +148,14 @@ pub mod api {
 
     pub fn suspend_and_run_next() {
         let pcb = current_pcb().unwrap();
+        let pid = current_pid();
         let mut pcb_inner = pcb.ex_inner();
         pcb_inner.set_status(TaskStatus::Ready);
         let task_cx_ptr = pcb_inner.task_cx() as *mut TaskContext;
         drop(pcb_inner);
 
         // suspend 只是换一个进程调度, 而当前进程仍然是 ready 的
-        scheduler::add_ready(pcb.clone());
+        scheduler::add_ready(pcb);
 
         schedule(task_cx_ptr);
     }

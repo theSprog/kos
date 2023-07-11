@@ -2,6 +2,7 @@ use logger::info;
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
 #[repr(C)]
+#[derive(Debug, Clone)]
 pub struct TrapContext {
     pub x: [usize; 32], // 通用寄存器
     pub sstatus: Sstatus,
