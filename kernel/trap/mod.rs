@@ -159,26 +159,25 @@ pub fn trap_handler() -> ! {
                 current_cmd_name(),
                 current_pid()
             );
-            let tcb = processor::api::current_tcb();
+            let address_space = processor::api::current_address_space();
             // 先判断是不是缺页, 还是说真的是 page_fault
-            if tcb
-                .address_space
+            if address_space
                 .is_page_fault(stval, segment::MapPermission::W)
             {
                 // 是否是 copy on write 
                 let vpn = VirtAddr::from(stval).floor();
-                let user_page_table = tcb.address_space.page_table();
+                let user_page_table = address_space.page_table();
                 let pte = user_page_table.translate(vpn);
 
                 // 页存在且有物理页映射, 但是不可写
                 if pte.is_some() && pte.as_ref().unwrap().valid() && !pte.as_ref().unwrap().writable() {
                     // segment 可写, 但是 pte 表示不可写, 说明是 cow
                     trace!("Fixing COW for this StorePageFault");
-                    tcb.address_space.fix_cow(stval);
+                    address_space.fix_cow(stval);
                 } else {
                     // 物理页不存在, 缺页只有可能发生在堆栈段
                     assert!(pte.is_none() || !pte.unwrap().valid());
-                    tcb.address_space.fix_page_missing(stval);
+                    address_space.fix_page_missing(stval);
                 }
             } else {
                 warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
@@ -195,12 +194,11 @@ pub fn trap_handler() -> ! {
                 current_pid()
             );
 
-            let tcb = processor::api::current_tcb();
-            if tcb
-                .address_space
+            let address_space = processor::api::current_address_space();
+            if address_space
                 .is_page_fault(stval, segment::MapPermission::R)
             {
-                tcb.address_space.fix_page_missing(stval);
+                address_space.fix_page_missing(stval);
             } else {
                 warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
                 // processor::api::exit_and_run_next(-2);
@@ -238,7 +236,7 @@ pub fn trap_handler() -> ! {
 
     // 检查是否有错, 若有错(例如段错误)则退出
     if let Some((exit_code, msg)) = signal::api::check_signals_error() {
-        info!("{}", msg);
+        info!("msg: {}, exit_code: {}", msg, exit_code);
         processor::api::exit_and_run_next(syserr::EINTR as i32);
     }
 

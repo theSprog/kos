@@ -1,4 +1,3 @@
-use logger::info;
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
 #[repr(C)]
@@ -28,9 +27,7 @@ impl TrapContext {
         kernel_satp: usize,
         kernel_sp: usize,
         trap_handler: usize,
-        pid: usize,
     ) -> Self {
-        info!("app_init_context() called with pid={}", pid);
         // CSR sstatus
         let sstatus = sstatus::read();
         //设置返回的特权级：User mode。换句话说返回后( sret )进入 User 态

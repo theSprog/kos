@@ -1,5 +1,4 @@
 use crate::{memory::page_table, process::processor};
-use logger::*;
 use sys_interface::{syserr, syssig::*};
 
 fn check_sigaction_error(signal: SignalFlags, action: usize, old_action: usize) -> bool {

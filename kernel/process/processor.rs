@@ -49,7 +49,10 @@ impl Processor {
 }
 
 pub mod api {
-    use crate::process::{pid::PID_MAP, processor};
+    use crate::{
+        memory::address_space::AddressSpace,
+        process::{fdtable::FdTable, pid::PID_MAP, processor},
+    };
     use logger::{debug, trace};
     use sys_interface::syssig::SignalFlags;
 
@@ -73,6 +76,14 @@ pub mod api {
 
     pub fn current_tcb() -> &'static mut TCB {
         current_pcb().unwrap().ex_inner().tcb()
+    }
+
+    pub fn current_address_space() -> &'static mut AddressSpace {
+        current_pcb().unwrap().ex_inner().address_space()
+    }
+
+    pub fn current_fdtable() -> &'static mut FdTable {
+        current_pcb().unwrap().ex_inner().fd_table()
     }
 
     pub fn current_pid() -> usize {
@@ -166,7 +177,7 @@ pub mod api {
         let pid = pcb.getpid();
         assert_ne!(pid, 1, "init should not exit!"); // init 进程不能退出
         debug!(
-            "process-'{}'(pid={}) exited with code {}",
+            "'{}' (pid={}) exited with code {}",
             pcb.ex_inner().cmd(),
             pid,
             exit_code
@@ -188,9 +199,9 @@ pub mod api {
         // 释放对于孩子的所有权
         pcb_inner.children.clear();
         // 释放地址空间, 同时释放页表
-        pcb_inner.tcb.address_space.release_space();
+        pcb_inner.address_space.release_space();
         // 释放文件描述符
-        pcb_inner.tcb.fd_table.clear();
+        pcb_inner.fd_table.clear();
         drop(pcb_inner);
         drop(pcb); // 手动原地释放, 因为 schedule 不会回到此作用域了
 
@@ -203,9 +214,9 @@ pub mod api {
 
     // TODO: 错误的实现, 权宜之计
     pub(crate) fn sbrk(incrment: usize) -> usize {
-        let tcb = current_tcb();
+        let address_space = current_address_space();
         // 默认最后一个是 heap
-        let heap = tcb.address_space.heap_mut();
+        let heap = address_space.heap_mut();
 
         if incrment == 0 {
             // 获取当前堆顶

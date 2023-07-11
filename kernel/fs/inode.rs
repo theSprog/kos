@@ -5,8 +5,6 @@ use crate::vfs::VfsError;
 use crate::vfs::VfsInode;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use bitflags::bitflags;
-use logger::info;
 use spin::Mutex;
 
 use super::SeekFrom;

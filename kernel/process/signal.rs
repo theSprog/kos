@@ -14,8 +14,7 @@ impl Default for SignalActions {
 }
 
 pub mod api {
-    use super::*;
-    use crate::process::processor::{self};
+    use crate::process::processor;
     use logger::info;
     use sys_interface::syssig::{SignalFlags, MAX_SIG};
 

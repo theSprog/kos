@@ -32,7 +32,7 @@ impl Drop for Pid {
 impl Pid {
     pub fn unmap(&self) {
         match PID_MAP.exclusive_access().remove(&self.0) {
-            Some(pcb) => {
+            Some(_pcb) => {
                 // nothing to do so far
             }
             None => panic!("cannot unmap pid(={}) because there is no such key", self.0),

@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::ops::{Deref, DerefMut};
 
 pub struct UserBuffer {
     pub buffers: Vec<&'static mut [u8]>,

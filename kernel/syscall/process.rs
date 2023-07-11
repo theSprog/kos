@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::{sync::Arc, vec::Vec};
 use logger::*;
-use sys_interface::{syserr, syssig::*};
+use sys_interface::syserr;
 
 /// processor exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -127,7 +127,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         // 以可变引用的方式取得用户空间 exit_code_ptr 对应的的地址
         // 并在该处写上 exit_code
         let user_exit_code_ptr =
-            page_table::api::translated_refmut(inner.tcb().address_space.token(), exit_code_ptr);
+            page_table::api::translated_refmut(inner.address_space().token(), exit_code_ptr);
         // 设定好 exit_code
         *user_exit_code_ptr = exit_code;
         found_pid as isize

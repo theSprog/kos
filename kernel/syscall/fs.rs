@@ -17,18 +17,17 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = processor::api::current_user_token();
     let pcb = processor::api::current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
-    let tcb = inner.tcb();
-    if fd >= tcb.fd_table.len() {
+    let fd_table = inner.fd_table();
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
 
-    if let Some(file) = &tcb.fd_table[fd] {
+    if let Some(file) = &fd_table[fd] {
         if !file.writable() {
             return syserr::EBADF;
         }
 
         let file = file.clone();
-        drop(inner);
         file.write(UserBuffer::new(page_table::api::translated_byte_buffer(
             token, buf, len,
         )))
@@ -42,12 +41,13 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = processor::api::current_user_token();
     let pcb = processor::api::current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
-    let tcb = inner.tcb();
-    if fd >= tcb.fd_table.len() {
+    let fd_table = inner.fd_table();
+
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
 
-    if let Some(file) = &tcb.fd_table[fd] {
+    if let Some(file) = &fd_table[fd] {
         // 不可读
         if !file.readable() {
             return syserr::EBADF;
@@ -55,7 +55,6 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 
         let file = file.clone();
 
-        drop(inner);
         file.read(UserBuffer::new(page_table::api::translated_byte_buffer(
             token, buf, len,
         )))
@@ -134,7 +133,7 @@ fn report_fs_err(err: VfsError) -> isize {
 pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
     let path = build_abs_path(path);
 
-    let tcb = processor::api::current_tcb();
+    let fdtable = processor::api::current_fdtable();
     let flags = sysfs::OpenFlags::from_bits(flags).unwrap();
     let (create, trancate, append) = (flags.create(), flags.truncate(), flags.append());
 
@@ -145,13 +144,13 @@ pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
                 return report_fs_err(err);
             }
         }
-        let fd = tcb.alloc_fd();
+        let fd = fdtable.alloc_fd();
         let offset = inode.metadata().size() as usize;
         let os_inode = OSInode::new(flags.read(), flags.write(), inode);
         if append {
             os_inode.set_offset(offset);
         }
-        tcb.fd_table[fd] = Some(Arc::new(os_inode));
+        fdtable[fd] = Some(Arc::new(os_inode));
         fd as isize
     } else {
         // open 失败可能是因为不存在文件
@@ -160,9 +159,8 @@ pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
             match inode {
                 Ok(mut inode) => {
                     inode.set_permissions(&mode.into());
-                    let fd = tcb.alloc_fd();
-                    tcb.fd_table[fd] =
-                        Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
+                    let fd = fdtable.alloc_fd();
+                    fdtable[fd] = Some(Arc::new(OSInode::new(flags.read(), flags.write(), inode)));
                     return fd as isize;
                 }
                 Err(err) => {
@@ -209,9 +207,9 @@ pub fn sys_listdir(path: *const u8) -> isize {
         let colored_name = match metadata.filetype() {
             VfsFileType::RegularFile => {
                 if metadata.permissions().user().execute() {
-                    alloc::format!("\x1b[32m{}\x1b[0m", entry.name())
+                    alloc::format!("\x1b[32m{}\x1b[0m", name)
                 } else {
-                    entry.name().to_string()
+                    name
                 }
             }
             VfsFileType::Directory => alloc::format!("\x1b[94m{}\x1b[0m", entry.name()),
@@ -243,17 +241,16 @@ pub fn sys_listdir(path: *const u8) -> isize {
 pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
     let pcb = processor::api::current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
-    let tcb = inner.tcb();
+    let fd_table = inner.fd_table();
     // fd 越界
-    if fd >= tcb.fd_table.len() {
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
-    if let Some(file) = &tcb.fd_table[fd] {
+    if let Some(file) = &fd_table[fd] {
         if !file.writable() {
             return syserr::EBADF;
         }
         let file = file.clone();
-        drop(inner);
         let res = file.truncate(length);
 
         return match res {
@@ -290,13 +287,14 @@ pub fn sys_fstat(fd: usize, stat_buf: *mut u8) -> isize {
 
     let pcb = processor::api::current_pcb().unwrap();
     let mut inner = pcb.ex_inner();
-    let tcb = inner.tcb();
+    let fd_table = inner.fd_table();
+
     // fd 越界
-    if fd >= tcb.fd_table.len() {
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
 
-    if let Some(file) = &tcb.fd_table[fd] {
+    if let Some(file) = &fd_table[fd] {
         match file.metadata() {
             Err(err) => return report_fs_err(err),
             Ok(_) => {
@@ -312,13 +310,13 @@ pub fn sys_fstat(fd: usize, stat_buf: *mut u8) -> isize {
 
 pub fn sys_pipe(pipe: *mut usize) -> isize {
     let token = processor::api::current_user_token();
-    let tcb = processor::api::current_tcb();
+    let fd_table = processor::api::current_fdtable();
 
     let (pipe_read, pipe_write) = pipe::make_pipe();
-    let read_fd = tcb.alloc_fd();
-    tcb.fd_table[read_fd] = Some(pipe_read);
-    let write_fd = tcb.alloc_fd();
-    tcb.fd_table[write_fd] = Some(pipe_write);
+    let read_fd = fd_table.alloc_fd();
+    fd_table[read_fd] = Some(pipe_read);
+    let write_fd = fd_table.alloc_fd();
+    fd_table[write_fd] = Some(pipe_write);
 
     let read_slot = page_table::api::translated_refmut(token, unsafe { pipe.add(0) });
     let write_slot = page_table::api::translated_refmut(token, unsafe { pipe.add(1) });
@@ -331,15 +329,15 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
 
 /// 功能：将一个文件描述符复制到当前可用的最低数值文件描述符，返回新复制的文件描述符。
 pub fn sys_dup(fd: usize) -> isize {
-    let tcb = processor::api::current_tcb();
+    let fd_table = processor::api::current_fdtable();
 
-    if fd >= tcb.fd_table.len() || tcb.fd_table[fd].is_none() {
+    if fd >= fd_table.len() || fd_table[fd].is_none() {
         return syserr::EBADF;
     }
 
-    let new_fd = tcb.alloc_fd();
+    let new_fd = fd_table.alloc_fd();
     // clone 一份打开的 fd
-    tcb.fd_table[new_fd] = tcb.fd_table[fd].clone();
+    fd_table[new_fd] = fd_table[fd].clone();
 
     new_fd as isize
 }
@@ -406,15 +404,14 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> isize {
-    let pcb = processor::api::current_pcb().unwrap();
-    let mut inner = pcb.ex_inner();
-    let tcb = inner.tcb();
+    let fd_table = processor::api::current_fdtable();
+
     // fd 越界
-    if fd >= tcb.fd_table.len() {
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
 
-    if let Some(file) = &tcb.fd_table[fd] {
+    if let Some(file) = &fd_table[fd] {
         match file.seek(offset, whence) {
             Err(err) => return report_fs_err(err),
             Ok(_) => return 0,
@@ -453,15 +450,15 @@ pub fn sys_linkat(to: *const u8, from: *const u8) -> isize {
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    let tcb = processor::api::current_tcb();
-    if fd >= tcb.fd_table.len() {
+    let fd_table = processor::api::current_fdtable();
+    if fd >= fd_table.len() {
         return syserr::EBADF;
     }
-    if tcb.fd_table[fd].is_none() {
+    if fd_table[fd].is_none() {
         return syserr::EBADF;
     }
     // 所有权取出, 将 None 置入
-    tcb.fd_table[fd].take();
+    fd_table[fd].take();
     0
 }
 

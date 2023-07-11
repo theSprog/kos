@@ -14,7 +14,6 @@ use crate::{
     MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
 use alloc::{
-    format,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
@@ -25,7 +24,6 @@ use component::{
 };
 use logger::info;
 use qemu_config::MMIO;
-use sys_interface::config::USER_PROG_PATH;
 use xmas_elf::ElfFile;
 
 // 内核空间
@@ -69,7 +67,7 @@ impl AddressSpace {
         // 从 user_space 复制 trap_context,
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
         let trap_seg = Segment::from_trap(&parent_space.segments[0]);
-        let trap_content = parent_space.trap_ppn().get_one_page();
+        let trap_content = parent_space.trap_cx_ppn().get_one_page();
 
         // 向新 address_space 添加一个段, 并且放置初始内容
         // 注意这不能够 COW 因为两个进程的 trap 必定不一样(至少返回值不一样)
@@ -317,9 +315,7 @@ impl AddressSpace {
 
     /// 映射 ELF 的 sections 以及 trampoline、TrapContext(用于地址空间切换) 和 user stack,
     /// 返回 user_sp 和 entry point.
-    pub fn from_elf(elf: &ElfFile<'_>, pid: usize) -> (Self, usize, usize) {
-        info!("Creating user ELF file mapping for pid={}", pid);
-
+    pub fn from_elf(elf: &ElfFile<'_>) -> (Self, usize, usize) {
         // 为应用程序申请一个地址空间
         let mut address_space = Self::new_bare();
 
@@ -392,7 +388,6 @@ impl AddressSpace {
         user_stack_bottom += PAGE_SIZE;
         // 用户栈栈顶, 从栈底延伸出一个 USER_STACK_SIZE 的空间大小
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        info!("user_stack_top = {:#x} for pid={}", user_stack_top, pid);
 
         let mut stack_seg = Segment::new(
             user_stack_bottom.into(),
@@ -449,7 +444,7 @@ impl AddressSpace {
     }
 
     // 找到该地址空间的 trap 的 ppn
-    pub fn trap_ppn(&self) -> PhysPageNum {
+    pub fn trap_cx_ppn(&self) -> PhysPageNum {
         let trap = self.translate_vpn(VirtAddr::from(TRAP_CONTEXT).into());
         assert!(
             trap.is_some(),

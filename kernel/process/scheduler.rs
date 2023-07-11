@@ -1,4 +1,3 @@
-use alloc::collections::BTreeMap;
 use component::process::IScheduler;
 use logger::info;
 
@@ -6,7 +5,7 @@ use crate::process::PCB;
 use crate::{sync::unicore::UPSafeCell, KernelScheduler};
 use alloc::sync::Arc;
 
-use super::pid::{self, PID_MAP};
+use super::pid::PID_MAP;
 
 lazy_static! {
     pub(crate) static ref SCHEDULER: UPSafeCell<KernelScheduler> = unsafe {

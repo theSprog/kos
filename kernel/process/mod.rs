@@ -3,10 +3,11 @@ pub mod processor;
 pub mod scheduler;
 pub mod signal;
 
+mod fdtable;
 mod stack;
 
 use alloc::{
-    string::String,
+    string::{String, ToString},
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -16,16 +17,13 @@ use sys_interface::{syserr, syssig::*};
 
 use crate::{
     loader::load_app,
-    memory::{
-        address_space::{AddressSpace, KERNEL_SPACE},
-        kernel_view::get_kernel_view,
-    },
+    memory::address_space::{AddressSpace, KERNEL_SPACE},
     sync::unicore::UPSafeCell,
     task::{context::TaskContext, TaskStatus, TCB},
     trap::{context::TrapContext, trap_handler},
 };
 
-use self::{pid::Pid, signal::SignalActions, stack::KernelStack};
+use self::{fdtable::FdTable, pid::Pid, signal::SignalActions, stack::KernelStack};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct PCB {
@@ -34,6 +32,7 @@ pub struct PCB {
     pub pid: Pid,
     // KernelStack 只是一个 pid, 目的是 RAII, PCB 析构时自动释放内核栈资源
     pub kernel_stack: KernelStack,
+    // pub cmd: String,
 
     // 在运行过程中可能发生变化的元数据
     inner: UPSafeCell<PCBInner>,
@@ -46,25 +45,29 @@ impl PCB {
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
-    pub fn set_priority(&mut self, priority: u8) {
-        self.ex_inner().set_priority(priority);
-    }
-    pub fn priority(&self) -> u8 {
-        self.ex_inner().priority()
-    }
 
-    pub fn new(elf_data: &[u8], cmd: &str) -> Self {
+    /// pid 在该函数内惟一的作用就是决定内核栈的位置
+    /// task_cx 需要用到该位置
+    /// 注意该函数只应该调用一次, 剩下的进程全都是用 fork 创建出来
+    pub fn new_once(elf_data: &[u8], cmd: &str) -> Self {
         // 分配 pid
         let pid = pid::api::pid_alloc();
         // 确定内核栈位置
         let kernel_stack = KernelStack::new(&pid);
-        let tcb = TCB::new_once(elf_data, pid.0);
 
-        // init 默认优先级是 3, 或者继承自父优先级
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf);
+        
+        // init 默认优先级是 3
+        let tcb = TCB::new(user_sp, entry_point, address_space.trap_cx_ppn(), pid.0, 3);
+
+        // 准备 crt0 栈
+        address_space.init_crt0(tcb.trap_cx_ppn.get_mut());
+
         Self {
             pid,
             kernel_stack,
-            inner: unsafe { UPSafeCell::new(PCBInner::new_bare(tcb, 3, cmd)) },
+            inner: unsafe { UPSafeCell::new(PCBInner::new(tcb, address_space, cmd)) },
         }
     }
 
@@ -72,32 +75,32 @@ impl PCB {
         // 访问父进程
         let mut parent_inner = self.ex_inner();
         // 拷贝用户空间
-        let address_space: AddressSpace =
-            AddressSpace::from_fork(&mut parent_inner.tcb.address_space);
+        let address_space: AddressSpace = AddressSpace::from_fork(&mut parent_inner.address_space);
 
         // 分配 pid 和 内核栈
         let pid_handle = pid::api::pid_alloc();
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
-        let trap_cx_ppn = address_space.trap_ppn();
+        let trap_cx_ppn = address_space.trap_cx_ppn();
 
         let new_tcb = TCB {
+            priority: parent_inner.tcb.priority,
             task_status: TaskStatus::Ready,
             task_cx: TaskContext::goto_trap_return(kernel_stack_top),
-            address_space,
             trap_cx_ppn,
             base_size: parent_inner.tcb.base_size,
-            fd_table: parent_inner.tcb.fd_table.clone(),
         };
 
         let pcb_inner = PCBInner {
-            priority: parent_inner.priority, // 与父进程同优先级
             tcb: new_tcb,
+            address_space,
+            fd_table: parent_inner.fd_table.clone(),
+
             count: 0, // 新建进程所用时间片为 0
             // 父进程是 self, 没有子进程
             parent: Some(Arc::downgrade(self)),
             children: Vec::new(),
-            cmd: String::from(parent_inner.cmd()),
+            cmd: parent_inner.cmd().to_string(),
             exit_code: 0,
             cwd: parent_inner.cwd().clone(),
 
@@ -131,9 +134,6 @@ impl PCB {
     }
 
     pub fn exec(&self, app_name: &str, args: Vec<String>, envs: Vec<String>) -> isize {
-        // self 即子进程自身
-        let pid = processor::api::current_pid();
-
         let elf_data = match load_app(app_name) {
             Some(app) => app,
             None => return syserr::ENOENT,
@@ -147,13 +147,12 @@ impl PCB {
             }
         };
 
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf, pid);
-        let trap_cx_ppn = address_space.trap_ppn();
+        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf);
+        let trap_cx_ppn = address_space.trap_cx_ppn();
 
-        // **** access inner exclusively
         let mut inner = self.ex_inner();
         // 替换地址空间, 原来的地址空间全部被回收, 页表也更换了
-        inner.tcb.address_space = address_space;
+        inner.address_space = address_space;
         // 更新 trap_cx ppn
         inner.tcb.trap_cx_ppn = trap_cx_ppn;
         // 更新 base_size
@@ -169,11 +168,10 @@ impl PCB {
             KERNEL_SPACE.exclusive_access().token(),
             self.kernel_stack.get_top(), // 复用子进程自身的 kernel_stack
             trap_handler as usize,
-            pid,
         );
 
         // 压入 crt0 栈
-        inner.tcb.address_space.push_crt0(trap_cx, &args, &envs);
+        inner.address_space.push_crt0(trap_cx, &args, &envs);
 
         // 注意: 在执行 execve() 后:
         // 子进程的程序映像被替换为新的程序，但是文件描述符表不会受到影响，仍然保持不变。
@@ -188,15 +186,17 @@ impl PCB {
 pub struct PCBInner {
     tcb: TCB,
 
+    // 应用程序的地址空间
+    address_space: AddressSpace,
+    fd_table: FdTable,
+
+    // 当前所执行的命令
     cmd: String,
-    // 进程优先级, 1~5
-    // 有些调度算法不会关注优先级, 例如 FIFO
-    priority: u8,
 
     // 当前进程所在目录
     cwd: VfsPath,
 
-    // 进程运行的时间片, 每用一个 +1
+    // 进程运行的时间段
     count: usize,
 
     // 树形结构, 父子进程, 父进程有多个子进程指向它
@@ -223,11 +223,12 @@ pub struct PCBInner {
 }
 
 impl PCBInner {
-    pub fn new_bare(tcb: TCB, priority: u8, cmd: &str) -> Self {
-        assert!((1..=5).contains(&priority)); // 1-5 优先级
+    pub fn new(tcb: TCB, address_space: AddressSpace, cmd: &str) -> Self {
         Self {
-            priority,
             tcb,
+            address_space,
+            fd_table: FdTable::default(),
+
             count: 0,
             parent: None,
             children: Vec::new(),
@@ -250,6 +251,16 @@ impl PCBInner {
         unsafe { tcb.as_mut().unwrap() }
     }
 
+    pub fn address_space(&mut self) -> &'static mut AddressSpace {
+        let address_space = &mut self.address_space as *mut AddressSpace;
+        unsafe { address_space.as_mut().unwrap() }
+    }
+
+    pub fn fd_table(&mut self) -> &'static mut FdTable {
+        let fd_table = &mut self.fd_table as *mut FdTable;
+        unsafe { fd_table.as_mut().unwrap() }
+    }
+
     pub fn cmd(&self) -> &str {
         &self.cmd
     }
@@ -264,15 +275,6 @@ impl PCBInner {
 
     pub fn parent(&self) -> Option<Weak<PCB>> {
         self.parent.clone()
-    }
-
-    pub fn priority(&self) -> u8 {
-        self.priority
-    }
-
-    pub fn set_priority(&mut self, priority: u8) {
-        assert!((1..=5).contains(&priority));
-        self.priority = priority
     }
 
     pub fn status(&self) -> TaskStatus {
@@ -294,7 +296,7 @@ impl PCBInner {
     }
 
     pub fn user_token(&self) -> usize {
-        self.tcb.address_space.token()
+        self.address_space.token()
     }
     pub fn trap_cx(&self) -> &'static mut TrapContext {
         self.tcb.trap_cx_ppn.get_mut()

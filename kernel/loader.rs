@@ -1,7 +1,6 @@
 use crate::{
     fs::{inode::OSInode, VFS},
     process::processor,
-    task::INIT,
     *,
 };
 use alloc::{boxed::Box, string::ToString, vec::Vec};
@@ -90,7 +89,7 @@ fn get_app_data_by_path(app_path: &str) -> Option<&'static [u8]> {
     // 例如首先声明 "app1", 那么地址处也是首先存放 app1 的数据
     trace!("extracting app data from '{}'", app_path);
     let num_app = get_num_app();
-    
+
     let app_data = (0..num_app)
         .find(|&i| APP_CONTAINER[i] == app_path)
         .map(get_app_data_by_id);

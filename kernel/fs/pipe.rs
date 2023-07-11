@@ -3,7 +3,6 @@ use alloc::{
     vec::Vec,
 };
 use component::fs::vfs::VfsError;
-use logger::info;
 use spin::Mutex;
 
 use crate::process::processor::api::suspend_and_run_next;

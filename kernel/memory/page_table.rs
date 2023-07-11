@@ -243,10 +243,8 @@ impl PageTableEntry {
 }
 
 pub mod api {
-    use logger::{info, warn};
+    use logger::*;
     use sys_interface::config::PAGE_SIZE;
-
-    use crate::println;
 
     use super::*;
 

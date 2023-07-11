@@ -19,15 +19,15 @@ impl KernelStack {
         KernelStack { pid: pid_handle.0 }
     }
 
-    // psuh 一个 Sized 结构体到栈顶
-    pub fn push_on_top<T: Sized>(&self, value: T) -> *mut T {
-        let kernel_stack_top = self.get_top();
-        let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
-        unsafe {
-            *ptr_mut = value;
-        }
-        ptr_mut
-    }
+    // // psuh 一个 Sized 结构体到栈顶
+    // pub fn push_on_top<T: Sized>(&self, value: T) -> *mut T {
+    //     let kernel_stack_top = self.get_top();
+    //     let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
+    //     unsafe {
+    //         *ptr_mut = value;
+    //     }
+    //     ptr_mut
+    // }
 
     pub fn get_top(&self) -> usize {
         let (_, kernel_stack_top) = kernel_view::get_kernel_view().kernel_stack_range(self.pid);
