@@ -23,125 +23,125 @@ path = "src/init.rs"
 name = "shell"
 path = "src/shell/mod.rs"
 
-# [[bin]]
-# name = "fw"
-# path = "src/fw.rs"
+[[bin]]
+name = "fw"
+path = "src/fw.rs"
 
-# [[bin]]
-# name = "rw"
-# path = "src/rw.rs"
+[[bin]]
+name = "rw"
+path = "src/rw.rs"
 
-# [[bin]]
-# name = "tc"
-# path = "src/tc.rs"
+[[bin]]
+name = "tc"
+path = "src/tc.rs"
 
-# [[bin]]
-# name = "ls"
-# path = "src/ls.rs"
+[[bin]]
+name = "ls"
+path = "src/ls.rs"
 
-# [[bin]]
-# name = "cat"
-# path = "src/cat.rs"
+[[bin]]
+name = "cat"
+path = "src/cat.rs"
 
-# [[bin]]
-# name = "touch"
-# path = "src/touch.rs"
+[[bin]]
+name = "touch"
+path = "src/touch.rs"
 
-# [[bin]]
-# name = "echo"
-# path = "src/echo.rs"
+[[bin]]
+name = "echo"
+path = "src/echo.rs"
 
-# [[bin]]
-# name = "mkdir"
-# path = "src/mkdir.rs"
+[[bin]]
+name = "mkdir"
+path = "src/mkdir.rs"
 
-# [[bin]]
-# name = "rm"
-# path = "src/rm.rs"
+[[bin]]
+name = "rm"
+path = "src/rm.rs"
 
-# [[bin]]
-# name = "pwd"
-# path = "src/pwd.rs"
+[[bin]]
+name = "pwd"
+path = "src/pwd.rs"
 
-# [[bin]]
-# name = "mv"
-# path = "src/mv.rs"
+[[bin]]
+name = "mv"
+path = "src/mv.rs"
 
-# [[bin]]
-# name = "hello"
-# path = "src/hello.rs"
+[[bin]]
+name = "hello"
+path = "src/hello.rs"
 
-# [[bin]]
-# name = "cp"
-# path = "src/cp.rs"
+[[bin]]
+name = "cp"
+path = "src/cp.rs"
 
-# [[bin]]
-# name = "pipetest"
-# path = "src/pipetest.rs"
+[[bin]]
+name = "pipetest"
+path = "src/pipetest.rs"
 
-# [[bin]]
-# name = "pipe_large"
-# path = "src/pipe_large.rs"
+[[bin]]
+name = "pipe_large"
+path = "src/pipe_large.rs"
 
-# [[bin]]
-# name = "perc"
-# path = "src/perc.rs"
+[[bin]]
+name = "perc"
+path = "src/perc.rs"
 
-# [[bin]]
-# name = "yield"
-# path = "src/yield.rs"
+[[bin]]
+name = "yield"
+path = "src/yield.rs"
 
-# [[bin]]
-# name = "read"
-# path = "src/read.rs"
+[[bin]]
+name = "read"
+path = "src/read.rs"
 
-# [[bin]]
-# name = "exit"
-# path = "src/exit.rs"
+[[bin]]
+name = "exit"
+path = "src/exit.rs"
 
 [[bin]]
 name = "forkexec"
 path = "src/forkexec.rs"
 
-# [[bin]]
-# name = "text"
-# path = "src/text.rs"
+[[bin]]
+name = "text"
+path = "src/text.rs"
 
 [[bin]]
 name = "forktest2"
 path = "src/forktest2.rs"
 
-# [[bin]]
-# name = "matrix"
-# path = "src/matrix.rs"
+[[bin]]
+name = "matrix"
+path = "src/matrix.rs"
 
 [[bin]]
 name = "forktree"
 path = "src/forktree.rs"
 
-# [[bin]]
-# name = "sleep"
-# path = "src/sleep.rs"
+[[bin]]
+name = "sleep"
+path = "src/sleep.rs"
 
-# [[bin]]
-# name = "sleep_simple"
-# path = "src/sleep_simple.rs"
+[[bin]]
+name = "sleep_simple"
+path = "src/sleep_simple.rs"
 
 [[bin]]
 name = "forktest"
 path = "src/forktest.rs"
 
-# [[bin]]
-# name = "stack_overflow"
-# path = "src/stack_overflow.rs"
+[[bin]]
+name = "stack_overflow"
+path = "src/stack_overflow.rs"
 
-# [[bin]]
-# name = "usertests"
-# path = "src/usertests.rs"
+[[bin]]
+name = "usertests"
+path = "src/usertests.rs"
 
-# [[bin]]
-# name = "sig1"
-# path = "src/sig1.rs"
+[[bin]]
+name = "sig1"
+path = "src/sig1.rs"
 
 [[bin]]
 name = "cor"

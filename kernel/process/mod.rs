@@ -1,8 +1,8 @@
+pub mod kstack;
 pub mod pid;
 pub mod processor;
 pub mod scheduler;
 pub mod signal;
-pub mod stack;
 
 mod fdtable;
 
@@ -26,7 +26,12 @@ use crate::{
     trap::{context::TrapContext, trap_handler},
 };
 
-use self::{fdtable::FdTable, pid::Pid, signal::SignalActions, stack::KernelStack};
+use self::{
+    fdtable::FdTable,
+    kstack::KernelStack,
+    pid::{Pid, RecycleAllocator},
+    signal::SignalActions,
+};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct PCB {
@@ -39,42 +44,63 @@ pub struct PCB {
 }
 
 impl PCB {
-    pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
-        self.inner.exclusive_access()
-    }
-    pub fn get_pid(&self) -> usize {
-        self.pid.0
-    }
-
-    pub fn address_space(&self) -> &mut AddressSpace {
-        self.ex_inner().address_space()
-    }
-
-    /// pid 在该函数内惟一的作用就是决定内核栈的位置
-    /// task_cx 需要用到该位置
+    /// task_ctx 需要用到该位置
     /// 注意该函数只应该调用一次, 剩下的进程全都是用 fork 创建出来
     pub fn new_once(elf_data: &[u8], cmd: &str) -> Arc<Self> {
-        // 分配 pid
-        let pid = Pid::alloc();
-
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf);
+        let (address_space, ustack_base, entry_point) = AddressSpace::from_elf(&elf);
 
         let pcb = Arc::new(Self {
-            pid,
+            pid: Pid::alloc(), // 分配 pid
             inner: unsafe { UPSafeCell::new(PCBInner::new(address_space, cmd)) },
         });
 
         // init 默认优先级是 3
-        let tcb = Arc::new(TCB::new_once(&pcb, user_sp, entry_point, 3));
+        let tcb = Arc::new(TCB::new(&pcb, ustack_base, false));
 
-        // 准备 crt0 栈
-        pcb.address_space().init_crt0(tcb.trap_ctx_ppn());
+        let tcb_inner = tcb.ex_inner();
+        let trap_ctx = tcb_inner.trap_ctx();
+        let (ustack_top, kstack_top) = (tcb_inner.ustack_top(), tcb.kstack.get_top());
+        drop(tcb_inner);
+
+        *trap_ctx = TrapContext::app_init_context(
+            entry_point,
+            ustack_top,
+            KERNEL_SPACE.exclusive_access().token(),
+            kstack_top,
+            trap_handler as usize,
+        );
+
+        // 为 main 线程准备 crt0 栈
+        pcb.ex_address_space().init_crt0(tcb.ex_inner().trap_ctx());
 
         // 进程的第一个可运行线程
-        pcb.ex_inner().tcbs.push(Some(tcb));
+        pcb.ex_add_tcb(tcb.clone());
 
         pcb
+    }
+
+    pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
+        self.inner.exclusive_access()
+    }
+    pub fn pid(&self) -> usize {
+        self.pid.0
+    }
+
+    pub fn ex_address_space(&self) -> &'static mut AddressSpace {
+        self.ex_inner().address_space()
+    }
+
+    pub fn ex_fd_table(&self) -> &'static mut FdTable {
+        self.ex_inner().fd_table()
+    }
+
+    pub fn ex_add_tcb(&self, tcb: Arc<TCB>) {
+        self.ex_inner().tcbs.push(Some(tcb));
+    }
+
+    pub fn ex_ustack_base(&self) -> usize {
+        self.ex_inner().ustack_base()
     }
 
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
@@ -83,10 +109,9 @@ impl PCB {
         assert_eq!(parent_pcb_inner.tcb_count(), 1);
 
         // 拷贝父进程用户态地址空间(内核态空间不能拷贝)
-        let child_address_space = AddressSpace::from_fork(parent_pcb_inner.address_space());
-
-        // 由于 address_space 即将 move, 所以先保存子进程自己的 trap
-        let trap_ctx_ppn = child_address_space.trap_ctx_ppn();
+        let parent_tcb = parent_pcb_inner.main_tcb();
+        let child_address_space =
+            AddressSpace::from_fork(parent_pcb_inner.address_space(), parent_tcb.trap_ctx_ppn());
 
         // 先构建 pcb
         let child_pcb = Arc::new(PCB {
@@ -94,6 +119,7 @@ impl PCB {
             inner: unsafe {
                 UPSafeCell::new(PCBInner {
                     tcbs: Vec::new(), // 暂时还未放置线程
+                    tid_allocator: RecycleAllocator::new(),
                     address_space: child_address_space,
                     fd_table: parent_pcb_inner.fd_table.clone(),
 
@@ -112,54 +138,37 @@ impl PCB {
                     killed: false,
                     frozen: false,
                     trap_ctx_backup: None,
-                    // task_res_allocator: RecycleAllocator::new(),
                     // mutex_list: Vec::new(),
                     // semaphore_list: Vec::new(),
                     // condvar_list: Vec::new(),
                 })
             },
         });
-
         // 父子关系
         parent_pcb_inner.children.push(child_pcb.clone());
 
         // pcb 构建完毕, 开始构建 tcb
-        let parent_tcb = parent_pcb_inner.get_tcb(0);
+        let ustack_base = parent_pcb_inner.ustack_base();
         drop(parent_pcb_inner);
 
-        let kstack = KernelStack::alloc();
-        let kstack_top = kstack.get_top();
-
-        let child_tcb: Arc<TCB> = Arc::new(TCB {
-            pcb: Arc::downgrade(&child_pcb),
-            kstack,
-            inner: unsafe {
-                UPSafeCell::new(TCBInner {
-                    priority: parent_tcb.priority(),
-                    task_status: TaskStatus::Ready,
-                    count: 0,
-                    task_ctx: TaskContext::goto_trap_return(kstack_top),
-                    trap_ctx_ppn,
-                    base_size: parent_tcb.base_size(),
-                })
-            },
-        });
+        let child_tcb = Arc::new(TCB::new(&child_pcb, ustack_base, false));
 
         // 设置该 tcb 的内核栈
-        let mut tcb_inner = child_tcb.ex_inner();
+        let tcb_inner = child_tcb.ex_inner();
         let trap_ctx = tcb_inner.trap_ctx();
-        trap_ctx.kernel_sp = kstack_top;
+        trap_ctx.kernel_sp = child_tcb.kstack.get_top();
         drop(tcb_inner);
 
         // 将构建好的 tcb 放入其中
-        let mut child_pcb_inner = child_pcb.ex_inner();
-        child_pcb_inner.tcbs.push(Some(child_tcb));
-        drop(child_pcb_inner);
+        child_pcb.ex_add_tcb(child_tcb);
 
         child_pcb
     }
 
+    /// Only support processes with a single thread.
     pub fn exec(&self, app_name: &str, args: Vec<String>, envs: Vec<String>) -> isize {
+        assert_eq!(self.ex_inner().tcb_count(), 1);
+
         let elf_data = match load_app(app_name) {
             Some(app) => app,
             None => return syserr::ENOENT,
@@ -173,8 +182,7 @@ impl PCB {
             }
         };
 
-        let (address_space, user_sp, entry_point) = AddressSpace::from_elf(&elf);
-        let trap_cx_ppn = address_space.trap_ctx_ppn();
+        let (address_space, ustack_base, entry_point) = AddressSpace::from_elf(&elf);
 
         let mut pcb_inner = self.ex_inner();
         // 替换地址空间, 原来的地址空间全部被回收, 页表也更换了
@@ -182,37 +190,45 @@ impl PCB {
         // 更新名称
         pcb_inner.cmd = String::from(app_name);
 
-        let tcb = pcb_inner.get_tcb(0);
-        // 更新 trap_cx ppn
-        tcb.set_trap_ctx_ppn(trap_cx_ppn);
-        // 更新 base_size
-        tcb.set_base_size(user_sp);
+        let tcb = pcb_inner.main_tcb();
+        drop(pcb_inner);
 
-        // 取出进程的 trap_cx 并更新
-        let trap_cx = tcb.trap_ctx();
-        *trap_cx = TrapContext::app_init_context(
+        let mut tcb_inner = tcb.ex_inner();
+        tcb_inner.set_ustack_base(ustack_base);
+
+        let trap_ctx_ppn = tcb_inner.resource().trap_ctx_ppn_ex();
+        // 原先的 trap_ctx 物理页已被回收, 现在需要新换上物理页
+        tcb_inner.set_trap_ctx_ppn(trap_ctx_ppn);
+
+        let trap_ctx = tcb_inner.trap_ctx();
+        let (ustack_top, kstack_top) = (tcb_inner.ustack_top(), tcb.kstack.get_top());
+
+        *trap_ctx = TrapContext::app_init_context(
             entry_point,
-            user_sp,
+            ustack_top,
             KERNEL_SPACE.exclusive_access().token(),
-            tcb.kstack.get_top(), // 复用子进程自身的 kernel_stack
+            kstack_top,
             trap_handler as usize,
         );
 
-        // 压入 crt0 栈
-        pcb_inner.address_space.push_crt0(trap_cx, &args, &envs);
+        // // 压入 crt0 栈
+        let mut pcb_inner = self.ex_inner();
+        pcb_inner.address_space.update_crt0(trap_ctx, &args, &envs);
+        drop(pcb_inner);
 
-        // 注意: 在执行 execve() 后:
-        // 子进程的程序映像被替换为新的程序，但是文件描述符表不会受到影响，仍然保持不变。
-        // 因此，子进程在 execve() 执行后会继续使用父进程继承的文件描述符。
+        // // 注意: 在执行 execve() 后:
+        // // 子进程的程序映像被替换为新的程序，但是文件描述符表不会受到影响，仍然保持不变。
+        // // 因此，子进程在 execve() 执行后会继续使用从父进程继承的文件描述符。
 
-        // 如果希望子进程在 execve() 执行后关闭或重定向文件描述符，
-        // 可以在调用 execve() 之前手动关闭或重定向这些文件描述符
+        // // 如果希望子进程在 execve() 执行后关闭或重定向文件描述符，
+        // // 可以在调用 execve() 之前手动关闭或重定向这些文件描述符
         0
     }
 }
 
 pub struct PCBInner {
     tcbs: Vec<Option<Arc<TCB>>>,
+    tid_allocator: RecycleAllocator,
 
     // 进程的地址空间
     address_space: AddressSpace,
@@ -261,6 +277,7 @@ impl PCBInner {
         Self {
             // 进程初创时没有线程
             tcbs: Vec::new(),
+            tid_allocator: RecycleAllocator::new(),
             address_space,
             fd_table: FdTable::default(),
 
@@ -281,7 +298,19 @@ impl PCBInner {
         }
     }
 
-    pub fn get_tcb(&mut self, tid: usize) -> Arc<TCB> {
+    pub fn alloc_tid(&mut self) -> usize {
+        self.tid_allocator.alloc()
+    }
+
+    pub fn dealloc_tid(&mut self, tid: usize) {
+        self.tid_allocator.dealloc(tid)
+    }
+
+    pub fn main_tcb(&self) -> Arc<TCB> {
+        self.get_tcb(0)
+    }
+
+    pub fn get_tcb(&self, tid: usize) -> Arc<TCB> {
         self.tcbs[tid].as_ref().unwrap().clone()
     }
 
@@ -315,9 +344,10 @@ impl PCBInner {
         self.parent.clone()
     }
 
-    pub fn status(&self) -> TaskStatus {
-        todo!()
+    pub fn is_zombie(&self) -> bool {
+        self.is_zombie
     }
+
     pub fn set_zombie(&mut self) {
         self.is_zombie = true;
     }
@@ -326,21 +356,17 @@ impl PCBInner {
         self.exit_code
     }
 
-    pub fn is_zombie(&self) -> bool {
-        self.is_zombie
+    pub fn set_exit_code(&mut self, exit_code: i32) {
+        self.exit_code = exit_code;
     }
 
     pub fn user_token(&self) -> usize {
         self.address_space.token()
     }
 
-    // pub fn trap_cx(&self) -> &'static mut TrapContext {
-    //     self.tcb.trap_cx_ppn.get_mut()
-    // }
-    // pub fn task_cx(&mut self) -> &'static mut TaskContext {
-    //     let ctx = &mut self.tcb.task_cx as *mut TaskContext;
-    //     unsafe { ctx.as_mut().unwrap() }
-    // }
+    pub fn ustack_base(&self) -> usize {
+        self.main_tcb().ustack_base()
+    }
 
     pub fn children_mut(&mut self) -> &mut Vec<Arc<PCB>> {
         &mut self.children

@@ -1,4 +1,5 @@
 use crate::{memory::page_table, process::processor};
+use logger::*;
 use sys_interface::{syserr, syssig::*};
 
 fn check_sigaction_error(signal: SignalFlags, action: usize, old_action: usize) -> bool {
@@ -23,7 +24,7 @@ pub fn sys_sigaction(
     old_action: *mut SignalAction,
 ) -> isize {
     let token = processor::api::current_user_token();
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let mut inner = pcb.ex_inner();
     if signal as usize > MAX_SIG {
         return syserr::EINVAL;
@@ -50,19 +51,16 @@ pub fn sys_sigaction(
 
 // 进程可以通过 sigprocmask 系统调用直接设置自身的全局信号掩码
 pub fn sys_sigprocmask(mask: u32) -> isize {
-    if let Some(pcb) = processor::api::current_pcb() {
-        let mut inner = pcb.ex_inner();
-        let old_mask = inner.signal_mask().bits();
-        if let Some(flag) = SignalFlags::from_bits(mask) {
-            // 设置信号掩码
-            inner.set_signal_mask(flag);
-            old_mask as isize
-        } else {
-            // 非法参数
-            syserr::EINVAL
-        }
+    let pcb = processor::api::current_pcb();
+    let mut inner = pcb.ex_inner();
+    let old_mask = inner.signal_mask().bits();
+    if let Some(flag) = SignalFlags::from_bits(mask) {
+        // 设置信号掩码
+        inner.set_signal_mask(flag);
+        old_mask as isize
     } else {
-        syserr::ESRCH
+        // 非法参数
+        syserr::EINVAL
     }
 }
 
@@ -89,14 +87,12 @@ pub fn sys_kill(pid: usize, signal: i32) -> isize {
 }
 
 pub fn sys_sigreturn() -> isize {
-    if let Some(pcb) = processor::api::current_pcb() {
-        let mut inner = pcb.ex_inner();
-        inner.set_handling_sig(-1);
-        // restore the trap context
-        let trap_ctx = processor::api::current_trap_ctx();
-        *trap_ctx = inner.trap_ctx_backup().unwrap();
-        trap_ctx.x[10] as isize
-    } else {
-        syserr::EINVAL
-    }
+    let pcb = processor::api::current_pcb();
+    let mut inner = pcb.ex_inner();
+    inner.set_handling_sig(-1);
+    // restore the trap context
+    info!("restore up trap");
+    let trap_ctx = processor::api::current_trap_ctx();
+    *trap_ctx = inner.trap_ctx_backup().unwrap();
+    trap_ctx.x[10] as isize
 }

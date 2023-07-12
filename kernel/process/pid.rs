@@ -18,6 +18,15 @@ lazy_static! {
 }
 
 pub struct Pid(pub usize);
+
+impl Drop for Pid {
+    // PidHandle 析构的时候, PID_ALLOCATOR 中也应该释放资源
+    // 同时应该释放 pid -> pcb 的 map 映射
+    fn drop(&mut self) {
+        PID_ALLOCATOR.exclusive_access().dealloc(self.0);
+    }
+}
+
 impl Pid {
     pub fn alloc() -> Pid {
         Pid(PID_ALLOCATOR.exclusive_access().alloc())
@@ -30,16 +39,8 @@ impl From<usize> for Pid {
     }
 }
 
-impl Drop for Pid {
-    // PidHandle 析构的时候, PID_ALLOCATOR 中也应该释放资源
-    // 同时应该释放 pid -> pcb 的 map 映射
-    fn drop(&mut self) {
-        PID_ALLOCATOR.exclusive_access().dealloc(self.0);
-    }
-}
-
 impl Pid {
-    pub fn unmap(&self) {
+    pub fn unmap_pcb(&self) {
         match PID_MAP.exclusive_access().remove(&self.0) {
             Some(_pcb) => {
                 // nothing to do so far

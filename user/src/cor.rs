@@ -9,14 +9,16 @@ extern crate user_lib;
 
 use core::arch::asm;
 
+use alloc::vec;
 use alloc::vec::Vec;
 use user_lib::{exit, sleep};
 
 // 默认栈大小, 不可过小
-const DEFAULT_STACK_SIZE: usize = 4096;
+const DEFAULT_STACK_SIZE: usize = 8192;
 const MAX_TASKS: usize = 5;
 static mut RUNTIME: usize = 0;
 
+#[repr(C, align(16))]
 pub struct Runtime {
     workers: Vec<Thread>,
     current: usize,
@@ -66,7 +68,7 @@ impl Thread {
         // to do it here. The important part is that once allocated it MUST NOT move in memory.
         Thread {
             id,
-            stack: alloc::vec![0_u8; DEFAULT_STACK_SIZE],
+            stack: vec![0_u8; DEFAULT_STACK_SIZE],
             ctx: TaskContext::default(),
             state: ThreadState::Init,
         }
@@ -78,23 +80,20 @@ impl Runtime {
         // This will be our base task, which will be initialized in the `running` state
         let base_task = Thread {
             id: 0,
-            stack: alloc::vec![0u8; DEFAULT_STACK_SIZE],
+            stack: vec![0u8; DEFAULT_STACK_SIZE],
             ctx: TaskContext::default(),
             state: ThreadState::Running,
         };
 
         // We initialize the rest of our tasks.
-        let mut tasks = alloc::vec![base_task];
+        let mut tasks = vec![base_task];
         let mut available_tasks: Vec<Thread> = (1..MAX_TASKS).map(|i| Thread::new(i)).collect();
         tasks.append(&mut available_tasks);
 
-        let runtime = Runtime {
+        Runtime {
             workers: tasks,
             current: 0,
-        };
-        runtime.init();
-
-        runtime
+        }
     }
 
     pub fn init(&self) {
@@ -157,6 +156,8 @@ impl Runtime {
         unsafe {
             switch(&mut self.workers[old_pos].ctx, &self.workers[cur].ctx);
         }
+
+        true
     }
 
     pub fn spawn(&mut self, f: fn()) {
@@ -204,7 +205,8 @@ pub fn yield_task() {
 
 #[naked]
 #[no_mangle]
-unsafe extern "C" fn switch(old: *mut TaskContext, new: *const TaskContext) -> ! {
+// unsafe extern "C" fn switch(old: *mut TaskContext, new: *const TaskContext) -> ! {
+unsafe extern "C" fn switch(old: *mut TaskContext, new: *const TaskContext) {
     // a0 是第一个参数, a1 是第二个参数
     // a0: _old, a1: _new
     asm!(
@@ -252,6 +254,7 @@ pub fn main() {
     println!("stackful_coroutine begin...");
     println!("TASK  0(Runtime) STARTING");
     let mut runtime = Runtime::new();
+    runtime.init();
     runtime.spawn(|| {
         println!("TASK  1 STARTING");
         let id = 1;

@@ -22,7 +22,7 @@ pub mod api {
     fn handle_pending_signals() {
         // 遍历所有信号
         for sig in 0..MAX_SIG {
-            let pcb = processor::api::current_pcb().unwrap();
+            let pcb = processor::api::current_pcb();
             let inner = pcb.ex_inner();
             let signal = SignalFlags::from_bits(1 << sig).unwrap();
 
@@ -67,7 +67,7 @@ pub mod api {
     }
 
     fn kernel_signal_handler(signal: SignalFlags) {
-        let pcb = processor::api::current_pcb().unwrap();
+        let pcb = processor::api::current_pcb();
         let mut inner = pcb.ex_inner();
         match signal {
             SignalFlags::SIGSTOP => {
@@ -91,7 +91,7 @@ pub mod api {
     }
 
     fn user_signal_handler(sig: usize, signal: SignalFlags) {
-        let pcb = processor::api::current_pcb().unwrap();
+        let pcb = processor::api::current_pcb();
         let mut inner = pcb.ex_inner();
         // 找到信号处理函数
         let handler = inner.signal_actions.table[sig].handler;
@@ -104,6 +104,7 @@ pub mod api {
             inner.pending_signals ^= signal;
 
             // 备份 trap
+            info!("back up trap");
             let trap_ctx = processor::api::current_trap_ctx();
             inner.trap_ctx_backup = Some(trap_ctx.clone());
 
@@ -127,7 +128,7 @@ pub mod api {
             handle_pending_signals();
             // 检查是否被 STOP 或者 KILL
             let (frozen, killed) = {
-                let pcb = processor::api::current_pcb().unwrap();
+                let pcb = processor::api::current_pcb();
                 let inner = pcb.ex_inner();
                 (inner.frozen(), inner.killed())
             };
@@ -139,7 +140,7 @@ pub mod api {
     }
 
     pub fn check_signals_error() -> Option<(i32, &'static str)> {
-        let pcb = processor::api::current_pcb().unwrap();
+        let pcb = processor::api::current_pcb();
         let inner = pcb.ex_inner();
         inner.pending_signals().check_error()
     }

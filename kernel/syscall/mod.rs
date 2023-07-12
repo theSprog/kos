@@ -1,3 +1,4 @@
+use logger::info;
 use sys_interface::{syscall::*, syssig::SignalAction};
 
 use crate::sbi::shutdown;
@@ -56,6 +57,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
 
         // 自定义系统调用
         SYSCALL_CUSTOM_LISTDIR => sys_listdir(args[0] as *const u8),
+        SYSCALL_CUSTOM_LISTAPPS => sys_listapps(),
 
         // SYSCALL_IO_DESTROY => sys_io_destroy(args[0] as *const u8),
         // 严格来说这里不应该直接 panic,

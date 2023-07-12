@@ -1,5 +1,5 @@
 use alloc::{collections::BTreeMap, sync::Arc};
-use logger::trace;
+use logger::{info, trace};
 
 use crate::{bitflags::bitflags, process::processor, PAGE_SIZE};
 

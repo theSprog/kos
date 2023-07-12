@@ -17,6 +17,7 @@ const SBI_REMOTE_SFENCE_VMA_ASID: usize = 7;
 
 // system reset extension
 const SYSTEM_RESET_EXTENSION: usize = 0x53525354;
+const SYSTEM_TIME_EXTENSION: usize = 0x54494D45;
 const SBI_SHUTDOWN: usize = 0;
 const SBI_COLD_REBOOT: usize = 1;
 
@@ -83,7 +84,7 @@ fn sbi_call(eid: usize, fid: usize, arg0: usize, arg1: usize, arg2: usize) -> SB
 
 // 设置下一次中断的发生时间
 pub fn set_timer(timer: usize) {
-    sbi_call(SBI_SET_TIMER, 0, timer, 0, 0);
+    sbi_call(SYSTEM_TIME_EXTENSION, 0, timer, 0, 0);
 }
 
 pub fn console_putchar(c: usize) {
@@ -91,23 +92,7 @@ pub fn console_putchar(c: usize) {
 }
 
 pub fn console_getchar() -> usize {
-    let ret = sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0, 0);
-    // 由于是用 legacy 代码因此 error 反而才是 返回值
-    // 这是 sbi 不兼容导致的
-    ret.error as usize
-}
-
-pub fn console_getchar_nio(base_addr: *const u8) -> usize {
-    panic!("unsupported getchar function");
-    // let low = ((base_addr as usize) << 32) >> 32;
-    // let high = base_addr as usize >> 32;
-    // debug!(
-    //     "low = {:#x}, high = {:#x}, base_addr = {:?}",
-    //     low, high, base_addr
-    // );
-    // let ret = sbi_call(0x4442434E, 1, 1, low, high);
-    // assert_eq!(SBIErrType::SBI_SUCCESS, ret.error.into());
-    // ret.value
+    sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0, 0).error as usize
 }
 
 #[allow(clippy::empty_loop)]
@@ -119,18 +104,11 @@ pub fn shutdown() -> ! {
         VFS.flush();
     };
     info!("goodbye!");
-    let ret = sbi_call(SYSTEM_RESET_EXTENSION, SBI_SHUTDOWN, 0, 0, 0);
+    sbi_call(SYSTEM_RESET_EXTENSION, SBI_SHUTDOWN, 0, 0, 0);
+    // let ret = sbi_call(SYSTEM_RESET_EXTENSION, SBI_SHUTDOWN, 0, 0, 0);
     error!("cannot be here");
     // 此时 assert 已经不管用了, 因为 assert 失败会 shutdown, 又回到这个函数
     // 同样 unreachable 也不可能行，因此只打印一句 error 就 loop
     // 最后的防线如果不关机，就自旋
-    loop {}
-}
-
-#[allow(clippy::empty_loop)]
-pub fn reboot() -> ! {
-    println!("rebooting...");
-    let ret = sbi_call(SYSTEM_RESET_EXTENSION, SBI_COLD_REBOOT, 0, 0, 0);
-    assert_eq!(SBIErrType::SBI_SUCCESS, ret.error.into());
     loop {}
 }

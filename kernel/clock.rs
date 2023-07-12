@@ -53,37 +53,3 @@ pub(crate) fn init() {
         set_next_trigger();
     }
 }
-
-// 时钟端口
-// const TIMER_TIME_LOW: usize = 0x00;
-// const TIMER_TIME_HIGH: usize = 0x04;
-// pub struct RtcGoldfish {
-//     base: usize,
-// }
-
-// impl RtcGoldfish {
-//     // read seconds since 1970-01-01
-//     fn read_epoch(&self) -> u64 {
-//         let ns = unsafe {
-//             let low: u32 = core::ptr::read_volatile((self.base + TIMER_TIME_LOW) as *const _);
-//             let high: u32 = core::ptr::read_volatile((self.base + TIMER_TIME_HIGH) as *const _);
-//             ((high as u64) << 32) | (low as u64)
-//         };
-
-//         ns / 1_000_000_000u64
-//     }
-// }
-
-// pub const PHYSICAL_MEMORY_OFFSET: usize = 0xFFFF_FFFF_4000_0000;
-// fn init_dt(dt: &Node) {
-//     let addr = dt.prop_u64("reg").unwrap() as usize;
-//     RTC_DRIVERS.write().push(Arc::new(RtcGoldfish {
-//         base: PHYSICAL_MEMORY_OFFSET + paddr,
-//     }));
-// }
-
-// pub fn driver_init() {
-//     DEVICE_TREE_REGISTRY
-//         .write()
-//         .insert("google,goldfish-rtc", init_dt);
-// }

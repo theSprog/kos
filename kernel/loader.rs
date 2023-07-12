@@ -47,7 +47,7 @@ pub fn load_app(app_name: &str) -> Option<Box<[u8]>> {
         true => load_fs_app(app_name), // 绝对路径
         false => {
             // 相对路径
-            let pcb = processor::api::current_pcb().unwrap();
+            let pcb = processor::api::current_pcb();
             let inner = pcb.ex_inner();
             let cwd_string = inner.cwd().to_string();
             load_fs_app(&alloc::format!("{}/{}", cwd_string, app_name))

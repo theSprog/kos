@@ -62,43 +62,45 @@ pub mod api {
         PROCESSOR.exclusive_access().get_idle_cx_ptr()
     }
 
-    pub fn take_current_pcb() -> Option<Arc<PCB>> {
-        PROCESSOR.exclusive_access().take_current().unwrap().pcb()
-    }
-
-    pub fn current_pcb() -> Option<Arc<PCB>> {
-        PROCESSOR.exclusive_access().current().unwrap().pcb()
+    pub fn current_pcb() -> Arc<PCB> {
+        PROCESSOR
+            .exclusive_access()
+            .current()
+            .unwrap()
+            .pcb()
+            .unwrap()
     }
 
     pub fn current_tcb() -> Option<Arc<TCB>> {
         PROCESSOR.exclusive_access().current()
     }
 
+    pub fn take_current_tcb() -> Option<Arc<TCB>> {
+        PROCESSOR.exclusive_access().take_current()
+    }
+
     pub fn current_cmd_name() -> String {
-        String::from(current_pcb().unwrap().ex_inner().cmd())
+        String::from(current_pcb().ex_inner().cmd())
     }
 
-    pub fn current_address_space() -> &'static mut AddressSpace {
-        current_pcb().unwrap().ex_inner().address_space()
+    pub fn current_ex_address_space() -> &'static mut AddressSpace {
+        current_pcb().ex_address_space()
     }
 
-    pub fn current_fdtable() -> &'static mut FdTable {
-        current_pcb().unwrap().ex_inner().fd_table()
+    pub fn current_ex_fdtable() -> &'static mut FdTable {
+        current_pcb().ex_fd_table()
     }
 
     pub fn current_pid() -> usize {
-        match current_pcb() {
-            Some(pcb) => pcb.get_pid(),
-            None => 1,
-        }
+        current_pcb().pid()
     }
 
     pub fn current_user_token() -> usize {
-        current_pcb().unwrap().ex_inner().user_token()
+        current_pcb().ex_inner().user_token()
     }
 
     pub fn current_trap_ctx() -> &'static mut TrapContext {
-        current_tcb().unwrap().trap_ctx()
+        current_tcb().unwrap().ex_inner().trap_ctx()
     }
 
     pub fn pid2pcb(pid: usize) -> Option<Arc<PCB>> {
@@ -107,7 +109,7 @@ pub mod api {
     }
 
     pub fn current_add_signal(signal: SignalFlags) {
-        let pcb = processor::api::current_pcb().unwrap();
+        let pcb = processor::api::current_pcb();
         let mut inner = pcb.ex_inner();
         inner.pending_signals |= signal;
         info!("current task sigflag {:?}", inner.pending_signals());
@@ -171,42 +173,53 @@ pub mod api {
         schedule(task_ctx_ptr);
     }
 
+    // 退出当前线程, 但不保证退出进程
     pub fn exit_and_run_next(exit_code: i32) -> ! {
         // 已经把 pcb 取出, current 为 None
-        let pcb = take_current_pcb().unwrap();
-        let pid = pcb.get_pid();
-        assert_ne!(pid, 1, "init should not exit!"); // init 进程不能退出
-        debug!(
-            "'{}' (pid={}) exited with code {}",
-            pcb.ex_inner().cmd(),
-            pid,
-            exit_code
-        );
+        let tcb = take_current_tcb().unwrap();
+        let tid = tcb.ex_inner().tid();
+        debug!("(tid={}) exited with code {}", tid, exit_code);
 
-        let mut pcb_inner = pcb.ex_inner();
-        // 设置为 zombie 孩子被 init 收养
-        pcb_inner.set_zombie();
-        pcb_inner.exit_code = exit_code;
+        // 如果是主线程, 那么进程也应该退出
+        if tid == 0 {
+            let pcb = tcb.pcb().unwrap();
+            let pid = pcb.pid();
+            // 主线程的 exit_code 就是进程的退出码
+            debug!(
+                "'{}'(pid={}) exited with code {}",
+                pcb.ex_inner().cmd(),
+                pid,
+                exit_code
+            );
 
-        {
-            // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
-            let mut initproc_inner = INITPROC.ex_inner();
-            for child in pcb_inner.children.iter() {
-                child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
-                initproc_inner.children.push(child.clone());
+            let mut pcb_inner = pcb.ex_inner();
+            // 设置为 zombie 孩子被 init 收养
+            pcb_inner.set_zombie();
+            pcb_inner.set_exit_code(exit_code);
+
+            {
+                // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
+                let mut initproc_inner = INITPROC.ex_inner();
+                for child in pcb_inner.children.iter() {
+                    child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
+                    initproc_inner.children.push(child.clone());
+                }
             }
-        }
-        // 释放对于孩子的所有权
-        pcb_inner.children.clear();
-        // 释放地址空间, 同时释放页表
-        pcb_inner.address_space.release_space();
-        // 释放文件描述符
-        pcb_inner.fd_table.clear();
-        drop(pcb_inner);
-        drop(pcb); // 手动原地释放, 因为 schedule 不会回到此作用域了
 
-        let idle = get_idle_cx_ptr();
-        schedule(idle);
+            // TODO：将剩余所有的线程一并释放
+            pcb_inner.tcbs.clear();
+
+            // 释放对于孩子的所有权
+            pcb_inner.children.clear();
+            // 释放地址空间, 同时释放页表
+            pcb_inner.address_space.release_space();
+            // 释放文件描述符
+            pcb_inner.fd_table.clear();
+            drop(pcb_inner);
+            drop(pcb); // 手动原地释放, 因为 schedule 不会回到此作用域了
+        }
+
+        schedule(get_idle_cx_ptr());
 
         // 不可能到达此处
         unreachable!();
@@ -214,7 +227,7 @@ pub mod api {
 
     // TODO: 错误的实现, 权宜之计
     pub(crate) fn sbrk(incrment: usize) -> usize {
-        let address_space = current_address_space();
+        let address_space = current_ex_address_space();
         // 默认最后一个是 heap
         let heap = address_space.heap_mut();
 

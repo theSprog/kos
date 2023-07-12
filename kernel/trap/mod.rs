@@ -110,7 +110,7 @@ pub fn trap_handler() -> ! {
                 let old_cx = cx;
 
                 let ret = syscall(old_cx.x[17], [old_cx.x[10], old_cx.x[11], old_cx.x[12]]);
-    
+
                 let now_cx = processor::api::current_trap_ctx();
                 now_cx.x[10] = ret as usize;
             }else {
@@ -159,7 +159,7 @@ pub fn trap_handler() -> ! {
                 current_cmd_name(),
                 current_pid()
             );
-            let address_space = processor::api::current_address_space();
+            let address_space = processor::api::current_ex_address_space();
             // 先判断是不是缺页, 还是说真的是 page_fault
             if address_space
                 .is_page_fault(stval, segment::MapPermission::W)
@@ -194,7 +194,7 @@ pub fn trap_handler() -> ! {
                 current_pid()
             );
 
-            let address_space = processor::api::current_address_space();
+            let address_space = processor::api::current_ex_address_space();
             if address_space
                 .is_page_fault(stval, segment::MapPermission::R)
             {

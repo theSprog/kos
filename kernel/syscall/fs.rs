@@ -1,4 +1,5 @@
 use crate::fs::{inode::OSInode, pipe, userbuf::UserBuffer, VFS};
+use crate::loader::APP_CONTAINER;
 use crate::{memory::page_table, process::processor};
 use alloc::{
     string::{String, ToString},
@@ -9,15 +10,14 @@ use component::fs::vfs::{
     IOErrorKind, VfsError, VfsErrorKind,
 };
 use logger::*;
+use sys_interface::config::USER_PROG_PATH;
 use sys_interface::{syserr, sysfs};
 
 /// 由于内核和应用地址空间的隔离， sys_write 不再能够直接访问位于应用空间中的数据，
 /// 而需要手动查页表才能知道那些数据被放置在哪些物理页帧上并进行访问
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = processor::api::current_user_token();
-    let pcb = processor::api::current_pcb().unwrap();
-    let mut inner = pcb.ex_inner();
-    let fd_table = inner.fd_table();
+    let fd_table = processor::api::current_ex_fdtable();
     if fd >= fd_table.len() {
         return syserr::EBADF;
     }
@@ -26,8 +26,6 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         if !file.writable() {
             return syserr::EBADF;
         }
-
-        let file = file.clone();
         file.write(UserBuffer::new(page_table::api::translated_byte_buffer(
             token, buf, len,
         )))
@@ -39,9 +37,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = processor::api::current_user_token();
-    let pcb = processor::api::current_pcb().unwrap();
-    let mut inner = pcb.ex_inner();
-    let fd_table = inner.fd_table();
+    let fd_table = processor::api::current_ex_fdtable();
 
     if fd >= fd_table.len() {
         return syserr::EBADF;
@@ -52,8 +48,6 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         if !file.readable() {
             return syserr::EBADF;
         }
-
-        let file = file.clone();
 
         file.read(UserBuffer::new(page_table::api::translated_byte_buffer(
             token, buf, len,
@@ -70,7 +64,7 @@ fn build_abs_path(path: *const u8) -> String {
     let ret_path = match path.starts_with('/') {
         true => path,
         false => {
-            let pcb = processor::api::current_pcb().unwrap();
+            let pcb = processor::api::current_pcb();
             let mut pwd = pcb.ex_inner().cwd().clone();
             pwd.forward(&path);
             pwd.to_string()
@@ -133,7 +127,7 @@ fn report_fs_err(err: VfsError) -> isize {
 pub fn sys_open(path: *const u8, flags: u32, mode: u16) -> isize {
     let path = build_abs_path(path);
 
-    let fdtable = processor::api::current_fdtable();
+    let fdtable = processor::api::current_ex_fdtable();
     let flags = sysfs::OpenFlags::from_bits(flags).unwrap();
     let (create, trancate, append) = (flags.create(), flags.truncate(), flags.append());
 
@@ -238,8 +232,17 @@ pub fn sys_listdir(path: *const u8) -> isize {
     0
 }
 
+pub fn sys_listapps() -> isize {
+    let path = alloc::format!("{}/", USER_PROG_PATH);
+    for app in APP_CONTAINER.iter() {
+        crate::println!("{}", app.strip_prefix(&path).unwrap());
+    }
+
+    0
+}
+
 pub fn sys_ftruncate(fd: usize, length: usize) -> isize {
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let mut inner = pcb.ex_inner();
     let fd_table = inner.fd_table();
     // fd 越界
@@ -285,7 +288,7 @@ pub fn sys_fstat(fd: usize, stat_buf: *mut u8) -> isize {
     let token = processor::api::current_user_token();
     let mut stat_buf = UserBuffer::new(page_table::api::translated_byte_buffer(token, stat_buf, 0));
 
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let mut inner = pcb.ex_inner();
     let fd_table = inner.fd_table();
 
@@ -310,7 +313,7 @@ pub fn sys_fstat(fd: usize, stat_buf: *mut u8) -> isize {
 
 pub fn sys_pipe(pipe: *mut usize) -> isize {
     let token = processor::api::current_user_token();
-    let fd_table = processor::api::current_fdtable();
+    let fd_table = processor::api::current_ex_fdtable();
 
     let (pipe_read, pipe_write) = pipe::make_pipe();
     let read_fd = fd_table.alloc_fd();
@@ -329,7 +332,7 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
 
 /// 功能：将一个文件描述符复制到当前可用的最低数值文件描述符，返回新复制的文件描述符。
 pub fn sys_dup(fd: usize) -> isize {
-    let fd_table = processor::api::current_fdtable();
+    let fd_table = processor::api::current_ex_fdtable();
 
     if fd >= fd_table.len() || fd_table[fd].is_none() {
         return syserr::EBADF;
@@ -345,7 +348,7 @@ pub fn sys_dup(fd: usize) -> isize {
 pub fn sys_chdir(path: *const u8) -> isize {
     let token = processor::api::current_user_token();
     let path = page_table::api::translated_user_cstr(token, path);
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     match &path[..] {
         "." => 0,
         ".." => {
@@ -387,7 +390,7 @@ pub fn sys_chdir(path: *const u8) -> isize {
 
 pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
     let token = processor::api::current_user_token();
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let inner = pcb.ex_inner();
     let cwd_string = inner.cwd().to_string();
     // 如果当前路径已经超过了最大容量
@@ -404,7 +407,7 @@ pub fn sys_getcwd(buffer: *mut u8, max_len: usize) -> isize {
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> isize {
-    let fd_table = processor::api::current_fdtable();
+    let fd_table = processor::api::current_ex_fdtable();
 
     // fd 越界
     if fd >= fd_table.len() {
@@ -450,7 +453,7 @@ pub fn sys_linkat(to: *const u8, from: *const u8) -> isize {
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    let fd_table = processor::api::current_fdtable();
+    let fd_table = processor::api::current_ex_fdtable();
     if fd >= fd_table.len() {
         return syserr::EBADF;
     }

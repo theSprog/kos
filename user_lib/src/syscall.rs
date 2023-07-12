@@ -144,6 +144,10 @@ pub fn sys_list_dir(path: *const u8) -> isize {
     syscall(SYSCALL_CUSTOM_LISTDIR, [path as usize, 0, 0])
 }
 
+pub fn sys_list_apps() -> isize {
+    syscall(SYSCALL_CUSTOM_LISTAPPS, [0, 0, 0])
+}
+
 pub fn sys_chdir(path: *const u8) -> isize {
     syscall(SYSCALL_CHDIR, [path as usize, 0, 0])
 }

@@ -20,8 +20,10 @@ lazy_static! {
 // scheduler 实际上是依赖外部实现
 pub fn add_ready(tcb: Arc<TCB>) {
     let pcb = tcb.pcb().unwrap();
-    let pid = pcb.get_pid();
-    PID_MAP.exclusive_access().insert(pid, pcb.clone());
+    let pid = pcb.pid();
+    if !PID_MAP.exclusive_access().contains_key(&pid) {
+        PID_MAP.exclusive_access().insert(pid, pcb.clone());
+    }
     SCHEDULER.exclusive_access().add_ready(tcb)
 }
 

@@ -24,6 +24,7 @@ use component::{
 };
 use logger::info;
 use qemu_config::MMIO;
+use sys_interface::config::MAX_THREADS;
 use xmas_elf::ElfFile;
 
 // 内核空间
@@ -59,15 +60,16 @@ impl AddressSpace {
             segments: Vec::new(),
         }
     }
-    pub fn from_fork(parent_space: &mut Self) -> Self {
+
+    pub fn from_fork(parent_space: &mut Self, trap_ctx_ppn: PhysPageNum) -> Self {
         let mut new_space = Self::new_bare();
         // map trampoline
         new_space.map_trampoline();
 
-        // 从 user_space 复制 trap_context,
+        // 从 user_space 复制 trap_context, 第 0 个段,
         // 每一个进程都有自己的 trap_context, 但初始时候都一样
         let trap_seg = Segment::from_trap(&parent_space.segments[0]);
-        let trap_content = parent_space.trap_ctx_ppn().get_one_page();
+        let trap_content = trap_ctx_ppn.get_one_page();
 
         // 向新 address_space 添加一个段, 并且放置初始内容
         // 注意这不能够 COW 因为两个进程的 trap 必定不一样(至少返回值不一样)
@@ -108,14 +110,14 @@ impl AddressSpace {
     }
 
     // 把倒数第二个 segement 必须设置为 stack 段
-    pub fn stack_mut(&mut self) -> &mut Segment {
-        assert!(self.segments.len() >= 2);
-        let idx = self.segments.len() - 2;
-        let stack_seg = &mut self.segments[idx];
-        // 必然是用户态访问
-        assert!(stack_seg.map_perm.contains(MapPermission::U));
-        stack_seg
-    }
+    // pub fn stack_mut(&mut self) -> &mut Segment {
+    //     assert!(self.segments.len() >= 2);
+    //     let idx = self.segments.len() - 2;
+    //     let stack_seg = &mut self.segments[idx];
+    //     // 必然是用户态访问
+    //     assert!(stack_seg.map_perm.contains(MapPermission::U));
+    //     stack_seg
+    // }
 
     // 把倒数第一个 segement 必须设置为 heap 段
     // heap 是可变的
@@ -129,7 +131,9 @@ impl AddressSpace {
     }
 
     // 回收所有空间, 同时回收页表
-    pub fn release_space(&self) {}
+    pub fn release_space(&mut self) {
+        self.segments.clear();
+    }
 
     // 开启内核内存空间
     pub fn enable_paging(&self) {
@@ -166,7 +170,7 @@ impl AddressSpace {
     }
 
     /// 假设 seg 之间没有两个段占用同一页面
-    /// 插入一个以 framed 方式为映射的逻辑段, 供 User 调用
+    /// 插入一个以 framed 方式为映射的逻辑段, 供 User 调用, 以立即分配的方式
     pub fn insert_framed_segment(
         &mut self,
         start_va: VirtAddr,
@@ -177,6 +181,15 @@ impl AddressSpace {
             Segment::new(start_va, end_va, MapType::Framed, permission),
             None,
         );
+    }
+
+    pub fn insert_framed_segment_lazy(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) {
+        self.push_lazy(Segment::new(start_va, end_va, MapType::Framed, permission));
     }
 
     // 准备好内核虚实地址的关联，对内核进行恒等映射
@@ -402,9 +415,11 @@ impl AddressSpace {
         );
         address_space.push_lazy(stack_seg);
 
+        // 预留出 (MAX_THREADS - 1) 个栈的空间
         // 用户堆内存, 堆向高地址生长, 最初时无内存
         // 加上 PAGE_SIZE 是为了 guard page
-        let heap_start_va = (user_stack_top + PAGE_SIZE).into();
+        let heap_start_va =
+            (user_stack_top + (MAX_THREADS - 1) * (PAGE_SIZE + USER_STACK_SIZE) + PAGE_SIZE).into();
         let heap_end_va = heap_start_va;
         address_space.push_lazy(Segment::new(
             heap_start_va,
@@ -414,11 +429,10 @@ impl AddressSpace {
         ));
 
         heap_alloc::api::display_heap_info();
-
         // 返回值
         (
             address_space,
-            user_stack_top,
+            user_stack_bottom,
             elf.header.pt2.entry_point() as usize,
         )
     }
@@ -444,14 +458,14 @@ impl AddressSpace {
     }
 
     // 找到该地址空间的 trap 的 ppn
-    pub fn trap_ctx_ppn(&self) -> PhysPageNum {
-        let trap = self.translate_vpn(VirtAddr::from(TRAP_CONTEXT).into());
-        assert!(
-            trap.is_some(),
-            "trap should be initialized in address_space"
-        );
-        trap.unwrap().ppn()
-    }
+    // pub fn trap_ctx_ppn(&self) -> PhysPageNum {
+    //     let trap = self.translate_vpn(VirtAddr::from(TRAP_CONTEXT).into());
+    //     assert!(
+    //         trap.is_some(),
+    //         "trap should be initialized in address_space"
+    //     );
+    //     trap.unwrap().ppn()
+    // }
 
     // page fault 有两种: 写 cow 和懒加载
     pub fn is_page_fault(&self, vaddr: usize, perm: MapPermission) -> bool {
@@ -526,7 +540,7 @@ impl AddressSpace {
         unreachable!();
     }
 
-    pub fn release_kernel_stack_segment(&mut self, start_vpn: VirtPageNum) {
+    pub fn free_kernel_stack_segment(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, seg)) = self
             .segments
             .iter_mut()
@@ -538,22 +552,38 @@ impl AddressSpace {
             seg.unmap(&mut self.page_table);
             // 同时 segments 中也删除对应的 segment
             self.segments.remove(idx);
+            return;
         }
+        unreachable!()
     }
 
-    pub(crate) fn push_crt0(
+    pub fn free_user_segment(&mut self, start_vpn: VirtPageNum) {
+        if let Some((idx, seg)) = self
+            .segments
+            .iter_mut()
+            .enumerate()
+            .find(|(_, seg)| seg.vpn_range.get_start() == start_vpn)
+        {
+            seg.unmap(&mut self.page_table);
+            self.segments.remove(idx);
+            return;
+        }
+        unreachable!()
+    }
+
+    pub(crate) fn update_crt0(
         &mut self,
-        trap_cx: &mut TrapContext,
+        trap_ctx: &mut TrapContext,
         args: &[String],
         envs: &[String],
     ) {
         // 拨动栈指针
-        trap_cx.x[2] -= PAGE_SIZE;
+        trap_ctx.x[2] -= PAGE_SIZE;
 
         let stack_frame_top =
-            page_table::api::translated_one_page(self.token(), trap_cx.x[2] as *const u8);
+            page_table::api::translated_one_page(self.token(), trap_ctx.x[2] as *const u8);
 
-        let mut builder_arg = Builder::new(stack_frame_top, trap_cx.x[2]);
+        let mut builder_arg = Builder::new(stack_frame_top, trap_ctx.x[2]);
         for arg in args {
             builder_arg.push(arg).unwrap();
         }

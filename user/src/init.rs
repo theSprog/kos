@@ -6,6 +6,8 @@ extern crate user_lib;
 
 use user_lib::*;
 
+const SHELL_PID: usize = 1;
+
 #[no_mangle]
 fn main() -> i32 {
     // 执行 shell
@@ -19,14 +21,8 @@ fn main() -> i32 {
             // pid 返回退出的子进程 pid 号
             let pid = wait(&mut exit_code);
 
-            // 尚不存在死亡的子进程
-            if pid == syserr::EAGAIN {
-                yield_cpu();
-                continue;
-            }
-
-            if pid == 2 {
-                // shell 是 2 号进程
+            if pid == SHELL_PID as isize {
+                // shell 是 1 号进程
                 break;
             }
             println!(

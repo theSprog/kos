@@ -66,6 +66,10 @@ pub fn list_dir(path: &str) -> isize {
     sys_list_dir(path.as_str().as_ptr())
 }
 
+pub fn list_apps() -> isize {
+    sys_list_apps()
+}
+
 pub fn chdir(path: &str) -> isize {
     let path = format!("{}\0", path);
     sys_chdir(path.as_str().as_ptr())

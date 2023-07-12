@@ -50,6 +50,7 @@ fn shell_cmd(line: &str) -> i32 {
     let words = line.split_whitespace().collect::<Vec<_>>();
     match words.as_slice() {
         ["shutdown"] => shutdown(),
+        ["apps"] => list_apps() as i32,
         // exit 只退出当前 shell, 而不会关机
         // ["exit"] => exit(0) as i32,
         // cd 命令针对当前 shell

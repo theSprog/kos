@@ -13,7 +13,7 @@ pub struct PageTable {
     root_ppn: PhysPageNum,
 
     // 已经被分配的中途物理页(非叶子的页目录项)
-    frames: Vec<PhysFrame>,
+    frames: Vec<PhysFrame>, // RAII 管理物理页
 }
 
 impl Drop for PageTable {
@@ -21,7 +21,7 @@ impl Drop for PageTable {
         // 置空
         self.root_ppn.0 = 0;
         // 其实不用 clear 也是可以的, RAII 会保证 Vec<PhysFrame> 都被释放
-        self.frames.clear();
+        // self.frames.clear();
     }
 }
 
@@ -33,12 +33,6 @@ impl PageTable {
             frames: alloc::vec![frame],
         }
     }
-
-    // pub fn clear(&mut self) {
-    //     // 置空
-    //     self.root_ppn.0 = 0;
-    //     self.frames.clear();
-    // }
 
     // 给定虚拟页号，找到页表项，找不到就建立
     pub fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {

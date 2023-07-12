@@ -7,6 +7,9 @@ pub const PAGE_SIZE: usize = 4 * KB;
 // 单页页宽
 pub const PAGE_SIZE_BITS: usize = 12;
 
+// 最多允许线程数, tid 范围 0 ~ (MAX_THREADS-1)
+pub const MAX_THREADS: usize = 128;
+
 // 用户栈大小, 8MB, 由于有了虚拟内存, 可以开大一点
 pub const USER_STACK_SIZE: usize = 8 * MB;
 // 内核栈大小, 应该开大一点，因为内核栈有时候会爆栈

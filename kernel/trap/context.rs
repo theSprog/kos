@@ -23,9 +23,9 @@ impl TrapContext {
     /// sp: 用户栈指针
     pub fn app_init_context(
         entry: usize,
-        sp: usize,
+        sp: usize, // 用户线程栈指针
         kernel_satp: usize,
-        kernel_sp: usize,
+        kernel_sp: usize, // 内核栈指针
         trap_handler: usize,
     ) -> Self {
         // CSR sstatus

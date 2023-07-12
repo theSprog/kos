@@ -37,16 +37,18 @@ pub fn sys_getpid() -> isize {
 }
 
 pub fn sys_fork() -> isize {
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let new_pcb = pcb.fork();
-    let new_pid = new_pcb.get_pid();
+    let new_pid = new_pcb.pid();
 
-    let new_tcb = new_pcb.ex_inner().get_tcb(0);
-    let trap_ctx = new_tcb.trap_ctx();
+    let new_tcb = new_pcb.ex_inner().main_tcb();
+    let trap_ctx = new_tcb.ex_inner().trap_ctx();
 
     // 子进程的返回值为 0
     trap_ctx.x[10] = 0;
     scheduler::add_ready(new_tcb);
+
+    info!("pid {}, new_pid {}", pcb.pid(), new_pid);
 
     // 父进程返回子进程的 pid
     new_pid as isize
@@ -89,7 +91,7 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
     };
 
     debug!("pid = {}, args: {:?}, envs: {:?}", pid, args, envs);
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     pcb.exec(&app_name, args, envs)
 }
 
@@ -97,12 +99,12 @@ pub fn sys_execve(filename: *const u8, args: *const *const u8, envs: *const *con
 /// 如果存在一个进程 ID 为 pid 的僵尸子进程，
 /// 则正常回收并返回子进程的 pid，并更新系统调用的退出码参数为 exit_code
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
-    let pcb = processor::api::current_pcb().unwrap();
+    let pcb = processor::api::current_pcb();
     let mut inner = pcb.ex_inner();
     if !inner
         .children()
         .iter()
-        .any(|p| pid == -1 || pid as usize == p.get_pid())
+        .any(|p| pid == -1 || pid as usize == p.pid())
     {
         // 孩子中不存在所指定 pid 的进程
         return syserr::ECHILD;
@@ -110,20 +112,20 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 
     // 确实存在要等待的进程(也有可能参数 pid == -1 从而等待任意一个进程)
     // 注意一次只回收一个进程, enumerate 逐个枚举
-    let pair = inner.children().iter().enumerate().find(|(_, p)| {
+    let pair = inner.children().iter().enumerate().find(|(_, pcb)| {
         // 僵尸进程，并且是指定 pid 的进程(pid == -1 表示任意一个进程)
-        p.ex_inner().is_zombie() && (pid == -1 || pid as usize == p.get_pid())
+        pcb.ex_inner().is_zombie() && (pid == -1 || pid as usize == pcb.pid())
     });
 
     if let Some((idx, _)) = pair {
         // remove 会获取所有权
         let child = inner.children_mut().remove(idx);
         // 在 pcb -> pcb map 中取消映射关系
-        child.pid.unmap();
+        child.pid.unmap_pcb();
         // 确保它的引用计数只有 1, 这样在离开作用域时才会 RAII
         assert_eq!(Arc::strong_count(&child), 1);
 
-        let found_pid = child.get_pid();
+        let found_pid = child.pid();
         let exit_code = child.ex_inner().exit_code();
 
         // 以可变引用的方式取得用户空间 exit_code_ptr 对应的的地址
