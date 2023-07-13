@@ -62,8 +62,9 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> isize {
 /// # Returns
 ///
 /// 该函数正常来说永不返回
-pub fn sys_exit(exit_code: i32) -> isize {
-    syscall(SYSCALL_EXIT, [exit_code as usize, 0, 0])
+pub fn sys_exit(exit_code: i32) -> ! {
+    syscall(SYSCALL_EXIT, [exit_code as usize, 0, 0]);
+    unreachable!()
 }
 
 pub fn sys_yield() -> isize {
@@ -72,6 +73,10 @@ pub fn sys_yield() -> isize {
 
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     syscall(SYSCALL_CUSTOM_THREAD_CREATE, [entry, arg, 0])
+}
+
+pub fn sys_waittid(tid: usize) -> isize {
+    syscall(SYSCALL_WAITID, [tid, 0, 0])
 }
 
 pub fn sys_get_time_ms() -> isize {

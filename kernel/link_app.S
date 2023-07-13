@@ -2,7 +2,7 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 35
+    .quad 36
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
@@ -38,7 +38,8 @@ _num_app:
     .quad app_32_start
     .quad app_33_start
     .quad app_34_start
-    .quad app_34_end
+    .quad app_35_start
+    .quad app_35_end
 
     .global _app_names
 _app_names:
@@ -74,6 +75,7 @@ _app_names:
     .string "user/prog/tc"
     .string "user/prog/text"
     .string "user/prog/thread"
+    .string "user/prog/thread2"
     .string "user/prog/touch"
     .string "user/prog/usertests"
     .string "user/prog/yield"
@@ -339,7 +341,7 @@ app_31_end:
     .global app_32_end
     .align 3
 app_32_start:
-    .incbin "user/prog/touch"
+    .incbin "user/prog/thread2"
 app_32_end:
 
     .section .data
@@ -347,7 +349,7 @@ app_32_end:
     .global app_33_end
     .align 3
 app_33_start:
-    .incbin "user/prog/usertests"
+    .incbin "user/prog/touch"
 app_33_end:
 
     .section .data
@@ -355,5 +357,13 @@ app_33_end:
     .global app_34_end
     .align 3
 app_34_start:
-    .incbin "user/prog/yield"
+    .incbin "user/prog/usertests"
 app_34_end:
+
+    .section .data
+    .global app_35_start
+    .global app_35_end
+    .align 3
+app_35_start:
+    .incbin "user/prog/yield"
+app_35_end:

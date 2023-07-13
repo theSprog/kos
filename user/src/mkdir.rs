@@ -15,7 +15,7 @@ pub fn main() -> i32 {
         return 1;
     }
     let path = args.get(1).unwrap();
-    let res = mkdir(path, 0o664);
+    let res = mkdir(path, 0o774);
     if res != 0 {
         println!("mkdir: {:?} {}", path, err_msg(res));
         return 1;

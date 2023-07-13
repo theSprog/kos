@@ -1,6 +1,7 @@
 use crate::syscall::sys_exit;
 use logger::error;
 
+#[allow(unreachable_code)]
 #[panic_handler]
 fn panic_handler(panic_info: &core::panic::PanicInfo) -> ! {
     let err_msg = panic_info.message().unwrap();

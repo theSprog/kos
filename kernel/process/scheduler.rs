@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use component::process::IScheduler;
 use logger::info;
 
@@ -26,4 +27,12 @@ pub fn add_ready(tcb: Arc<TCB>) {
 
 pub fn fetch() -> Option<Arc<TCB>> {
     SCHEDULER.exclusive_access().fetch()
+}
+
+pub fn count() -> usize {
+    SCHEDULER.exclusive_access().count()
+}
+
+pub fn filter<P: Fn(Arc<TCB>) -> bool>(pred: P) -> Vec<Arc<TCB>> {
+    SCHEDULER.exclusive_access().filter(pred)
 }

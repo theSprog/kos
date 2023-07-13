@@ -79,6 +79,7 @@ impl PCB {
     pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
         self.inner.exclusive_access()
     }
+    
     pub fn pid(&self) -> usize {
         self.pid.0
     }
@@ -92,14 +93,18 @@ impl PCB {
     }
 
     pub fn ex_add_tcb(&self, tcb: Arc<TCB>) {
-        let tcbs = &mut self.ex_inner().tcbs;
         let tid = tcb.ex_inner().tid();
+        let tcbs = &mut self.ex_inner().tcbs;
         if tid < tcbs.len() {
-            assert!(self.ex_inner().tcbs[tid].is_none());
+            assert!(tcbs[tid].is_none());
             tcbs[tid] = Some(tcb)
         } else {
             tcbs.push(Some(tcb))
         }
+    }
+
+    pub fn ex_drop_tcb(&self, tid: usize) -> Option<Arc<TCB>> {
+        self.ex_inner().tcbs[tid].take()
     }
 
     pub fn ex_ustack_base(&self) -> usize {
@@ -109,7 +114,7 @@ impl PCB {
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         // 访问父进程
         let mut parent_pcb_inner = self.ex_inner();
-        assert_eq!(parent_pcb_inner.tcb_count(), 1);
+        assert_eq!(parent_pcb_inner.tcb_slots_len(), 1);
 
         // 拷贝父进程用户态地址空间(内核态空间不能拷贝)
         let parent_tcb = parent_pcb_inner.main_tcb();
@@ -170,7 +175,7 @@ impl PCB {
 
     /// Only support processes with a single thread.
     pub fn exec(&self, app_name: &str, args: Vec<String>, envs: Vec<String>) -> isize {
-        assert_eq!(self.ex_inner().tcb_count(), 1);
+        assert_eq!(self.ex_inner().tcb_slots_len(), 1);
 
         let elf_data = match load_app(app_name) {
             Some(app) => app,
@@ -311,14 +316,22 @@ impl PCBInner {
     }
 
     pub fn main_tcb(&self) -> Arc<TCB> {
-        self.get_tcb(0)
+        self.tcb_nth(0)
     }
 
-    pub fn get_tcb(&self, tid: usize) -> Arc<TCB> {
+    pub fn tcb_nth(&self, tid: usize) -> Arc<TCB> {
         self.tcbs[tid].as_ref().unwrap().clone()
     }
 
-    pub fn tcb_count(&self) -> usize {
+    pub fn take_tcb_nth(&mut self, tid: usize) -> Option<Arc<TCB>> {
+        self.tcbs[tid].take()
+    }
+
+    pub fn get_tcb(&self, tid: usize) -> Option<Arc<TCB>> {
+        self.tcbs[tid].clone()
+    }
+
+    pub fn tcb_slots_len(&self) -> usize {
         self.tcbs.len()
     }
 

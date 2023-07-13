@@ -143,9 +143,9 @@ path = "src/ls.rs"
 # name = "sig1"
 # path = "src/sig1.rs"
 
-# [[bin]]
-# name = "cor"
-# path = "src/cor.rs"
+[[bin]]
+name = "cor"
+path = "src/cor.rs"
 
 # [[bin]]
 # name = "corl"
@@ -154,3 +154,7 @@ path = "src/ls.rs"
 [[bin]]
 name = "thread"
 path = "src/thread.rs"
+
+[[bin]]
+name = "thread2"
+path = "src/thread2.rs"

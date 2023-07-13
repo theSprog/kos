@@ -177,63 +177,76 @@ pub mod api {
         schedule(task_ctx_ptr);
     }
 
+    fn exit_main(pcb: Arc<PCB>, exit_code: i32, main_tcb: Arc<TCB>) {
+        let pid = pcb.pid();
+        // 主线程的 exit_code 就是进程的退出码
+        debug!(
+            "process-'{}'(pid={}) exited with code {}",
+            pcb.ex_inner().cmd(),
+            pid,
+            exit_code
+        );
+
+        let mut pcb_inner = pcb.ex_inner();
+        // 设置为 zombie 孩子被 init 收养
+        pcb_inner.set_zombie();
+        pcb_inner.set_exit_code(exit_code);
+
+        {
+            // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
+            let mut initproc_inner = INITPROC.ex_inner();
+            for child in pcb_inner.children.iter() {
+                child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
+                initproc_inner.children.push(child.clone());
+            }
+        }
+
+        // 将剩余所有的线程一并释放
+        drop(pcb_inner);
+        drop(main_tcb);
+        // 有部分线程尚在 scheduler 里面, 找到所有属于本进程的线程
+        drop(scheduler::filter(|tcb| tcb.pid() == pid));
+
+        // 逐个 take 取出释放
+        let slots = pcb.ex_inner().tcb_slots_len();
+        for tid in 0..slots {
+            if let Some(tcb) = pcb.ex_drop_tcb(tid) {
+                assert_eq!(Arc::strong_count(&tcb), 1, "tid {} not single", tid);
+            }
+        }
+
+        // 主线程退出后还有其余资源需要释放
+        {
+            let mut pcb_inner = pcb.ex_inner();
+            // 释放对于孩子的所有权
+            pcb_inner.children.clear();
+            // 释放地址空间, 同时释放页表
+            pcb_inner.address_space.release_space();
+            // 释放文件描述符
+            pcb_inner.fd_table.clear();
+        }
+    }
+
+    // 从线程退出时仅仅设置标志位（退出码）
+    fn exit_slave(pcb: Arc<PCB>, exit_code: i32, slave_tcb: Arc<TCB>) {
+        let pid = pcb.pid();
+        let tid = slave_tcb.ex_inner().tid();
+        debug!("tid={}(pid={}) exited with code {}", tid, pid, exit_code);
+        slave_tcb.ex_inner().set_exit_code(exit_code);
+    }
+
     // 退出当前线程, 但不保证退出进程
     pub fn exit_and_run_next(exit_code: i32) -> ! {
-        // 手动构造作用域 RAII
-        {
-            // 已经把 pcb 取出, current 为 None
-            let tcb = take_current_tcb().unwrap();
-            let tid = tcb.ex_inner().tid();
-            let pcb = tcb.pcb().unwrap();
-            let pid = pcb.pid();
-            debug!("tid={}(pid={}) exited with code {}", tid, pid, exit_code);
+        // 已经把 pcb 取出, current 为 None
+        let tcb = take_current_tcb().unwrap();
+        let pcb = tcb.pcb().unwrap();
 
-            // 如果是主线程, 那么进程也应该退出
-            if tid == 0 {
-                // 主线程的 exit_code 就是进程的退出码
-                debug!(
-                    "'{}'(pid={}) exited with code {}",
-                    pcb.ex_inner().cmd(),
-                    pid,
-                    exit_code
-                );
-
-                let mut pcb_inner = pcb.ex_inner();
-                // 设置为 zombie 孩子被 init 收养
-                pcb_inner.set_zombie();
-                pcb_inner.set_exit_code(exit_code);
-
-                {
-                    // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
-                    let mut initproc_inner = INITPROC.ex_inner();
-                    for child in pcb_inner.children.iter() {
-                        child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
-                        initproc_inner.children.push(child.clone());
-                    }
-                }
-
-                // 将剩余所有的线程一并释放
-                pcb_inner.tcbs.clear();
-
-                assert_eq!(Arc::strong_count(&tcb), 1);
-                drop(pcb_inner);
-                // 释放本 tcb
-                drop(tcb);
-
-                {
-                    let mut pcb_inner = pcb.ex_inner();
-                    // 释放对于孩子的所有权
-                    pcb_inner.children.clear();
-                    // 释放地址空间, 同时释放页表
-                    pcb_inner.address_space.release_space();
-                    // 释放文件描述符
-                    pcb_inner.fd_table.clear();
-                }
-
-                // 手动原地释放, 因为 schedule 不会回到此作用域了
-                // 否则会造成内存泄漏
-                drop(pcb);
-            }
+        // 如果是主线程, 那么进程也应该退出
+        let tid = tcb.ex_inner().tid();
+        if tid == 0 {
+            exit_main(pcb, exit_code, tcb);
+        } else {
+            exit_slave(pcb, exit_code, tcb);
         }
 
         schedule(get_idle_cx_ptr());

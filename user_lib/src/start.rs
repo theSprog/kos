@@ -23,9 +23,6 @@ pub extern "C" fn _start() -> ! {
     println!("");
     // 进程退出后调用 exit
     exit(exit_code);
-
-    // 应该不可达
-    unreachable!()
 }
 
 fn read_crt0() {

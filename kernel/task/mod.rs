@@ -43,7 +43,7 @@ pub enum TaskStatus {
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct TCB {
-    pcb: Weak<PCB>,      // TCB 所属的进程
+    pcb: Weak<PCB>,          // TCB 所属的进程
     pub kstack: KernelStack, //任务（线程）的内核栈
 
     // 内部可变性
@@ -52,14 +52,13 @@ pub struct TCB {
 
 impl TCB {
     pub fn new(pcb: &Arc<PCB>, ustack_base: usize, alloc_uresource: bool) -> Self {
-        info!(
+        debug!(
             "new tcb for pid={}, alloc_uresource={}",
             pcb.pid(),
             alloc_uresource
         );
 
         let resource = TCBUserResource::new(pcb.clone(), ustack_base, alloc_uresource);
-
         // 查询 TrapContext 的物理页号
         let trap_ctx_ppn = resource.trap_ctx_ppn_ex();
 
@@ -76,7 +75,7 @@ impl TCB {
                     trap_ctx_ppn,
                     task_ctx: TaskContext::goto_trap_return(kstack_top),
                     task_status: TaskStatus::Ready,
-                    exit_code: 0,
+                    exit_code: None,
                     priority: 3,
                     count: 0,
                 })
@@ -90,6 +89,10 @@ impl TCB {
 
     pub fn ustack_base(&self) -> usize {
         self.ex_inner().ustack_base()
+    }
+
+    pub fn pid(&self) -> usize {
+        self.pcb().unwrap().pid()
     }
 
     pub fn pcb(&self) -> Option<Arc<PCB>> {
@@ -125,7 +128,7 @@ pub struct TCBInner {
 
     task_status: TaskStatus,
 
-    exit_code: i32,
+    exit_code: Option<i32>,
 }
 
 impl TCBInner {
@@ -134,6 +137,14 @@ impl TCBInner {
     }
     pub fn tid(&self) -> usize {
         self.resource.as_ref().unwrap().tid
+    }
+
+    pub fn set_exit_code(&mut self, exit_code: i32) {
+        self.exit_code = Some(exit_code);
+    }
+
+    pub fn exit_code(&self) -> Option<i32> {
+        self.exit_code
     }
 
     pub fn ustack_base(&self) -> usize {

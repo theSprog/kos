@@ -11,6 +11,7 @@ extern crate logger;
 #[macro_use]
 extern crate lazy_static;
 
+use alloc::boxed::Box;
 #[allow(unused_imports)]
 use logger::*;
 
@@ -99,7 +100,7 @@ pub fn link(to: &str, from: &str) -> isize {
     sys_link(to.as_str().as_ptr(), from.as_str().as_ptr())
 }
 
-pub fn exit(exit_code: i32) -> isize {
+pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code)
 }
 pub fn yield_cpu() -> isize {
@@ -184,8 +185,36 @@ pub fn sleep(period_ms: usize) {
     }
 }
 
-pub fn thread_create(entry: usize, arg: usize) -> isize {
-    sys_thread_create(entry, arg)
+struct Thread {
+    entry: usize,
+    args: usize,
+}
+
+fn thread(thread_ptr: *mut Thread) {
+    let thread = unsafe { Box::from_raw(thread_ptr) };
+    let func: fn(usize) -> i32 = unsafe { core::mem::transmute(thread.entry) };
+    let exit_code = func(thread.args);
+    // 必须手动释放 thread 内存
+    drop(thread);
+    sys_exit(exit_code);
+}
+
+pub fn thread_create(entry: usize, args: usize) -> isize {
+    // 将 thread 放在堆上, 并由对应的线程管理资源的释放
+    let thread_ptr = Box::into_raw(Box::new(Thread { entry, args }));
+    sys_thread_create(thread as usize, thread_ptr as usize)
+}
+
+pub fn waittid(tid: usize) -> isize {
+    loop {
+        match sys_waittid(tid) {
+            syserr::EAGAIN => {
+                yield_cpu();
+            }
+            syserr::EINVAL => return -1,
+            exit_code => return exit_code,
+        }
+    }
 }
 
 pub fn brk(_addr: usize) -> i32 {

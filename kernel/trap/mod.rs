@@ -180,7 +180,7 @@ pub fn trap_handler() -> ! {
                     address_space.fix_page_missing(stval);
                 }
             } else {
-                warn!("PageFault in application: bad 'store' addr = {:#x} for bad instruction (addr = {:#x}). Application want to write it but it's unwriteable. kernel killed it.", stval, cx.sepc);
+                warn!("PageFault in application: bad 'store' addr = {:#x} for instruction (addr = {:#x})", stval, cx.sepc);
                 // processor::api::exit_and_run_next(-2);
                 processor::api::current_add_signal(SignalFlags::SIGSEGV);
             }
@@ -200,7 +200,7 @@ pub fn trap_handler() -> ! {
             {
                 address_space.fix_page_missing(stval);
             } else {
-                warn!("PageFault in application: bad 'read' addr = {:#x} for bad instruction (addr= {:#x}). Application want to read it but it's unreadable, kernel killed it.", stval, cx.sepc);
+                warn!("PageFault in application: bad 'read' addr = {:#x} for instruction (addr= {:#x})", stval, cx.sepc);
                 // processor::api::exit_and_run_next(-2);
                 processor::api::current_add_signal(SignalFlags::SIGSEGV);
             }

@@ -7,22 +7,6 @@ use alloc::{sync::Arc, vec::Vec};
 use logger::*;
 use sys_interface::syserr;
 
-/// processor exits and submit an exit code
-pub fn sys_exit(exit_code: i32) -> ! {
-    info!(
-        "process-{} exited with code {}",
-        processor::api::current_pid(),
-        exit_code
-    );
-    processor::api::exit_and_run_next(exit_code)
-}
-
-pub fn sys_sched_yield() -> isize {
-    // 处理方式就是挂起当前，并且运行下一个
-    processor::api::suspend_and_run_next();
-    0
-}
-
 // 以毫秒的形式返回
 pub fn sys_get_time_of_day() -> isize {
     clock::get_time_ms() as isize

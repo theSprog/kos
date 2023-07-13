@@ -18,7 +18,7 @@ const DEFAULT_STACK_SIZE: usize = 8192;
 const MAX_TASKS: usize = 5;
 static mut RUNTIME: usize = 0;
 
-#[repr(C, align(16))]
+#[repr(C, align(32))]
 pub struct Runtime {
     workers: Vec<Thread>,
     current: usize,
