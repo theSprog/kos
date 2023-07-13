@@ -64,7 +64,7 @@ fn set_user_trap_entry() {
 pub fn trap_return() -> ! {
     // 一旦返回用户态，trap 就可以通过 TRAMPOLINE 陷入内核
     set_user_trap_entry();
-    let trap_cx_ptr = TRAP_CONTEXT;
+    let trap_cx_ptr = processor::api::current_trap_ctx_uptr();
     // 拿回用户页表
     let user_satp = processor::api::current_user_token();
 

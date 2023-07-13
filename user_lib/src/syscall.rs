@@ -70,6 +70,10 @@ pub fn sys_yield() -> isize {
     syscall(SYSCALL_SCHED_YIELD, [0, 0, 0])
 }
 
+pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
+    syscall(SYSCALL_CUSTOM_THREAD_CREATE, [entry, arg, 0])
+}
+
 pub fn sys_get_time_ms() -> isize {
     // 其实这个系统调用号是返回自 1970年1月1日 到现在的时间的时间差
     // 但是我们现在假借这个系统调用号来获取自开机起到当前的时间

@@ -5,8 +5,9 @@ use crate::sbi::shutdown;
 mod fs;
 mod process;
 mod signal;
+mod thread;
 
-use self::{fs::*, process::*, signal::*};
+use self::{fs::*, process::*, signal::*, thread::*};
 
 /// 统一处理系统调用入口
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
@@ -27,6 +28,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut u8),
         SYSCALL_PIPE2 => sys_pipe(args[0] as *mut usize),
         SYSCALL_DUP => sys_dup(args[0]),
+
+        SYSCALL_IO_SETUP => sys_io_setup(args[0], args[1], args[2]),
         SYSCALL_IO_DESTROY => sys_io_destroy(args[0], args[1], args[2]),
 
         // 信号相关系统调用
@@ -58,6 +61,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         // 自定义系统调用
         SYSCALL_CUSTOM_LISTDIR => sys_listdir(args[0] as *const u8),
         SYSCALL_CUSTOM_LISTAPPS => sys_listapps(),
+
+        SYSCALL_CUSTOM_THREAD_CREATE => sys_thread_create(args[0], args[1]),
 
         // SYSCALL_IO_DESTROY => sys_io_destroy(args[0] as *const u8),
         // 严格来说这里不应该直接 panic,

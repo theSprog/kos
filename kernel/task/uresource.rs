@@ -68,11 +68,11 @@ impl TCBUserResource {
         );
 
         // 分配 trap context 空间
-        let trap_cx_bottom = trap_ctx_bottom(self.tid);
-        let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
+        let trap_ctx_bottom = trap_ctx_bottom(self.tid);
+        let trap_ctx_top = trap_ctx_bottom + PAGE_SIZE;
         pcb_inner.address_space().insert_framed_segment(
-            trap_cx_bottom.into(),
-            trap_cx_top.into(),
+            trap_ctx_bottom.into(),
+            trap_ctx_top.into(),
             MapPermission::R | MapPermission::W,
         );
     }
@@ -111,6 +111,10 @@ impl TCBUserResource {
             .unwrap()
             .ppn()
     }
+
+    pub fn trap_ctx_uptr(&self) -> usize {
+        trap_ctx_bottom(self.tid)
+    }
 }
 
 // 线程所属的 trap ctx 底部
@@ -122,5 +126,5 @@ fn trap_ctx_bottom(tid: usize) -> usize {
 // 线程所属的栈底部
 fn ustack_bottom(ustack_base: usize, tid: usize) -> usize {
     assert!(tid < MAX_THREADS);
-    ustack_base + tid * (PAGE_SIZE + USER_STACK_SIZE)
+    ustack_base + tid * (USER_STACK_SIZE + PAGE_SIZE)
 }

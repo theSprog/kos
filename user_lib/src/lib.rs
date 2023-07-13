@@ -184,6 +184,10 @@ pub fn sleep(period_ms: usize) {
     }
 }
 
+pub fn thread_create(entry: usize, arg: usize) -> isize {
+    sys_thread_create(entry, arg)
+}
+
 pub fn brk(_addr: usize) -> i32 {
     // On success, brk() returns zero.  On error, -1 is returned
     // sys_brk(addr) as i32;

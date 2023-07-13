@@ -303,6 +303,7 @@ pub const SYSCALL_LANDLOCK_RESTRICT_SELF: usize = 0x1be;
 /// 自定义
 pub const SYSCALL_CUSTOM_LISTDIR: usize = 0x200;
 pub const SYSCALL_CUSTOM_LISTAPPS: usize = 0x201;
+pub const SYSCALL_CUSTOM_THREAD_CREATE: usize = 0x210;
 
 /// Minimum valid system call number.
 pub const SYSCALL_CALL_BASE_INDEX: usize = 0x0;

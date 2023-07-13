@@ -43,7 +43,7 @@ pub enum TaskStatus {
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct TCB {
-    pub pcb: Weak<PCB>,      // TCB 所属的进程
+    pcb: Weak<PCB>,      // TCB 所属的进程
     pub kstack: KernelStack, //任务（线程）的内核栈
 
     // 内部可变性

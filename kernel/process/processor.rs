@@ -102,6 +102,11 @@ pub mod api {
         current_tcb().unwrap().ex_inner().trap_ctx()
     }
 
+    // 此处返回的是用户态所看到的 trap 虚拟地址
+    pub fn current_trap_ctx_uptr() -> usize {
+        current_tcb().unwrap().ex_inner().resource().trap_ctx_uptr()
+    }
+
     pub fn pid2pcb(pid: usize) -> Option<Arc<PCB>> {
         let map = PID_MAP.exclusive_access();
         map.get(&pid).map(Arc::clone)

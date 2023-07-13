@@ -465,6 +465,10 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 
+pub fn sys_io_setup(_args0: usize, _args1: usize, _args2: usize) -> isize {
+    info!("sys_io_setup: [{}, {}, {}]", _args0, _args1, _args2);
+    0
+}
 pub fn sys_io_destroy(_args0: usize, _args1: usize, _args2: usize) -> isize {
     0
 }

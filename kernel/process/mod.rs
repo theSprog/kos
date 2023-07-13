@@ -92,7 +92,14 @@ impl PCB {
     }
 
     pub fn ex_add_tcb(&self, tcb: Arc<TCB>) {
-        self.ex_inner().tcbs.push(Some(tcb));
+        let tcbs = &mut self.ex_inner().tcbs;
+        let tid = tcb.ex_inner().tid();
+        if tid < tcbs.len() {
+            assert!(self.ex_inner().tcbs[tid].is_none());
+            tcbs[tid] = Some(tcb)
+        } else {
+            tcbs.push(Some(tcb))
+        }
     }
 
     pub fn ex_ustack_base(&self) -> usize {
@@ -190,10 +197,11 @@ impl PCB {
         drop(pcb_inner);
 
         let mut tcb_inner = tcb.ex_inner();
+        // 新的程序所以 ustack_base 已经改变
         tcb_inner.set_ustack_base(ustack_base);
 
-        let trap_ctx_ppn = tcb_inner.resource().trap_ctx_ppn_ex();
         // 原先的 trap_ctx 物理页已被回收, 现在需要新换上物理页
+        let trap_ctx_ppn = tcb_inner.resource().trap_ctx_ppn_ex();
         tcb_inner.set_trap_ctx_ppn(trap_ctx_ppn);
 
         let trap_ctx = tcb_inner.trap_ctx();
