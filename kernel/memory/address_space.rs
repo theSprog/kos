@@ -109,16 +109,6 @@ impl AddressSpace {
         &self.segments
     }
 
-    // 把倒数第二个 segement 必须设置为 stack 段
-    // pub fn stack_mut(&mut self) -> &mut Segment {
-    //     assert!(self.segments.len() >= 2);
-    //     let idx = self.segments.len() - 2;
-    //     let stack_seg = &mut self.segments[idx];
-    //     // 必然是用户态访问
-    //     assert!(stack_seg.map_perm.contains(MapPermission::U));
-    //     stack_seg
-    // }
-
     // 把倒数第一个 segement 必须设置为 heap 段
     // heap 是可变的
     pub fn heap_mut(&mut self) -> &mut Segment {
@@ -564,7 +554,10 @@ impl AddressSpace {
             .enumerate()
             .find(|(_, seg)| seg.vpn_range.get_start() == start_vpn)
         {
-            seg.unmap(&mut self.page_table);
+            for (vpn, _) in &seg.data_frames {
+                self.page_table.unlink(*vpn);
+            }
+
             self.segments.remove(idx);
             return;
         }

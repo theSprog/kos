@@ -4,7 +4,6 @@ use crate::task::switch::__switch;
 use crate::task::TaskStatus;
 use crate::{memory::address::*, task::TCB};
 use crate::{sync::unicore::UPSafeCell, task::context::TaskContext, trap::context::TrapContext};
-use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 use logger::*;
@@ -53,7 +52,7 @@ pub mod api {
         memory::address_space::AddressSpace,
         process::{fdtable::FdTable, pid::PID_MAP, processor},
     };
-    use logger::{debug, trace};
+    use logger::*;
     use sys_interface::syssig::SignalFlags;
 
     use super::*;
@@ -175,52 +174,64 @@ pub mod api {
 
     // 退出当前线程, 但不保证退出进程
     pub fn exit_and_run_next(exit_code: i32) -> ! {
-        // 已经把 pcb 取出, current 为 None
-        let tcb = take_current_tcb().unwrap();
-        let tid = tcb.ex_inner().tid();
-        debug!("(tid={}) exited with code {}", tid, exit_code);
-
-        // 如果是主线程, 那么进程也应该退出
-        if tid == 0 {
+        // 手动构造作用域 RAII
+        {
+            // 已经把 pcb 取出, current 为 None
+            let tcb = take_current_tcb().unwrap();
+            let tid = tcb.ex_inner().tid();
             let pcb = tcb.pcb().unwrap();
             let pid = pcb.pid();
-            // 主线程的 exit_code 就是进程的退出码
-            debug!(
-                "'{}'(pid={}) exited with code {}",
-                pcb.ex_inner().cmd(),
-                pid,
-                exit_code
-            );
+            debug!("tid={}(pid={}) exited with code {}", tid, pid, exit_code);
 
-            let mut pcb_inner = pcb.ex_inner();
-            // 设置为 zombie 孩子被 init 收养
-            pcb_inner.set_zombie();
-            pcb_inner.set_exit_code(exit_code);
+            // 如果是主线程, 那么进程也应该退出
+            if tid == 0 {
+                // 主线程的 exit_code 就是进程的退出码
+                debug!(
+                    "'{}'(pid={}) exited with code {}",
+                    pcb.ex_inner().cmd(),
+                    pid,
+                    exit_code
+                );
 
-            {
-                // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
-                let mut initproc_inner = INITPROC.ex_inner();
-                for child in pcb_inner.children.iter() {
-                    child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
-                    initproc_inner.children.push(child.clone());
+                let mut pcb_inner = pcb.ex_inner();
+                // 设置为 zombie 孩子被 init 收养
+                pcb_inner.set_zombie();
+                pcb_inner.set_exit_code(exit_code);
+
+                {
+                    // 访问 init 进程, 所有进程死后它的孩子都归 init 抚养
+                    let mut initproc_inner = INITPROC.ex_inner();
+                    for child in pcb_inner.children.iter() {
+                        child.ex_inner().parent = Some(Arc::downgrade(&INITPROC));
+                        initproc_inner.children.push(child.clone());
+                    }
                 }
+
+                // 将剩余所有的线程一并释放
+                pcb_inner.tcbs.clear();
+
+                assert_eq!(Arc::strong_count(&tcb), 1);
+                drop(pcb_inner);
+                // 释放本 tcb
+                drop(tcb);
+
+                {
+                    let mut pcb_inner = pcb.ex_inner();
+                    // 释放对于孩子的所有权
+                    pcb_inner.children.clear();
+                    // 释放地址空间, 同时释放页表
+                    pcb_inner.address_space.release_space();
+                    // 释放文件描述符
+                    pcb_inner.fd_table.clear();
+                }
+
+                // 手动原地释放, 因为 schedule 不会回到此作用域了
+                // 否则会造成内存泄漏
+                drop(pcb);
             }
-
-            // TODO：将剩余所有的线程一并释放
-            pcb_inner.tcbs.clear();
-
-            // 释放对于孩子的所有权
-            pcb_inner.children.clear();
-            // 释放地址空间, 同时释放页表
-            pcb_inner.address_space.release_space();
-            // 释放文件描述符
-            pcb_inner.fd_table.clear();
-            drop(pcb_inner);
-            drop(pcb); // 手动原地释放, 因为 schedule 不会回到此作用域了
         }
 
         schedule(get_idle_cx_ptr());
-
         // 不可能到达此处
         unreachable!();
     }

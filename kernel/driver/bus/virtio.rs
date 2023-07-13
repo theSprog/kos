@@ -8,7 +8,7 @@ use crate::sync::up::UPIntrFreeCell;
 
 use alloc::vec::Vec;
 use core::ptr::NonNull;
-use logger::info;
+use logger::*;
 use virtio_drivers::{BufferDirection, Hal};
 
 lazy_static! {

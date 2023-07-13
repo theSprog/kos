@@ -73,10 +73,6 @@ impl KernelView {
         self.sbss..self.ebss
     }
 
-    // pub fn trampoline_range(&self) -> Range<usize> {
-    //     trampoline as usize..trampoline as usize + PAGE_SIZE
-    // }
-
     // 每个应用程序的内核栈地址
     pub fn kernel_stack_range(&self, pid: usize) -> (usize, usize) {
         let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);

@@ -4,8 +4,6 @@ use crate::{
     sync::unicore::UPSafeCell,
 };
 
-use super::pid::Pid;
-
 lazy_static! {
     static ref KSTACK_ID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
         unsafe { UPSafeCell::new(RecycleAllocator::new()) };

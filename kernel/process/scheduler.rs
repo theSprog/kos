@@ -1,9 +1,6 @@
-use core::borrow::BorrowMut;
-
 use component::process::IScheduler;
 use logger::info;
 
-use crate::process::PCB;
 use crate::task::TCB;
 use crate::{sync::unicore::UPSafeCell, KernelScheduler};
 use alloc::sync::Arc;
@@ -22,7 +19,7 @@ pub fn add_ready(tcb: Arc<TCB>) {
     let pcb = tcb.pcb().unwrap();
     let pid = pcb.pid();
     if !PID_MAP.exclusive_access().contains_key(&pid) {
-        PID_MAP.exclusive_access().insert(pid, pcb.clone());
+        PID_MAP.exclusive_access().insert(pid, pcb);
     }
     SCHEDULER.exclusive_access().add_ready(tcb)
 }

@@ -1,5 +1,5 @@
 use alloc::sync::{Arc, Weak};
-use logger::info;
+use logger::*;
 use sys_interface::config::{MAX_THREADS, PAGE_SIZE, USER_STACK_SIZE};
 
 use crate::{

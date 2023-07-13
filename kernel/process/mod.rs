@@ -6,8 +6,6 @@ pub mod signal;
 
 mod fdtable;
 
-use core::cell::UnsafeCell;
-
 use alloc::{
     string::{String, ToString},
     sync::{Arc, Weak},
@@ -15,20 +13,18 @@ use alloc::{
 };
 use component::fs::vfs::VfsPath;
 use logger::info;
-use spin::Mutex;
 use sys_interface::{syserr, syssig::*};
 
 use crate::{
     loader::load_app,
     memory::address_space::{AddressSpace, KERNEL_SPACE},
     sync::unicore::UPSafeCell,
-    task::{context::TaskContext, TCBInner, TaskStatus, TCB},
+    task::TCB,
     trap::{context::TrapContext, trap_handler},
 };
 
 use self::{
     fdtable::FdTable,
-    kstack::KernelStack,
     pid::{Pid, RecycleAllocator},
     signal::SignalActions,
 };

@@ -1,4 +1,4 @@
-use logger::info;
+use logger::*;
 use sys_interface::{syscall::*, syssig::SignalAction};
 
 use crate::sbi::shutdown;

@@ -3,21 +3,16 @@ pub mod switch;
 pub mod uresource;
 
 use crate::loader::load_app;
-use crate::memory::address_space;
 use crate::process::{scheduler, PCB};
 
 use crate::sync::unicore::UPSafeCell;
-use crate::{
-    memory::{address::*, address_space::KERNEL_SPACE, kernel_view::get_kernel_view},
-    trap::{context::TrapContext, trap_handler},
-    *,
-};
+use crate::{memory::address::*, trap::context::TrapContext, *};
 
 use self::context::TaskContext;
 use self::uresource::TCBUserResource;
 
 use alloc::sync::{Arc, Weak};
-use logger::info;
+use logger::{debug, info};
 use process::kstack::KernelStack;
 
 // INIT 进程名称
@@ -52,7 +47,64 @@ pub struct TCB {
     pub kstack: KernelStack, //任务（线程）的内核栈
 
     // 内部可变性
-    pub inner: UPSafeCell<TCBInner>,
+    inner: UPSafeCell<TCBInner>,
+}
+
+impl TCB {
+    pub fn new(pcb: &Arc<PCB>, ustack_base: usize, alloc_uresource: bool) -> Self {
+        info!(
+            "new tcb for pid={}, alloc_uresource={}",
+            pcb.pid(),
+            alloc_uresource
+        );
+
+        let resource = TCBUserResource::new(pcb.clone(), ustack_base, alloc_uresource);
+
+        // 查询 TrapContext 的物理页号
+        let trap_ctx_ppn = resource.trap_ctx_ppn_ex();
+
+        // 为该线程分配内核栈
+        let kstack = KernelStack::alloc();
+        let kstack_top = kstack.get_top();
+
+        Self {
+            pcb: Arc::downgrade(pcb),
+            kstack,
+            inner: unsafe {
+                UPSafeCell::new(TCBInner {
+                    resource: Some(resource),
+                    trap_ctx_ppn,
+                    task_ctx: TaskContext::goto_trap_return(kstack_top),
+                    task_status: TaskStatus::Ready,
+                    exit_code: 0,
+                    priority: 3,
+                    count: 0,
+                })
+            },
+        }
+    }
+
+    pub fn ex_inner(&self) -> core::cell::RefMut<'_, TCBInner> {
+        self.inner.exclusive_access()
+    }
+
+    pub fn ustack_base(&self) -> usize {
+        self.ex_inner().ustack_base()
+    }
+
+    pub fn pcb(&self) -> Option<Arc<PCB>> {
+        self.pcb.upgrade()
+    }
+
+    pub fn trap_ctx_ppn(&self) -> PhysPageNum {
+        self.inner.exclusive_access().trap_ctx_ppn
+    }
+}
+
+impl Drop for TCB {
+    fn drop(&mut self) {
+        debug!("tcb drop, tid: {}", self.inner.exclusive_access().tid());
+    }
 }
 
 #[derive(Debug)]
@@ -119,65 +171,6 @@ impl TCBInner {
 
     pub fn set_trap_ctx_ppn(&mut self, trap_ctx_ppn: PhysPageNum) {
         self.trap_ctx_ppn = trap_ctx_ppn;
-    }
-}
-
-impl TCB {
-    pub fn new(pcb: &Arc<PCB>, ustack_base: usize, alloc_uresource: bool) -> Self {
-        info!(
-            "new tcb for pid={}, alloc_uresource={}",
-            pcb.pid(),
-            alloc_uresource
-        );
-
-        let resource = TCBUserResource::new(pcb.clone(), ustack_base, alloc_uresource);
-
-        // 查询 TrapContext 的物理页号
-        let trap_ctx_ppn = resource.trap_ctx_ppn_ex();
-
-        // 为该线程分配内核栈
-        let kstack = KernelStack::alloc();
-        let kstack_top = kstack.get_top();
-
-        Self {
-            pcb: Arc::downgrade(pcb),
-            kstack,
-            inner: unsafe {
-                UPSafeCell::new(TCBInner {
-                    resource: Some(resource),
-                    trap_ctx_ppn,
-                    task_ctx: TaskContext::goto_trap_return(kstack_top),
-                    task_status: TaskStatus::Ready,
-                    exit_code: 0,
-                    priority: 3,
-                    count: 0,
-                })
-            },
-        }
-    }
-
-    pub fn ex_inner(&self) -> core::cell::RefMut<'_, TCBInner> {
-        self.inner.exclusive_access()
-    }
-
-    pub fn ustack_base(&self) -> usize {
-        self.ex_inner().ustack_base()
-    }
-
-    pub fn pcb(&self) -> Option<Arc<PCB>> {
-        self.pcb.upgrade()
-    }
-
-    pub fn trap_ctx_ppn(&self) -> PhysPageNum {
-        self.inner.exclusive_access().trap_ctx_ppn
-    }
-
-    pub fn set_trap_ctx_ppn(&self, ppn: PhysPageNum) {
-        self.inner.exclusive_access().trap_ctx_ppn = ppn;
-    }
-
-    pub fn priority(&self) -> u8 {
-        self.inner.exclusive_access().priority
     }
 }
 
