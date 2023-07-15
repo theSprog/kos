@@ -32,7 +32,7 @@ pub fn sys_fork() -> isize {
     trap_ctx.x[10] = 0;
     scheduler::add_ready(new_tcb);
 
-    info!("self_pid {}, child_pid {}", pcb.pid(), new_pid);
+    debug!("self_pid {}, child_pid {}", pcb.pid(), new_pid);
 
     // 父进程返回子进程的 pid
     new_pid as isize

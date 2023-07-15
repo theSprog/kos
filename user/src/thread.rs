@@ -13,7 +13,7 @@ pub fn thread_a(args: usize) -> i32 {
 
     unsafe {
         let ptr: *const i32 = args as _; // 创建一个空指针
-        let value = *ptr; // 强行解引用空指针, 模拟异常退出
+        let value: i32 = *ptr; // 强行解引用空指针, 模拟异常退出
         println!("Value: {}", value);
     }
 

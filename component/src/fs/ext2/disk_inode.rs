@@ -131,7 +131,7 @@ impl Ext2Inode {
         if self.filetype().is_file() {
             assert_eq!(self.size_high, 0);
         }
-        self.sectors_count = (Self::total_blocks(size) * block::SECTORS_PER_BLOCK) as u32;
+        self.sectors_count = (Self::total_blocks(size) * block::SECTORS) as u32;
         self.size_low = size as u32;
     }
 

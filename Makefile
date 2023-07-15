@@ -11,8 +11,10 @@ QEMU_FLAGS = -machine virt -nographic -m 256M -smp 1
 BOOTLOADER = -bios ./boot/rustsbi-qemu.bin
 QEMU_DEVICE1 = -device loader,file=./$(KERNEL),addr=0x80200000
 QEMU_DRIVE = -drive file=$(FS_IMG),if=none,format=raw,id=x0
-QEMU_DEVICE2 = -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-QEMU_BIOS = $(BOOTLOADER) $(QEMU_DEVICE1) $(QEMU_DRIVE) $(QEMU_DEVICE2)
+QEMU_DEVICE_BLK = -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+QEMU_DEVICE_NET = -device virtio-net-device,netdev=net0,bus=virtio-mmio-bus.3
+QEMU_NET_CONFIG = -netdev user,id=net0,hostfwd=udp::6200-:2000,hostfwd=tcp::6201-:80
+QEMU_BIOS = $(BOOTLOADER) $(QEMU_DEVICE1) $(QEMU_DRIVE) $(QEMU_DEVICE_BLK) $(QEMU_DEVICE_NET) $(QEMU_NET_CONFIG)
 
 
 # 允许的指令

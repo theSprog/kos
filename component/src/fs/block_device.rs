@@ -24,15 +24,7 @@ impl BlockCache {
     pub fn new(block_id: usize, block_device: Arc<dyn BlockDevice>) -> Self {
         // 必须要用 vec 而不是数组, 内核栈在进程退出后就会销毁
         let mut cache = alloc::vec![0u8; block::SIZE];
-        let lower_bid = block_id * block::SECTORS_PER_BLOCK;
-
-        // 底层是以 SECTOR_SIZE 为单位的
-        for i in 0..block::SECTORS_PER_BLOCK {
-            block_device.read_block(
-                lower_bid + i,
-                &mut cache[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
-            );
-        }
+        block_device.read_block(block_id, &mut cache);
 
         Self {
             cache,
@@ -45,16 +37,7 @@ impl BlockCache {
     pub fn sync(&mut self) {
         if self.modified {
             self.modified = false;
-
-            let lower_bid = self.block_id * block::SECTORS_PER_BLOCK;
-
-            // 底层是以 SECTOR_SIZE 为单位的
-            for i in 0..block::SECTORS_PER_BLOCK {
-                self.block_device.write_block(
-                    lower_bid + i,
-                    &self.cache[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
-                );
-            }
+            self.block_device.write_block(self.block_id, &self.cache);
         }
     }
 

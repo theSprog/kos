@@ -7,13 +7,13 @@ pub mod vfs;
 pub const SECTOR_SIZE: usize = 512;
 
 pub mod block {
-    use super::SECTOR_SIZE;
+    pub use super::SECTOR_SIZE;
 
     pub const SIZE: usize = 4096;
     pub const LOG_SIZE: usize = 12;
     pub const BITS: usize = SIZE * 8;
     pub const MASK: usize = SIZE - 1;
-    pub const SECTORS_PER_BLOCK: usize = 8;
+    pub const SECTORS: usize = 8;
 
     pub type DataBlock = [u8; SIZE];
 }

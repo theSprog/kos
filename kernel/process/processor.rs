@@ -74,6 +74,13 @@ pub mod api {
         PROCESSOR.exclusive_access().current()
     }
 
+    pub fn current_kstack_top() -> usize {
+        match current_tcb() {
+            Some(tcb) => tcb.kstack.get_top(),
+            None => loop {}, // before tcb construct, imply inner error, stop immediately
+        }
+    }
+
     pub fn take_current_tcb() -> Option<Arc<TCB>> {
         PROCESSOR.exclusive_access().take_current()
     }
@@ -92,6 +99,10 @@ pub mod api {
 
     pub fn current_pid() -> usize {
         current_pcb().pid()
+    }
+
+    pub fn current_tid() -> usize {
+        current_tcb().unwrap().ex_inner().tid()
     }
 
     pub fn current_user_token() -> usize {

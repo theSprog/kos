@@ -79,7 +79,7 @@ impl PCB {
     pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
         self.inner.exclusive_access()
     }
-    
+
     pub fn pid(&self) -> usize {
         self.pid.0
     }

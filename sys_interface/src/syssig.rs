@@ -75,12 +75,12 @@ bitflags! {
 impl SignalFlags {
     pub fn check_error(&self) -> Option<(i32, &'static str)> {
         match self {
-            _ if self.contains(Self::SIGINT) => Some((-2, "Killed, SIGINT=2")),
-            _ if self.contains(Self::SIGILL) => Some((-4, "Illegal Instruction, SIGILL=4")),
-            _ if self.contains(Self::SIGABRT) => Some((-6, "Aborted, SIGABRT=6")),
-            _ if self.contains(Self::SIGFPE) => Some((-8, "Error Arithmetic Operation, SIGFPE=8")),
-            _ if self.contains(Self::SIGKILL) => Some((-9, "Killed, SIGKILL=9")),
-            _ if self.contains(Self::SIGSEGV) => Some((-11, "Segmentation Fault, SIGSEGV=11")),
+            _ if self.contains(Self::SIGINT) => Some((-2, "Killed (SIGINT=2)")),
+            _ if self.contains(Self::SIGILL) => Some((-4, "Illegal Instruction (SIGILL=4)")),
+            _ if self.contains(Self::SIGABRT) => Some((-6, "Aborted (SIGABRT=6)")),
+            _ if self.contains(Self::SIGFPE) => Some((-8, "Error Arithmetic Operation (SIGFPE=8)")),
+            _ if self.contains(Self::SIGKILL) => Some((-9, "Killed (SIGKILL=9)")),
+            _ if self.contains(Self::SIGSEGV) => Some((-11, "Segmentation Fault (SIGSEGV=11)")),
             _ => None,
         }
     }

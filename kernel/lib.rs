@@ -25,6 +25,7 @@ mod fs;
 mod lang_items;
 mod loader;
 mod memory;
+mod net;
 mod process;
 mod sbi;
 mod sync;

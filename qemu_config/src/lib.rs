@@ -43,5 +43,5 @@ pub const SECOND_UNIT: usize = CLOCK_FREQ;
 ///     [VIRT_PCIE_MMIO] =    { 0x40000000,    0x40000000 },
 ///     [VIRT_DRAM] =         { 0x80000000,           0x0 },
 /// };
-/// 
-pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x1000)];
+///
+pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x9000)];

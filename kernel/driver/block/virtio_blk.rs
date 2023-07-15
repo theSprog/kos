@@ -1,6 +1,8 @@
 use core::ptr::NonNull;
 
-use virtio_drivers::device::blk::VirtIOBlk;
+use component::fs::block;
+use logger::info;
+use virtio_drivers::device::blk::{VirtIOBlk, SECTOR_SIZE};
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 
 use super::BlockDevice;
@@ -28,16 +30,26 @@ impl VirtIOBlock {
 
 impl BlockDevice for VirtIOBlock {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        self.virtio_blk
-            .exclusive_access()
-            .read_block(block_id, buf)
+        let mut blk = self.virtio_blk.exclusive_access();
+        let lower_bid = block_id * block::SECTORS;
+
+        // 底层是以 SECTOR_SIZE 为单位的
+        for i in 0..block::SECTORS {
+            blk.read_block(
+                lower_bid + i,
+                &mut buf[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE],
+            )
             .expect("Error when reading VirtIOBlk");
+        }
     }
 
     fn write_block(&self, block_id: usize, buf: &[u8]) {
-        self.virtio_blk
-            .exclusive_access()
-            .write_block(block_id, buf)
-            .expect("Error when writing VirtIOBlk");
+        let mut blk = self.virtio_blk.exclusive_access();
+        let lower_bid = block_id * block::SECTORS;
+
+        for i in 0..block::SECTORS {
+            blk.write_block(lower_bid + i, &buf[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE])
+                .expect("Error when writing VirtIOBlk");
+        }
     }
 }

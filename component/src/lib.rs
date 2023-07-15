@@ -18,5 +18,6 @@ pub mod crt0;
 pub mod device_tree;
 pub mod fs;
 pub mod memory;
+pub mod net;
 pub mod process;
 pub mod util;

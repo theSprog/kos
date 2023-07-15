@@ -236,7 +236,7 @@ pub fn trap_handler() -> ! {
 
     // 检查是否有错, 若有错(例如段错误)则退出
     if let Some((exit_code, msg)) = signal::api::check_signals_error() {
-        info!("msg: {}, exit_code: {}", msg, exit_code);
+        info!("tid: {}, msg: {}, exit_code: {}", processor::api::current_tid(), msg,  exit_code);
         processor::api::exit_and_run_next(syserr::EINTR as i32);
     }
 
