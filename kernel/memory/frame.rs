@@ -6,13 +6,13 @@ use component::util::human_size::*;
 use logger::info;
 
 use crate::{
-    memory::kernel_view::get_kernel_view, sync::unicore::UPSafeCell, MEMORY_END, PAGE_SIZE,
+    memory::kernel_view::get_kernel_view, sync::unicore::UPIntrFreeCell, MEMORY_END, PAGE_SIZE,
 };
 
 lazy_static! {
-    pub(crate) static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> = {
+    pub(crate) static ref FRAME_ALLOCATOR: UPIntrFreeCell<FrameAllocatorImpl> = {
         info!("FRAME_ALLOCATOR Initializing...");
-        unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) }
+        unsafe { UPIntrFreeCell::new(FrameAllocatorImpl::new()) }
     };
 }
 

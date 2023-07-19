@@ -3,6 +3,8 @@ pub mod pipe;
 pub mod stdio;
 pub mod userbuf;
 
+use alloc::sync::Arc;
+use component::fs::block_device::BlockDevice;
 pub use userbuf::UserBuffer;
 
 use crate::driver::block::BlockDeviceImpl;
@@ -16,14 +18,21 @@ use component::fs::block_device;
 use logger::info;
 
 lazy_static! {
+    pub static ref BLOCK_DEVICE: Arc<dyn BlockDevice> = {
+        info!("BLOCK_DEVICE initializing...");
+        let blk_dev = Arc::new(BlockDeviceImpl::new());
+        block_device::register_block_device(blk_dev.clone());
+        blk_dev
+    };
     pub static ref VFS: VirtualFileSystem = {
+        BLOCK_DEVICE.as_ref();
         info!("VirtualFileSystem initializing...");
-        block_device::register_block_device(BlockDeviceImpl::new());
         let kfs = KernelFileSystem::new();
         VirtualFileSystem::new(kfs)
     };
 }
 
+#[allow(unused_variables)]
 pub trait File: Send + Sync {
     /// If readable
     fn readable(&self) -> bool;

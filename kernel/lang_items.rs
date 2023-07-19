@@ -34,7 +34,7 @@ unsafe fn backtrace() {
     let stop = processor::api::current_kstack_top();
     asm!("mv {}, s0", out(reg) fp);
     red!("---START BACKTRACE---");
-    for i in 0..16 {
+    for _ in 0..16 {
         if fp == stop {
             break;
         }

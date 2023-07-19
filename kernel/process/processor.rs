@@ -3,7 +3,9 @@ use crate::process::scheduler;
 use crate::task::switch::__switch;
 use crate::task::TaskStatus;
 use crate::{memory::address::*, task::TCB};
-use crate::{sync::unicore::UPSafeCell, task::context::TaskContext, trap::context::TrapContext};
+use crate::{
+    sync::unicore::UPIntrFreeCell, task::context::TaskContext, trap::context::TrapContext,
+};
 use alloc::string::String;
 use alloc::sync::Arc;
 use logger::*;
@@ -12,9 +14,9 @@ use sys_interface::config::PAGE_SIZE;
 use crate::{sbi::shutdown, task::INITPROC};
 
 lazy_static! {
-    pub(crate) static ref PROCESSOR: UPSafeCell<Processor> = unsafe {
+    pub(crate) static ref PROCESSOR: UPIntrFreeCell<Processor> = unsafe {
         info!("PROCESSOR initializing...");
-        UPSafeCell::new(Processor::new())
+        UPIntrFreeCell::new(Processor::new())
     };
 }
 
@@ -39,7 +41,7 @@ impl Processor {
 
     // 返回当前执行的任务的一份拷贝, 会增加引用计数
     pub fn current(&self) -> Option<Arc<TCB>> {
-        self.current.as_ref().map(|pcb| Arc::clone(pcb))
+        self.current.as_ref().map(Arc::clone)
     }
 
     fn get_idle_cx_ptr(&mut self) -> *mut TaskContext {
@@ -131,8 +133,8 @@ pub mod api {
     }
 
     pub fn run_app() {
-        info!("start running app");
         let mut processor = PROCESSOR.exclusive_access();
+        info!("start running app");
         let idle_cx_ptr = processor.get_idle_cx_ptr();
         drop(processor);
         schedule(idle_cx_ptr);

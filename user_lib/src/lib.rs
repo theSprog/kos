@@ -33,6 +33,7 @@ pub mod constant;
 mod env;
 pub use env::Env;
 pub mod fs;
+pub mod gui;
 pub mod io;
 
 mod lang_items;
@@ -42,7 +43,6 @@ use syscall::*;
 
 // 沟通 OS 系统调用, 发起请求后陷入 kernel
 pub fn open(path: &str, flags: OpenFlags, mode: u16) -> isize {
-    // TODO 应该把相对路径转为绝对路径
     let path = format!("{}\0", path);
     sys_open(path.as_str().as_ptr(), flags.bits(), mode)
 }
@@ -251,6 +251,14 @@ pub fn sigprocmask(mask: u32) -> isize {
 
 pub fn sigreturn() -> isize {
     sys_sigreturn()
+}
+
+pub fn key_pressed() -> bool {
+    if sys_key_pressed() == 1 {
+        true
+    } else {
+        false
+    }
 }
 
 pub fn shutdown() -> ! {

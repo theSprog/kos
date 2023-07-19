@@ -3,15 +3,15 @@ use component::process::IScheduler;
 use logger::info;
 
 use crate::task::TCB;
-use crate::{sync::unicore::UPSafeCell, KernelScheduler};
+use crate::{sync::unicore::UPIntrFreeCell, KernelScheduler};
 use alloc::sync::Arc;
 
 use super::pid::PID_MAP;
 
 lazy_static! {
-    pub(crate) static ref SCHEDULER: UPSafeCell<KernelScheduler> = unsafe {
+    pub(crate) static ref SCHEDULER: UPIntrFreeCell<KernelScheduler> = unsafe {
         info!("SCHEDULER initializing...");
-        UPSafeCell::new(KernelScheduler::new())
+        UPIntrFreeCell::new(KernelScheduler::new())
     };
 }
 
@@ -19,9 +19,7 @@ lazy_static! {
 pub fn add_ready(tcb: Arc<TCB>) {
     let pcb = tcb.pcb().unwrap();
     let pid = pcb.pid();
-    if !PID_MAP.exclusive_access().contains_key(&pid) {
-        PID_MAP.exclusive_access().insert(pid, pcb);
-    }
+    PID_MAP.exclusive_access().entry(pid).or_insert(pcb);
     SCHEDULER.exclusive_access().add_ready(tcb)
 }
 

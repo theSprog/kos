@@ -10,6 +10,7 @@ use crate::{cast, cast_mut};
 pub trait BlockDevice: Send + Sync + 'static {
     fn read_block(&self, block_id: usize, buf: &mut [u8]);
     fn write_block(&self, block_id: usize, buf: &[u8]);
+    fn handle_irq(&self);
 }
 
 pub struct BlockCache {
@@ -77,8 +78,8 @@ impl Drop for BlockCache {
     }
 }
 
-// 256 个 cache 即 1M 文件缓存
-const BLOCK_CACHE_SIZE: usize = 256;
+// 1024 个 cache 即 4MiB 文件缓存
+const BLOCK_CACHE_SIZE: usize = 1024;
 
 #[derive(Default)]
 pub struct BlockCacheManager {
@@ -125,11 +126,12 @@ impl BlockCacheManager {
     }
 }
 
-pub fn register_block_device(block_device: impl BlockDevice) {
+pub fn register_block_device<T: BlockDevice>(block_device: Arc<T>) {
+    info!("Registering block device");
     let old: Option<Arc<dyn BlockDevice>> = super::BLOCK_CACHE_MANAGER
         .lock()
         .block_device
-        .replace(Arc::new(block_device));
+        .replace(block_device);
     assert!(old.is_none(), "block device double register");
 }
 

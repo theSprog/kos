@@ -14,20 +14,11 @@ pub fn get_cycle() -> usize {
     riscv::register::time::read()
 }
 
-// 以微秒形式获取时间
-pub fn get_time_us() -> usize {
-    get_cycle() / MICRO_UNIT
-}
-
 // 以毫秒形式获取时间
 pub fn get_time_ms() -> usize {
     get_cycle() / MILLI_UNIT
 }
 
-// 以秒形式获取时间
-pub fn get_time_s() -> usize {
-    get_cycle() / SECOND_UNIT
-}
 
 pub fn set_next_trigger() {
     // 每秒时钟中断次数

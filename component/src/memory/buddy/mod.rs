@@ -75,6 +75,7 @@ impl<const ORDER: usize> Heap<ORDER> {
     }
 
     /// 向堆中添加一个内存范围 [start, end)
+    /// # Safety
     pub unsafe fn add_to_heap(&mut self, mut start: usize, mut end: usize) {
         // avoid unaligned access on some platforms
         start = (start + size_of::<usize>() - 1) & (!size_of::<usize>() + 1);

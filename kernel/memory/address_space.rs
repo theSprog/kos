@@ -9,7 +9,7 @@ use super::{
 
 use crate::{
     memory::{heap_alloc, page_table},
-    sync::unicore::UPSafeCell,
+    sync::unicore::UPIntrFreeCell,
     trap::context::TrapContext,
     MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE,
 };
@@ -31,9 +31,9 @@ use xmas_elf::ElfFile;
 lazy_static! {
     // 为什么要用 arc?
     // 有多处引用因此要用 Rc, 又由于全局变量所有要用 Arc, Rc 只适合单线程
-    pub(crate) static ref KERNEL_SPACE: Arc<UPSafeCell<AddressSpace>> ={
+    pub(crate) static ref KERNEL_SPACE: Arc<UPIntrFreeCell<AddressSpace>> ={
         info!("KERNEL_SPACE initializing...");
-        Arc::new(unsafe { UPSafeCell::new(AddressSpace::new_kernel()) })
+        Arc::new(unsafe { UPIntrFreeCell::new(AddressSpace::new_kernel()) })
     };
 }
 
@@ -105,10 +105,6 @@ impl AddressSpace {
         &self.page_table
     }
 
-    pub fn segments(&self) -> &[Segment] {
-        &self.segments
-    }
-
     // 把倒数第一个 segement 必须设置为 heap 段
     // heap 是可变的
     pub fn heap_mut(&mut self) -> &mut Segment {
@@ -140,7 +136,6 @@ impl AddressSpace {
             // 相当于是个内存屏障
             core::arch::asm!("sfence.vma");
         }
-        info!("Paging mechanism enabled");
     }
 
     /// 向地址空间中添加一个逻辑段 (segment)
@@ -554,7 +549,7 @@ impl AddressSpace {
             .enumerate()
             .find(|(_, seg)| seg.vpn_range.get_start() == start_vpn)
         {
-            for (vpn, _) in &seg.data_frames {
+            for vpn in seg.data_frames.keys() {
                 self.page_table.unlink(*vpn);
             }
 
@@ -623,6 +618,7 @@ impl AddressSpace {
 
 #[allow(clippy::bool_assert_comparison)]
 pub fn remap_test() {
+    info!("Start remap test");
     let kernel_view = get_kernel_view();
     let kernel_space = KERNEL_SPACE.exclusive_access();
     let mid_text: VirtAddr = ((kernel_view.stext + kernel_view.etext) / 2).into();

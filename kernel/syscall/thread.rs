@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
-use logger::info;
+use logger::*;
 use sys_interface::syserr;
 
 use crate::{
-    memory::address_space::{kernel_token, KERNEL_SPACE},
+    memory::address_space::kernel_token,
     process::{
         processor::{self},
         scheduler,
@@ -27,7 +27,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     *new_tcb_trap_ctx = TrapContext::app_init_context(
         entry,
         new_tcb_inner.ustack_top(),
-        KERNEL_SPACE.exclusive_access().token(),
+        kernel_token(),
         new_tcb.kstack.get_top(),
         trap_handler as usize,
     );
@@ -65,10 +65,10 @@ pub fn sys_waittid(tid: usize) -> isize {
         // tcb 析构要用到 pcb, 因此先 drop 析构 pcb_inner, 防止多次 borrow
         drop(pcb_inner);
         assert_eq!(Arc::strong_count(&died_tcb), 1);
-        return exit_code as isize;
+        exit_code as isize
     } else {
         // 线程还未退出
-        return syserr::EAGAIN;
+        syserr::EAGAIN
     }
 }
 

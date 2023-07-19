@@ -1,18 +1,18 @@
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use logger::info;
 
-use crate::{process::PCB, sync::unicore::UPSafeCell};
+use crate::{process::PCB, sync::unicore::UPIntrFreeCell};
 
 lazy_static! {
-    static ref PID_ALLOCATOR: UPSafeCell<RecycleAllocator> = unsafe {
+    static ref PID_ALLOCATOR: UPIntrFreeCell<RecycleAllocator> = unsafe {
         info!("PID_ALLOCATOR Initializing...");
-        UPSafeCell::new(RecycleAllocator::new())
+        UPIntrFreeCell::new(RecycleAllocator::new())
     };
 
     // 保存 pid -> pcb 的映射关系
-    pub static ref PID_MAP: UPSafeCell<BTreeMap<usize, Arc<PCB>>> =
+    pub static ref PID_MAP: UPIntrFreeCell<BTreeMap<usize, Arc<PCB>>> =
     unsafe {  info!("PID_MAP Initializing...");
-    UPSafeCell::new(BTreeMap::new()) };
+    UPIntrFreeCell::new(BTreeMap::new()) };
 
 
 }

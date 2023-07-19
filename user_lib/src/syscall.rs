@@ -176,3 +176,15 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
 pub fn sys_sigreturn() -> isize {
     syscall(SYSCALL_RT_SIGRETURN, [0, 0, 0])
 }
+
+pub fn sys_key_pressed() -> isize {
+    syscall(SYSCALL_CUSTOM_KEY_PRESSED, [0, 0, 0])
+}
+
+pub fn sys_framebuffer() -> isize {
+    syscall(SYSCALL_CUSTOM_FRAMEBUFFER, [0, 0, 0])
+}
+
+pub fn sys_framebuffer_flush() -> isize {
+    syscall(SYSCALL_CUSTOM_FRAMEBUFFER_FLUSH, [0, 0, 0])
+}

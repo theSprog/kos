@@ -17,8 +17,8 @@ use sys_interface::{syserr, syssig::*};
 
 use crate::{
     loader::load_app,
-    memory::address_space::{AddressSpace, KERNEL_SPACE},
-    sync::unicore::UPSafeCell,
+    memory::address_space::{kernel_token, AddressSpace},
+    sync::unicore::{UPIntrFreeCell, UPIntrRefMut},
     task::TCB,
     trap::{context::TrapContext, trap_handler},
 };
@@ -36,7 +36,7 @@ pub struct PCB {
     pub pid: Pid,
 
     // 在运行过程中可能发生变化的元数据
-    inner: UPSafeCell<PCBInner>,
+    inner: UPIntrFreeCell<PCBInner>,
 }
 
 impl PCB {
@@ -48,7 +48,7 @@ impl PCB {
 
         let pcb = Arc::new(Self {
             pid: Pid::alloc(), // 分配 pid
-            inner: unsafe { UPSafeCell::new(PCBInner::new(address_space, cmd)) },
+            inner: unsafe { UPIntrFreeCell::new(PCBInner::new(address_space, cmd)) },
         });
 
         // init 默认优先级是 3
@@ -62,7 +62,7 @@ impl PCB {
         *trap_ctx = TrapContext::app_init_context(
             entry_point,
             ustack_top,
-            KERNEL_SPACE.exclusive_access().token(),
+            kernel_token(),
             kstack_top,
             trap_handler as usize,
         );
@@ -76,7 +76,7 @@ impl PCB {
         pcb
     }
 
-    pub fn ex_inner(&self) -> core::cell::RefMut<'_, PCBInner> {
+    pub fn ex_inner(&self) -> UPIntrRefMut<'_, PCBInner> {
         self.inner.exclusive_access()
     }
 
@@ -125,7 +125,7 @@ impl PCB {
         let child_pcb = Arc::new(PCB {
             pid: Pid::alloc(), // 分配 pid
             inner: unsafe {
-                UPSafeCell::new(PCBInner {
+                UPIntrFreeCell::new(PCBInner {
                     tcbs: Vec::new(), // 暂时还未放置线程
                     tid_allocator: RecycleAllocator::new(),
                     address_space: child_address_space,
@@ -215,7 +215,7 @@ impl PCB {
         *trap_ctx = TrapContext::app_init_context(
             entry_point,
             ustack_top,
-            KERNEL_SPACE.exclusive_access().token(),
+            kernel_token(),
             kstack_top,
             trap_handler as usize,
         );

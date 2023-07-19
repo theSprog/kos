@@ -3,11 +3,13 @@ use sys_interface::{syscall::*, syssig::SignalAction};
 
 use crate::sbi::shutdown;
 mod fs;
+mod gui;
+mod input;
 mod process;
 mod signal;
 mod thread;
 
-use self::{fs::*, process::*, signal::*, thread::*};
+use self::{fs::*, gui::*, input::*, process::*, signal::*, thread::*};
 
 /// 统一处理系统调用入口
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
@@ -64,6 +66,11 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CUSTOM_LISTAPPS => sys_listapps(),
 
         SYSCALL_CUSTOM_THREAD_CREATE => sys_thread_create(args[0], args[1]),
+
+        SYSCALL_CUSTOM_KEY_PRESSED => sys_key_pressed(),
+
+        SYSCALL_CUSTOM_FRAMEBUFFER => sys_framebuffer(),
+        SYSCALL_CUSTOM_FRAMEBUFFER_FLUSH => sys_framebuffer_flush(),
 
         // SYSCALL_IO_DESTROY => sys_io_destroy(args[0] as *const u8),
         // 严格来说这里不应该直接 panic,

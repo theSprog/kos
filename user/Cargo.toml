@@ -8,9 +8,11 @@ edition = "2021"
 [dependencies]
 user_lib = { path = "../user_lib" }
 shell-words = { version = "1.0.0", default-features = false }
+embedded-graphics = "0.7.1"
+oorandom = "11"
 
 [profile.release]
-opt-level = 1
+opt-level = 2
 lto = "fat"
 
 
@@ -158,3 +160,7 @@ path = "src/thread.rs"
 [[bin]]
 name = "thread2"
 path = "src/thread2.rs"
+
+[[bin]]
+name = "snake"
+path = "src/snake.rs"

@@ -305,6 +305,11 @@ pub const SYSCALL_CUSTOM_LISTDIR: usize = 0x200;
 pub const SYSCALL_CUSTOM_LISTAPPS: usize = 0x201;
 pub const SYSCALL_CUSTOM_THREAD_CREATE: usize = 0x210;
 
+pub const SYSCALL_CUSTOM_KEY_PRESSED: usize = 0x300;
+
+pub const SYSCALL_CUSTOM_FRAMEBUFFER: usize = 0x400;
+pub const SYSCALL_CUSTOM_FRAMEBUFFER_FLUSH: usize = 0x401;
+
 /// Minimum valid system call number.
 pub const SYSCALL_CALL_BASE_INDEX: usize = 0x0;
 

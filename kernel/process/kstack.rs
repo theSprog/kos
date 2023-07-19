@@ -1,12 +1,12 @@
 use crate::{
     memory::{address::*, address_space::KERNEL_SPACE, kernel_view, segment::MapPermission},
     process::pid::RecycleAllocator,
-    sync::unicore::UPSafeCell,
+    sync::unicore::UPIntrFreeCell,
 };
 
 lazy_static! {
-    static ref KSTACK_ID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
-        unsafe { UPSafeCell::new(RecycleAllocator::new()) };
+    static ref KSTACK_ID_ALLOCATOR: UPIntrFreeCell<RecycleAllocator> =
+        unsafe { UPIntrFreeCell::new(RecycleAllocator::new()) };
 }
 
 #[derive(Debug)]

@@ -4,7 +4,7 @@ use logger::*;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
-    utvec::TrapMode, sepc,
+    utvec::TrapMode, sepc, sscratch,
 };
 use sys_interface::{syscall::SYSCALL_EXECVE, syssig::SignalFlags, syserr};
 
@@ -16,10 +16,11 @@ use crate::{
     }, signal},
     syscall::syscall,
     clock::set_next_trigger,
-    TRAMPOLINE, TRAP_CONTEXT,
+    TRAMPOLINE,
 };
 
 pub mod context;
+mod plic;
 
 global_asm!(include_str!("trap.S"));
 
@@ -39,8 +40,24 @@ pub fn init() {
 #[no_mangle]
 #[repr(align(4096))]
 pub fn trap_from_kernel() -> ! {
-    error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
-    panic!("A trap from kernel! How could be it ?");
+    let scause = scause::read();
+    let stval = stval::read();
+    match scause.cause() {
+        Trap::Interrupt(Interrupt::SupervisorExternal) => {
+            // crate::board::irq_handler();
+            todo!()
+        },
+        // Trap::Interrupt(Interrupt::SupervisorTimer) => {
+        //     set_next_trigger();
+        //     check_timer();
+        //     // do not schedule now
+        // }
+
+        _ => {
+            error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
+            panic!("An unhandle trap from kernel! How could be it ?");
+        }
+    }
 }
 
 /// 一旦进入内核后再次触发到 S态 Trap，
@@ -48,6 +65,16 @@ pub fn trap_from_kernel() -> ! {
 /// 会跳过对通用寄存器的保存过程，
 /// 直接跳转到 trap_from_kernel 函数，在那里直接 panic 退出
 fn set_kernel_trap_entry() {
+    // extern "C" {
+    //     fn __alltraps();
+    //     fn __alltraps_k();
+    // }
+    // let __kernel_trap = TRAMPOLINE + (__alltraps_k as usize - __alltraps as usize);
+    // unsafe {
+    //     stvec::write(__kernel_trap, TrapMode::Direct);
+    //     sscratch::write(trap_from_kernel as usize);
+    // }
+
     unsafe {
         stvec::write(trap_from_kernel as usize, TrapMode::Direct);
     }

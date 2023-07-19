@@ -55,6 +55,7 @@ impl File for OSInode {
         self.writable
     }
 
+    #[allow(clippy::explicit_auto_deref)]
     fn read(&self, mut buf: UserBuffer) -> Result<usize, VfsError> {
         // 两个进程无法同时访问同个文件
         let mut inner = self.inner.lock();
@@ -74,6 +75,7 @@ impl File for OSInode {
         Ok(total_read_size)
     }
 
+    #[allow(clippy::explicit_auto_deref)]
     fn write(&self, buf: UserBuffer) -> Result<usize, VfsError> {
         // 两个进程无法同时访问同个文件
         let mut inner = self.inner.lock();

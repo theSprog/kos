@@ -5,7 +5,7 @@ pub mod uresource;
 use crate::loader::load_app;
 use crate::process::{scheduler, PCB};
 
-use crate::sync::unicore::UPSafeCell;
+use crate::sync::unicore::{UPIntrFreeCell, UPIntrRefMut};
 use crate::{memory::address::*, trap::context::TrapContext, *};
 
 use self::context::TaskContext;
@@ -22,7 +22,7 @@ lazy_static! {
     /// init 进程
     pub static ref INITPROC: Arc<PCB> =
     {
-        info!("{INIT} process initializing...");
+        info!("'{INIT}' process initializing...");
         if let Some(init_data) = load_app(INIT) {
            PCB::new_once(&init_data, INIT)
         }else {
@@ -47,7 +47,7 @@ pub struct TCB {
     pub kstack: KernelStack, //任务（线程）的内核栈
 
     // 内部可变性
-    inner: UPSafeCell<TCBInner>,
+    inner: UPIntrFreeCell<TCBInner>,
 }
 
 impl TCB {
@@ -70,7 +70,7 @@ impl TCB {
             pcb: Arc::downgrade(pcb),
             kstack,
             inner: unsafe {
-                UPSafeCell::new(TCBInner {
+                UPIntrFreeCell::new(TCBInner {
                     resource: Some(resource),
                     trap_ctx_ppn,
                     task_ctx: TaskContext::goto_trap_return(kstack_top),
@@ -83,7 +83,7 @@ impl TCB {
         }
     }
 
-    pub fn ex_inner(&self) -> core::cell::RefMut<'_, TCBInner> {
+    pub fn ex_inner(&self) -> UPIntrRefMut<'_, TCBInner> {
         self.inner.exclusive_access()
     }
 
@@ -191,7 +191,7 @@ pub mod api {
     use super::*;
 
     pub fn init() {
-        info!("adding init tcb to shceduler");
+        info!("adding 'init' tcb to shceduler");
         scheduler::add_ready(INITPROC.ex_inner().main_tcb());
     }
 }
