@@ -1,4 +1,4 @@
-use embedded_graphics::prelude::{RgbColor, Size};
+use embedded_graphics::prelude::Size;
 
 use crate::syscall::{sys_framebuffer, sys_framebuffer_flush};
 pub const VIRTGPU_XRES: u32 = 1280;

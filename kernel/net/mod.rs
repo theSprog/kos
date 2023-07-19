@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use component::net::net_device::NetDevice;
+use component::net::NetDevice;
 use logger::info;
 
 use crate::driver::net::NetDeviceImpl;

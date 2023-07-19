@@ -4,7 +4,8 @@ use crate::driver::bus::VirtioHal;
 use crate::sync::unicore::UPIntrFreeCell;
 use alloc::string::String;
 use alloc::vec::Vec;
-use component::net::net_device::NetDevice;
+use component::net::NetDevice;
+use component::HandleIRQ;
 use logger::*;
 use virtio_drivers::device::net::{TxBuffer, VirtIONet};
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
@@ -31,16 +32,10 @@ impl VirtIONetwork {
             debug!("net max recv_queue size: {}", transport.max_queue_size(1));
 
             let virtio_network = Self {
-                virtio_net: UPIntrFreeCell::new(
-                    VirtIONet::<VirtioHal, MmioTransport, NET_QUEUE_SIZE>::new(
-                        transport,
-                        NET_BUF_LEN,
-                    )
-                    .unwrap(),
-                ),
+                virtio_net: UPIntrFreeCell::new(VirtIONet::new(transport, NET_BUF_LEN).unwrap()),
             };
 
-            net_test(&virtio_network);
+            // net_test(&virtio_network);
 
             virtio_network
         }
@@ -73,6 +68,12 @@ fn net_test(net: &VirtIONetwork) {
         }
     }
     info!("virtio-net test finished");
+}
+
+impl HandleIRQ for VirtIONetwork {
+    fn handle_irq(&self) {
+        todo!()
+    }
 }
 
 impl NetDevice for VirtIONetwork {

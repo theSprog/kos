@@ -22,6 +22,8 @@ pub mod init;
 mod clock;
 mod driver;
 mod fs;
+mod gpu;
+mod io;
 mod lang_items;
 mod loader;
 mod memory;

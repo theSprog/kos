@@ -36,6 +36,7 @@ pub enum TaskStatus {
     Ready,   // 就绪态
     Running, // 正在运行
     Died,    // 已退出
+    Blocked, // 阻塞
 
     Interruptable,   // 可中断睡眠
     Uninterruptable, // 不可中断睡眠

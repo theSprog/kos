@@ -1,6 +1,7 @@
 use crate::driver::bus::VirtioHal;
 use crate::sync::unicore::UPIntrFreeCell;
 use alloc::{sync::Arc, vec::Vec};
+use component::gpu::gpu_device::GpuDevice;
 use core::{any::Any, ptr::NonNull};
 use embedded_graphics::pixelcolor::Rgb888;
 use tinybmp::Bmp;
@@ -9,28 +10,19 @@ use virtio_drivers::{
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
 
-const VIRTIO7: usize = 0x10007000;
-pub trait GpuDevice: Send + Sync + 'static {
-    fn update_cursor(&self);
-    fn get_framebuffer(&self) -> &mut [u8];
-    fn flush(&self);
-}
+const VIRTIO6: usize = 0x10007000;
 
-lazy_static::lazy_static!(
-    pub static ref GPU_DEVICE: Arc<dyn GpuDevice> = Arc::new(VirtIOGpuWrapper::new());
-);
-
-pub struct VirtIOGpuWrapper {
+pub struct VirtIOGPU {
     gpu: UPIntrFreeCell<VirtIOGpu<VirtioHal, MmioTransport>>,
     fb: &'static [u8],
 }
 
-static BMP_DATA: &[u8] = include_bytes!("../../bmp/mouse.bmp");
+static BMP_DATA: &[u8] = include_bytes!("../../bmp/folder.bmp");
 
-impl VirtIOGpuWrapper {
+impl VirtIOGPU {
     pub fn new() -> Self {
         unsafe {
-            let header = VIRTIO7 as *mut VirtIOHeader;
+            let header = VIRTIO6 as *mut VirtIOHeader;
             let transport = MmioTransport::new(NonNull::new(header).unwrap()).unwrap();
 
             let mut virtio = VirtIOGpu::<VirtioHal, MmioTransport>::new(transport).unwrap();
@@ -62,7 +54,7 @@ impl VirtIOGpuWrapper {
     }
 }
 
-impl GpuDevice for VirtIOGpuWrapper {
+impl GpuDevice for VirtIOGPU {
     fn flush(&self) {
         self.gpu.exclusive_access().flush().unwrap();
     }

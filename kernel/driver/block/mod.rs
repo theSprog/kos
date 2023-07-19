@@ -1,5 +1,6 @@
 use component::fs::block;
 use component::fs::block_device::BlockDevice;
+use component::HandleIRQ;
 
 use core::ptr::NonNull;
 
@@ -13,7 +14,7 @@ use virtio_drivers::transport::Transport;
 
 pub type BlockDeviceImpl = VirtIOBlock;
 
-const VIRTIO8: usize = 0x10001000;
+const VIRTIO0: usize = 0x10001000;
 
 pub struct VirtIOBlock {
     virtio_blk: UPIntrFreeCell<VirtIOBlk<VirtioHal, MmioTransport>>,
@@ -23,7 +24,7 @@ pub struct VirtIOBlock {
 impl VirtIOBlock {
     pub fn new() -> Self {
         unsafe {
-            let header = VIRTIO8 as *mut VirtIOHeader;
+            let header = VIRTIO0 as *mut VirtIOHeader;
             let mut transport = MmioTransport::new(NonNull::new(header).unwrap()).unwrap();
 
             debug!("blk max send_queue size: {}", transport.max_queue_size(0));
@@ -33,6 +34,12 @@ impl VirtIOBlock {
 
             Self { virtio_blk }
         }
+    }
+}
+
+impl HandleIRQ for VirtIOBlock {
+    fn handle_irq(&self) {
+        todo!()
     }
 }
 
@@ -59,9 +66,5 @@ impl BlockDevice for VirtIOBlock {
             blk.write_block(lower_bid + i, &buf[i * SECTOR_SIZE..(i + 1) * SECTOR_SIZE])
                 .expect("Error when writing VirtIOBlk");
         }
-    }
-
-    fn handle_irq(&self) {
-        todo!()
     }
 }

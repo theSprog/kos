@@ -44,4 +44,12 @@ pub const SECOND_UNIT: usize = CLOCK_FREQ;
 ///     [VIRT_DRAM] =         { 0x80000000,           0x0 },
 /// };
 ///
-pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x9000)];
+// pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x9000)];
+
+pub const MMIO: &[(usize, usize)] = &[
+    // (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
+    // (0x2000000, 0x10000),
+    // (0xc000000, 0x210000), // VIRT_PLIC in virt machine
+    (0x10000000, 0x1000), // UART 0
+    (0x10001000, 0x8000), // VIRTIO0~7
+];

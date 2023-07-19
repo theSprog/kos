@@ -141,6 +141,21 @@ pub mod api {
         unreachable!()
     }
 
+    /// 阻塞当前函数, 阻塞之后必定要跟随一个 schedule
+    pub fn block_current_tcb() -> *mut TaskContext {
+        let tcb = take_current_tcb().unwrap();
+        let mut tcb_inner = tcb.ex_inner();
+        tcb_inner.set_status(TaskStatus::Blocked);
+        tcb_inner.task_ctx()
+    }
+
+    pub fn wakeup_tcb(tcb: Arc<TCB>) {
+        let mut tcb_inner = tcb.ex_inner();
+        tcb_inner.set_status(TaskStatus::Ready);
+        drop(tcb_inner);
+        scheduler::add_ready(tcb);
+    }
+
     // 本函数只管对下一个进程设置, 不负责对当前线程进行设置
     pub fn schedule(current_task_cx_ptr: *mut TaskContext) {
         let mut processor = PROCESSOR.exclusive_access();

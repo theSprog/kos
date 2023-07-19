@@ -161,6 +161,6 @@ path = "src/thread.rs"
 name = "thread2"
 path = "src/thread2.rs"
 
-[[bin]]
-name = "snake"
-path = "src/snake.rs"
+# [[bin]]
+# name = "snake"
+# path = "src/snake.rs"

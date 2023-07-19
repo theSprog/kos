@@ -1,4 +1,6 @@
-use crate::{print, sbi::console_getchar, vfs::VfsError};
+use component::chardev::CharDevice;
+
+use crate::{io::UART, print, sbi::console_getchar, vfs::VfsError};
 
 use super::{File, UserBuffer};
 
@@ -17,7 +19,15 @@ impl File for Stdin {
     }
 
     fn read(&self, mut user_buf: UserBuffer) -> Result<usize, VfsError> {
-        assert_eq!(user_buf.len(), 1, "Only support len = 1 in FD_STDIN!");
+        // assert_eq!(user_buf.len(), 1, "Only support len = 1 in FD_STDIN!");
+        // //println!("before UART.read() in Stdin::read()");
+        // let ch = UART.read();
+        // unsafe {
+        //     user_buf.buffers[0].as_mut_ptr().write_volatile(ch);
+        // }
+        // Ok(1)
+
+        assert_eq!(user_buf.len(), 1);
         // busy loop
         let c: usize;
         c = console_getchar();

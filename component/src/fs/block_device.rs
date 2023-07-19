@@ -5,12 +5,11 @@ use logger::info;
 use spin::Mutex;
 
 use super::{block, SECTOR_SIZE};
-use crate::{cast, cast_mut};
+use crate::{cast, cast_mut, HandleIRQ};
 
-pub trait BlockDevice: Send + Sync + 'static {
+pub trait BlockDevice: Send + Sync + HandleIRQ + 'static {
     fn read_block(&self, block_id: usize, buf: &mut [u8]);
     fn write_block(&self, block_id: usize, buf: &[u8]);
-    fn handle_irq(&self);
 }
 
 pub struct BlockCache {
